@@ -1,0 +1,1 @@
+#Trabalho de mestrado: Modelo de IA para classificação de aneurismas intracranianos.
