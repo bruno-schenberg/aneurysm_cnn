@@ -4,7 +4,7 @@ import csv
 from collections import defaultdict
 
 RAW_DATA_PATH = "/mnt/data/cases-3/raw"
-OUTPUT_CSV_PATH = "/home/aneurysm_cnn/folder_rename_map.csv"
+OUTPUT_CSV_PATH = "folder_rename_map.csv"
 
 def get_subfolders(path):
     """
@@ -64,6 +64,37 @@ def generate_new_names(folder_list):
 
     return rename_map
 
+def add_missing_cases_to_csv(csv_path, name_mapping):
+    """
+    Finds missing case numbers (1-999) and appends them to the CSV.
+
+    Args:
+        csv_path (str): The path to the CSV file to append to.
+        name_mapping (list): The list of dicts already written to the CSV.
+    """
+    print("Checking for missing case numbers...")
+    # Regex to extract the number from names like 'BP024' or 'BP024A'
+    pattern = re.compile(r"BP(\d+)")
+    existing_numbers = set()
+
+    for item in name_mapping:
+        match = pattern.match(item['fixed_name'])
+        if match:
+            existing_numbers.add(int(match.group(1)))
+
+    missing_rows = []
+    for i in range(1, 1000): # Check for numbers 1 through 999
+        if i not in existing_numbers:
+            fixed_name = f"BP{i:03d}" # e.g., 24 -> BP024
+            missing_rows.append({'original_name': 'missing', 'fixed_name': fixed_name})
+
+    with open(csv_path, 'a', newline='') as csvfile:
+        fieldnames = ['original_name', 'fixed_name']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writerows(missing_rows)
+
+    print(f"Appended {len(missing_rows)} missing case entries to '{csv_path}'")
+
 if __name__ == "__main__":
     case_folders = get_subfolders(RAW_DATA_PATH)
     print(f"Found {len(case_folders)} subfolders in '{RAW_DATA_PATH}'.")
@@ -77,3 +108,5 @@ if __name__ == "__main__":
         writer.writerows(name_mapping)
 
     print(f"Successfully created rename map at '{OUTPUT_CSV_PATH}'")
+
+    add_missing_cases_to_csv(OUTPUT_CSV_PATH, name_mapping)
