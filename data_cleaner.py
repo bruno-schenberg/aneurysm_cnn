@@ -1,6 +1,7 @@
 import os
 import re
 import csv
+from collections import defaultdict
 
 RAW_DATA_PATH = "/mnt/data/cases-3/raw"
 OUTPUT_CSV_PATH = "/home/aneurysm_cnn/folder_rename_map.csv"
@@ -26,21 +27,41 @@ def generate_new_names(folder_list):
     - Trims any characters after the numeric part.
     Returns a list of dictionaries with 'original_name' and 'fixed_name'.
     """
-    rename_map = []
+    # Sort the folder list to ensure deterministic suffix assignment (A, B, C...)
+    # for duplicates, as requested.
+    sorted_folders = sorted(folder_list)
+
+    potential_names = []
     # Regex to find 'bp' (case-insensitive) at the start, followed by digits.
     pattern = re.compile(r"^(bp)(\d+)", re.IGNORECASE)
 
-    for original_name in folder_list:
+    for original_name in sorted_folders:
         match = pattern.match(original_name)
         if match:
-            # Extract the numeric part from the match.
-            number_part = match.group(2)
+            # Convert to int and back to str to handle leading zeros (e.g., '0100' -> '100').
+            number_part = str(int(match.group(2)))
             # Format the new name: 'BP' + zero-padded 3-digit number.
             fixed_name = f"BP{number_part.zfill(3)}"
         else:
             # If the pattern doesn't match, keep the original name.
             fixed_name = original_name
-        rename_map.append({"original_name": original_name, "fixed_name": fixed_name})
+        potential_names.append({"original_name": original_name, "fixed_name": fixed_name})
+
+    # --- Handle duplicate fixed names ---
+    fixed_name_counts = defaultdict(int)
+    for item in potential_names:
+        fixed_name_counts[item['fixed_name']] += 1
+
+    rename_map = []
+    suffix_counters = defaultdict(int)
+    for item in potential_names:
+        base_name = item['fixed_name']
+        if fixed_name_counts[base_name] > 1:
+            suffix = chr(ord('A') + suffix_counters[base_name])
+            item['fixed_name'] = f"{base_name}{suffix}"
+            suffix_counters[base_name] += 1
+        rename_map.append(item)
+
     return rename_map
 
 if __name__ == "__main__":
