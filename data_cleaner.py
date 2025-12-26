@@ -95,6 +95,49 @@ def add_missing_cases_to_csv(csv_path, name_mapping):
 
     print(f"Appended {len(missing_rows)} missing case entries to '{csv_path}'")
 
+def get_folder_stats(base_path, folder_list):
+    """
+    Counts items and subfolders within a list of specified folders.
+
+    For each folder, it counts:
+    1. The number of items directly inside it.
+    2. The number of subfolders directly inside it.
+    3. The total number of items within all of those subfolders.
+
+    Returns a list of dictionaries, each containing the stats for a folder.
+    """
+    print("\nGathering folder statistics...")
+    stats_list = []
+    for folder_name in folder_list:
+        folder_path = os.path.join(base_path, folder_name)
+        direct_files, subfolder_count, items_in_subfolders = 0, 0, 0
+
+        try:
+            with os.scandir(folder_path) as entries:
+                subfolders_to_scan = []
+                for entry in entries:
+                    if entry.is_dir():
+                        subfolder_count += 1
+                        subfolders_to_scan.append(entry.path)
+                    elif entry.is_file():
+                        direct_files += 1
+
+            for subfolder_path in subfolders_to_scan:
+                with os.scandir(subfolder_path) as sub_entries:
+                    items_in_subfolders += sum(1 for _ in sub_entries)
+
+            stats_list.append({
+                'folder': folder_name,
+                'direct_items': direct_files,
+                'subfolders': subfolder_count,
+                'items_in_subfolders': items_in_subfolders
+            })
+        except FileNotFoundError:
+            print(f"  - Warning: Could not find folder '{folder_path}' to gather stats.")
+        except OSError as e:
+            print(f"  - Error scanning folder '{folder_path}': {e}")
+    return stats_list
+
 if __name__ == "__main__":
     case_folders = get_subfolders(RAW_DATA_PATH)
     print(f"Found {len(case_folders)} subfolders in '{RAW_DATA_PATH}'.")
@@ -110,3 +153,13 @@ if __name__ == "__main__":
     print(f"Successfully created rename map at '{OUTPUT_CSV_PATH}'")
 
     add_missing_cases_to_csv(OUTPUT_CSV_PATH, name_mapping)
+
+    # Get and print statistics for each folder
+    folder_stats = get_folder_stats(RAW_DATA_PATH, case_folders)
+    if folder_stats:
+        print("Folder statistics summary:")
+        for stats in folder_stats:
+            print(f"  - {stats['folder']}:")
+            print(f"    - Items directly inside: {stats['direct_items']}")
+            print(f"    - Subfolders: {stats['subfolders']}")
+            print(f"    - Items in all subfolders: {stats['items_in_subfolders']}")
