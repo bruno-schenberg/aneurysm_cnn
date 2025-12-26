@@ -141,11 +141,27 @@ def get_folder_stats(base_path, folder_list):
 if __name__ == "__main__":
     case_folders = get_subfolders(RAW_DATA_PATH)
     print(f"Found {len(case_folders)} subfolders in '{RAW_DATA_PATH}'.")
-
+    
+    # 1. Generate the mapping from original to new names.
     name_mapping = generate_new_names(case_folders)
-
+    
+    # 2. Get statistics for the original folders.
+    folder_stats = get_folder_stats(RAW_DATA_PATH, case_folders)
+    
+    # 3. Merge statistics into the name mapping data.
+    # Create a lookup dictionary for fast access to stats.
+    stats_map = {stat['folder']: stat for stat in folder_stats}
+    
+    for item in name_mapping:
+        original_name = item['original_name']
+        if original_name in stats_map:
+            # Update the dictionary with stats, removing the redundant 'folder' key.
+            item.update(stats_map[original_name])
+            del item['folder']
+            
+    # 4. Write the combined data to the CSV.
     with open(OUTPUT_CSV_PATH, 'w', newline='') as csvfile:
-        fieldnames = ['original_name', 'fixed_name']
+        fieldnames = ['original_name', 'fixed_name', 'direct_items', 'subfolders', 'items_in_subfolders']
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(name_mapping)
@@ -153,13 +169,3 @@ if __name__ == "__main__":
     print(f"Successfully created rename map at '{OUTPUT_CSV_PATH}'")
 
     add_missing_cases_to_csv(OUTPUT_CSV_PATH, name_mapping)
-
-    # Get and print statistics for each folder
-    folder_stats = get_folder_stats(RAW_DATA_PATH, case_folders)
-    if folder_stats:
-        print("Folder statistics summary:")
-        for stats in folder_stats:
-            print(f"  - {stats['folder']}:")
-            print(f"    - Items directly inside: {stats['direct_items']}")
-            print(f"    - Subfolders: {stats['subfolders']}")
-            print(f"    - Items in all subfolders: {stats['items_in_subfolders']}")
