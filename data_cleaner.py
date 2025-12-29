@@ -256,7 +256,7 @@ def get_orientation(iop):
         return "OBLIQUE"
 
 def validate_dcms(data_mapping, base_path):
-    print("\nValidating DICOM series...")
+    print("\nValidating DICOM series with Projection-Based Sorting...")
     
     for item in data_mapping:
         data_path = item.get('data_path')
@@ -265,10 +265,10 @@ def validate_dcms(data_mapping, base_path):
             continue
 
         print(f"  - Validating {item['fixed_name']}...")
-
         full_path = os.path.join(base_path, data_path)
+        
         try:
-            # 1. Load all headers
+            # 1. Load headers and basic series check
             metadata_list = []
             for f in os.listdir(full_path):
                 if f.lower().endswith('.dcm'):
@@ -279,48 +279,51 @@ def validate_dcms(data_mapping, base_path):
                 item['validation_status'] = 'NO_DCM_FILES'
                 continue
 
-            # 2. Check for Series Consistency (SeriesInstanceUID)
-            uids = [ds.SeriesInstanceUID for ds in metadata_list]
-            unique_uids = set(uids)
-            if len(unique_uids) > 1:
-                # Count which UID is most common to help the user debug
-                occurences = Counter(uids)
-                item['validation_status'] = f'MIXED_SERIES_ERROR ({len(unique_uids)} UIDs found)'
+            # 2. Check for Mixed Series (SeriesInstanceUID)
+            uids = {ds.SeriesInstanceUID for ds in metadata_list}
+            if len(uids) > 1:
+                item['validation_status'] = f'MIXED_SERIES_ERROR ({len(uids)} UIDs)'
                 continue
 
-            # 3. Sort by physical Z-axis (ImagePositionPatient)
-            # Use the index 2 (Z) for Axial, but for Sagittal you might need index 0 (X)
-            # A more robust sort uses the dot product with the normal vector, 
-            # but for most clinical work, sorting by Z-coord is standard.
-            metadata_list.sort(key=lambda x: float(x.ImagePositionPatient[2]))
+            # 3. Projection-Based Sorting
+            # Get orientation vectors from the first slice
+            sample_ds = metadata_list[0]
+            iop = sample_ds.ImageOrientationPatient  # [x1, y1, z1, x2, y2, z2]
+            row_vec = np.array(iop[:3])
+            col_vec = np.array(iop[3:])
+            normal_vec = np.cross(row_vec, col_vec)
 
-            # 4. Spacing Analysis (Geometric)
-            z_positions = [float(ds.ImagePositionPatient[2]) for ds in metadata_list]
-            z_diffs = np.around(np.abs(np.diff(z_positions)), decimals=3)
-            unique_spacings = np.unique(z_diffs)
+            # Calculate the distance of each slice along the normal vector
+            for ds in metadata_list:
+                ipp = np.array(ds.ImagePositionPatient)
+                # The dot product projects the 3D position onto the 1D normal axis
+                ds.dist = np.dot(ipp, normal_vec)
             
-            sample_ds = metadata_list[len(metadata_list)//2]
-            declared_spacing = getattr(sample_ds, 'SpacingBetweenSlices', sample_ds.get('SliceThickness', 0))
+            # Sort by the calculated distance
+            metadata_list.sort(key=lambda x: x.dist)
 
+            # 4. Spacing Analysis
+            distances = np.array([ds.dist for ds in metadata_list])
+            deltas = np.abs(np.diff(distances))
+            
+            # Use a tolerance (e.g., 0.01mm) to group similar spacings
+            unique_spacings = np.unique(np.around(deltas, decimals=2))
+            
+            # Update item metadata for CSV
+            item['orientation'] = get_orientation(iop)
+            item['slice_thickness'] = getattr(sample_ds, 'SliceThickness', 'N/A')
             item['spacing_type'] = "CONSISTENT" if len(unique_spacings) <= 1 else "VARIABLE"
-            item['orientation'] = get_orientation(sample_ds.get('ImageOrientationPatient'))
-            
-            # 5. Integrity Logic
-            instance_numbers = [int(ds.InstanceNumber) for ds in metadata_list]
-            is_sequential = all(np.diff(sorted(instance_numbers)) == 1)
 
-            if len(set(instance_numbers)) != len(instance_numbers):
-                status = 'DUPLICATE_INSTANCES'
-            elif item['spacing_type'] == "CONSISTENT" and len(z_diffs) > 0:
-                # Compare physical spacing to header spacing
-                if not np.isclose(unique_spacings[0], float(declared_spacing), atol=1e-2):
-                    status = 'SPACING_MISMATCH'
-                else:
-                    status = 'OK'
-            elif not is_sequential:
-                status = 'GAPPED_SEQUENCE'
+            # 5. Integrity Logic
+            if np.any(deltas < 0.001):
+                status = 'DUPLICATE_SLICES'
+            elif len(unique_spacings) > 1:
+                status = 'VARIABLE_SPACING' # Likely missing slices or intended gap change
             else:
-                status = 'OK'
+                # Check for Instance Number continuity
+                instance_numbers = [int(ds.InstanceNumber) for ds in metadata_list]
+                is_sequential = all(np.diff(sorted(instance_numbers)) == 1)
+                status = 'OK' if is_sequential else 'GAPPED_SEQUENCE'
 
             item['validation_status'] = status
 
