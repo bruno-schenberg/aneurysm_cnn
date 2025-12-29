@@ -67,27 +67,47 @@ def validate_dcms(data_mapping, base_path):
                 item['validation_status'] = 'NO_DCM_FILES'
                 continue
 
+            # --- Pre-filter for scout/localizer images ---
+            # These often get mixed into a series but are not part of the main scan.
+            # They can be identified by their SeriesDescription.
+            scout_keywords = ['scout', 'topogram', 'localizer', 'scanogram']
+            
+            main_series_metadata = []
+            scout_series_metadata = []
+
+            for ds in metadata_list:
+                description = getattr(ds, 'SeriesDescription', '').lower()
+                if any(keyword in description for keyword in scout_keywords):
+                    scout_series_metadata.append(ds)
+                else:
+                    main_series_metadata.append(ds)
+
+            # If filtering results in an empty main series, fall back to the original list.
+            # This prevents incorrectly flagging a series that is ONLY scouts.
+            if not main_series_metadata:
+                main_series_metadata = metadata_list
+
             # 2. Check for Mixed Series (SeriesInstanceUID)
-            uids = {ds.SeriesInstanceUID for ds in metadata_list}
+            uids = {ds.SeriesInstanceUID for ds in main_series_metadata}
             if len(uids) > 1:
                 item['validation_status'] = f'MIXED_SERIES_ERROR ({len(uids)} UIDs)'
                 continue
             
             # 3. Projection-Based Sorting
-            sample_ds = metadata_list[0]
+            sample_ds = main_series_metadata[0]
             iop = getattr(sample_ds, 'ImageOrientationPatient', None)
             row_vec = np.array(iop[:3])
             col_vec = np.array(iop[3:])
             normal_vec = np.cross(row_vec, col_vec)
 
-            for ds in metadata_list:
+            for ds in main_series_metadata:
                 ipp = np.array(getattr(ds, 'ImagePositionPatient', [0,0,0]))
                 ds.dist = np.dot(ipp, normal_vec)
 
-            metadata_list.sort(key=lambda x: x.dist)
+            main_series_metadata.sort(key=lambda x: x.dist)
 
             # 4. Spacing Analysis
-            distances = np.array([ds.dist for ds in metadata_list])
+            distances = np.array([ds.dist for ds in main_series_metadata])
             deltas = np.abs(np.diff(distances))
             unique_spacings = np.unique(np.around(deltas, decimals=2))
 
@@ -99,15 +119,28 @@ def validate_dcms(data_mapping, base_path):
 
             num_duplicates = np.sum(deltas < 0.001)
             item['duplicate_slice_count'] = int(num_duplicates)
+
             if num_duplicates > 0:
-                item['validation_status'] = f'DUPLICATE_SLICES ({num_duplicates})'
-            elif len(unique_spacings) > 1:
-                item['validation_status'] = 'VARIABLE_SPACING'
+                item['validation_status'] = f'DUPLICATE_SLICES'
             else:
-                instance_numbers = sorted([int(getattr(ds, 'InstanceNumber', 0)) for ds in metadata_list])
-                # Check if instance numbers are consecutive
-                is_gapped = any(np.diff(instance_numbers) != 1)
-                item['validation_status'] = 'GAPPED_SEQUENCE' if is_gapped else 'OK'
+                # Refined check for gapped vs. variable spacing
+                if len(unique_spacings) == 1:
+                    # Perfectly uniform spacing, check instance numbers for completeness
+                    instance_numbers = sorted([int(getattr(ds, 'InstanceNumber', 0)) for ds in main_series_metadata])
+                    is_gapped_instance = any(np.diff(instance_numbers) != 1)
+                    item['validation_status'] = 'GAPPED_SEQUENCE' if is_gapped_instance else 'OK'
+                elif len(unique_spacings) == 2:
+                    # Check if one spacing is roughly double the other, indicating missing slices
+                    sorted_spacings = sorted(unique_spacings)
+                    if np.isclose(sorted_spacings[1], 2 * sorted_spacings[0], atol=0.1):
+                         # Count how many "double gaps" exist
+                        gaps = np.sum(np.isclose(deltas, sorted_spacings[1], atol=0.1))
+                        item['validation_status'] = f'GAPPED_SEQUENCE ({gaps} missing)'
+                    else:
+                        item['validation_status'] = 'VARIABLE_SPACING'
+                elif len(unique_spacings) > 2:
+                    # More than two spacing values is truly variable
+                    item['validation_status'] = 'VARIABLE_SPACING'
 
         except Exception as e:
             item['validation_status'] = f'VALIDATION_ERROR: {str(e)}'
