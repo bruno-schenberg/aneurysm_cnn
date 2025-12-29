@@ -1,2 +1,3 @@
 .venv
 folder_rename_map.csv
+utils/__pycache__
