@@ -92,6 +92,11 @@ def validate_dcms(data_mapping, base_path):
             # Find the largest group of images by orientation
             main_series_metadata = max(orientation_groups.values(), key=len)
 
+            # Update total_dcms to reflect the main series size and count scouts
+            scout_slice_count = len(metadata_list) - len(main_series_metadata)
+            item['total_dcms'] = len(main_series_metadata)
+            item['scout_slice_count'] = scout_slice_count
+
             # 3. Projection-Based Sorting
             sample_ds = main_series_metadata[0]
             iop = getattr(sample_ds, 'ImageOrientationPatient', None)
