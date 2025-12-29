@@ -311,6 +311,8 @@ def validate_dcms(data_mapping, base_path):
             
             # Update item metadata for CSV
             item['orientation'] = get_orientation(iop)
+            item['series_description'] = getattr(sample_ds, 'SeriesDescription', 'N/A')
+            item['modality'] = getattr(sample_ds, 'Modality', 'N/A')
             item['slice_thickness'] = getattr(sample_ds, 'SliceThickness', 'N/A')
             item['spacing_type'] = "CONSISTENT" if len(unique_spacings) <= 1 else "VARIABLE"
 
@@ -378,8 +380,8 @@ if __name__ == "__main__":
     with open(OUTPUT_CSV_PATH, 'w', newline='') as csvfile:
         # Define the order of columns for the CSV file.
         fieldnames = ['original_name', 'fixed_name', 'data_path', 'total_dcms',
-                      'validation_status', 'series_description',
-                      'modality', 'slice_thickness', 'is_axial']
+                      'validation_status', 'orientation', 'series_description',
+                      'modality', 'slice_thickness']
         # Use `extrasaction='ignore'` to prevent errors for rows
         # that don't have all the stat fields.
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames, extrasaction='ignore')
