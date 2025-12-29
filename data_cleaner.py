@@ -19,7 +19,7 @@ if __name__ == "__main__":
     with open(OUTPUT_CSV_PATH, 'w', newline='') as csvfile:
         # Define the order of columns for the CSV file.
         fieldnames = ['original_name', 'fixed_name', 'data_path', 'total_dcms',
-                      'validation_status', 'orientation', 'series_description',
+                      'validation_status', 'duplicate_slice_count', 'orientation', 'series_description',
                       'modality', 'slice_thickness']
         # Use `extrasaction='ignore'` to prevent errors for rows
         # that don't have all the stat fields.

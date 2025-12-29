@@ -97,8 +97,10 @@ def validate_dcms(data_mapping, base_path):
             item['modality'] = getattr(sample_ds, 'Modality', 'N/A')
             item['slice_thickness'] = getattr(sample_ds, 'SliceThickness', 'N/A')
 
-            if np.any(deltas < 0.001):
-                item['validation_status'] = 'DUPLICATE_SLICES'
+            num_duplicates = np.sum(deltas < 0.001)
+            item['duplicate_slice_count'] = int(num_duplicates)
+            if num_duplicates > 0:
+                item['validation_status'] = f'DUPLICATE_SLICES ({num_duplicates})'
             elif len(unique_spacings) > 1:
                 item['validation_status'] = 'VARIABLE_SPACING'
             else:
