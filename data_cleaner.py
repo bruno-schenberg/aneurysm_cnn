@@ -18,6 +18,30 @@ def get_subfolders(path):
         print(f"Error: Directory not found at '{path}'")
         return []
 
+def get_folder_items(path):
+    """
+    Deletes .DS_Store files and returns the count of other files (items)
+    within a given directory.
+    """
+    file_count = 0
+    try:
+        with os.scandir(path) as entries:
+            for entry in entries:
+                if entry.is_file():
+                    if entry.name == '.DS_Store':
+                        try:
+                            os.remove(entry.path)
+                            print(f"  - Deleted: {entry.path}")
+                        except OSError as e:
+                            print(f"  - Error deleting '{entry.path}': {e}")
+                    else:
+                        file_count += 1
+        return file_count
+    except (FileNotFoundError, OSError) as e:
+        # Handle cases where the directory doesn't exist or can't be accessed
+        print(f"Error: Could not count items in '{path}': {e}")
+        return 0
+
 def generate_new_names(folder_list):
     """
     Generates new, standardized folder names from a list of original names.
@@ -110,30 +134,33 @@ def get_folder_stats(base_path, folder_list):
     stats_list = []
     for folder_name in folder_list:
         folder_path = os.path.join(base_path, folder_name)
-        direct_files, subfolder_count, items_in_subfolders = 0, 0, 0
+        items_in_subfolders, empty_subfolders = 0, 0
 
         try:
-            with os.scandir(folder_path) as entries:
-                subfolders_to_scan = []
-                for entry in entries:
-                    if entry.is_dir():
-                        subfolder_count += 1
-                        subfolders_to_scan.append(entry.path)
-                    elif entry.is_file():
-                        direct_files += 1
+            # Use helper functions to get direct counts
+            direct_files = get_folder_items(folder_path)
+            subfolders = get_subfolders(folder_path)
+            subfolder_count = len(subfolders)
 
-            for subfolder_path in subfolders_to_scan:
-                with os.scandir(subfolder_path) as sub_entries:
-                    items_in_subfolders += sum(1 for _ in sub_entries)
+            # Iterate through the found subfolders to get their stats
+            for subfolder_name in subfolders:
+                subfolder_path = os.path.join(folder_path, subfolder_name)
+                # Count items and sub-subfolders inside the subfolder
+                num_items = get_folder_items(subfolder_path)
+                num_sub_subfolders = len(get_subfolders(subfolder_path))
+                total_contents = num_items + num_sub_subfolders
+
+                if total_contents == 0:
+                    empty_subfolders += 1
+                items_in_subfolders += total_contents
 
             stats_list.append({
                 'folder': folder_name,
                 'direct_items': direct_files,
                 'subfolders': subfolder_count,
-                'items_in_subfolders': items_in_subfolders
+                'items_in_subfolders': items_in_subfolders,
+                'empty_subfolders': empty_subfolders
             })
-        except FileNotFoundError:
-            print(f"  - Warning: Could not find folder '{folder_path}' to gather stats.")
         except OSError as e:
             print(f"  - Error scanning folder '{folder_path}': {e}")
     return stats_list
@@ -161,7 +188,7 @@ if __name__ == "__main__":
             
     # 4. Write the combined data to the CSV.
     with open(OUTPUT_CSV_PATH, 'w', newline='') as csvfile:
-        fieldnames = ['original_name', 'fixed_name', 'direct_items', 'subfolders', 'items_in_subfolders']
+        fieldnames = ['original_name', 'fixed_name', 'direct_items', 'subfolders', 'items_in_subfolders', 'empty_subfolders']
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(name_mapping)
