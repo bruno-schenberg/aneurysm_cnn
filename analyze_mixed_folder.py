@@ -1,39 +1,24 @@
 import os
 import csv
-import argparse
 from utils.dicom_utils import analyze_mixed_series
+
+# --- Configuration ---
+INPUT_CSV_PATH = "folder_rename_map.csv"
+BASE_DATA_DIR = "/mnt/data/cases-3/raw"
+OUTPUT_CSV_PATH = "mixed_series_analysis.csv"
+# -------------------
 
 def main():
     """
-    A command-line tool to analyze all folders flagged with 'MIXED_SERIES_ERROR'
+    Analyzes all folders flagged with 'MIXED_SERIES_ERROR'
     in a given data map CSV.
     """
-    parser = argparse.ArgumentParser(
-        description="Find and analyze all mixed DICOM series from a data map CSV, generating a consolidated report.",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
-    )
-    parser.add_argument(
-        "input_csv",
-        help="Path to the input data map CSV (e.g., folder_rename_map.csv)."
-    )
-    parser.add_argument(
-        "--base-dir",
-        required=True,
-        help="The base directory where the data folders are located (e.g., /mnt/data/cases-3/raw)."
-    )
-    parser.add_argument(
-        "-o", "--output",
-        default="mixed_series_analysis.csv",
-        help="Path for the consolidated output CSV report."
-    )
-    args = parser.parse_args()
-
     try:
-        with open(args.input_csv, 'r', newline='') as f:
+        with open(INPUT_CSV_PATH, 'r', newline='') as f:
             reader = csv.DictReader(f)
             all_rows = list(reader)
     except FileNotFoundError:
-        print(f"Error: Input CSV not found at '{args.input_csv}'")
+        print(f"Error: Input CSV not found at '{INPUT_CSV_PATH}'")
         return
 
     mixed_series_cases = [
@@ -49,7 +34,7 @@ def main():
 
     all_series_reports = []
     for case in mixed_series_cases:
-        folder_path = os.path.join(args.base_dir, case['data_path'])
+        folder_path = os.path.join(BASE_DATA_DIR, case['data_path'])
         reports = analyze_mixed_series(folder_path)
         # Add the parent case name to each sub-series report for context
         for report in reports:
@@ -59,11 +44,11 @@ def main():
     if all_series_reports:
         # Ensure 'parent_case_name' is the first column for clarity
         fieldnames = ['parent_case_name'] + [k for k in all_series_reports[0].keys() if k != 'parent_case_name']
-        with open(args.output, 'w', newline='') as csvfile:
+        with open(OUTPUT_CSV_PATH, 'w', newline='') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(all_series_reports)
-        print(f"\nAnalysis complete. Consolidated report saved to: {args.output}")
+        print(f"\nAnalysis complete. Consolidated report saved to: {OUTPUT_CSV_PATH}")
 
 if __name__ == "__main__":
     main()
