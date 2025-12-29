@@ -166,6 +166,52 @@ def get_folder_stats(base_path, folder_list):
             print(f"  - Error scanning folder '{folder_path}': {e}")
     return stats_list
 
+def add_action_codes(name_mapping):
+    """
+    Adds an 'action_code' to each item in the mapping based on folder stats.
+
+    The logic for the action code is as follows:
+    - EMPTY: 0 non-empty subfolders and 0 direct items.
+    - READY: 0 non-empty subfolders and >0 direct items.
+    - SUBFOLDER_PATH: 1 non-empty subfolder and 0 direct items.
+    - DUPLICATE_DATA: 1 non-empty subfolder and >0 direct items.
+    - DUPLICATE_DATA: >=2 non-empty subfolders.
+    - MISSING: The case was not found in the raw data.
+
+    Args:
+        name_mapping (list): The list of dictionaries containing folder stats.
+
+    Returns:
+        list: The updated list of dictionaries with an 'action_code' key.
+    """
+    print("Assigning action codes...")
+    for item in name_mapping:
+        # Skip 'missing' entries that were added later and have no stats
+        if 'direct_items' not in item or 'non_empty_subfolders' not in item:
+            item['action_code'] = 'MISSING'
+            continue
+
+        direct_items = item['direct_items']
+        non_empty_subfolders = item['non_empty_subfolders']
+        action_code = ''
+
+        if non_empty_subfolders == 0:
+            if direct_items == 0:
+                action_code = 'EMPTY'
+            else:  # direct_items > 0
+                action_code = 'READY'
+        elif non_empty_subfolders == 1:
+            if direct_items == 0:
+                action_code = 'SUBFOLDER_PATH'
+            else:  # direct_items > 0
+                action_code = 'DUPLICATE_DATA'
+        else:  # non_empty_subfolders >= 2
+            action_code = 'DUPLICATE_DATA'
+
+        item['action_code'] = action_code
+    print("Action codes assigned.")
+    return name_mapping
+
 if __name__ == "__main__":
     case_folders = get_subfolders(RAW_DATA_PATH)
     print(f"Found {len(case_folders)} subfolders in '{RAW_DATA_PATH}'.")
@@ -186,14 +232,20 @@ if __name__ == "__main__":
             # Update the dictionary with stats, removing the redundant 'folder' key.
             item.update(stats_map[original_name])
             del item['folder']
-            
-    # 4. Write the combined data to the CSV.
+
+    # 4. Add action codes based on the gathered statistics.
+    name_mapping_with_actions = add_action_codes(name_mapping)
+
+    # 5. Write the combined data to the CSV.
     with open(OUTPUT_CSV_PATH, 'w', newline='') as csvfile:
-        fieldnames = ['original_name', 'fixed_name', 'direct_items', 'non_empty_subfolders', 'items_in_subfolders']
+        # Define the order of columns for the CSV file.
+        fieldnames = ['original_name', 'fixed_name', 'action_code', 'direct_items',
+                      'non_empty_subfolders', 'items_in_subfolders']
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
-        writer.writerows(name_mapping)
+        writer.writerows(name_mapping_with_actions)
 
     print(f"Successfully created rename map at '{OUTPUT_CSV_PATH}'")
 
+    # 6. Find and append missing cases to the CSV.
     add_missing_cases_to_csv(OUTPUT_CSV_PATH, name_mapping)
