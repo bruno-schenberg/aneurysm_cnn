@@ -255,6 +255,7 @@ def validate_dcms(data_mapping, base_path):
     for item in data_mapping:
         data_path = item.get('data_path')
         validation_status = 'NOT_APPLICABLE'
+        total_dcms = item.get('total_dcms', 0)
 
         if data_path in ('EMPTY', 'MISSING', 'DUPLICATE_DATA'):
             item['validation_status'] = validation_status
@@ -287,11 +288,21 @@ def validate_dcms(data_mapping, base_path):
              item['validation_status'] = 'UNREADABLE_DCM'
              continue
 
-        file_count = len(dcm_files)
+        # The number of files we could successfully read instance numbers from.
+        read_file_count = len(instance_numbers)
+        unique_instance_count = len(set(instance_numbers))
         max_instance = max(instance_numbers)
 
-        if max_instance != file_count:
+        # More robust validation logic
+        if read_file_count != unique_instance_count:
+            # This is the case you identified: more files were read than unique slice numbers exist.
+            validation_status = 'DUPLICATE_SLICES'
+        elif max_instance > total_dcms or read_file_count < total_dcms:
+            # The highest slice number is greater than the number of files we have.
             validation_status = 'MISSING_SLICES'
+        elif max_instance < total_dcms:
+            # This is an edge case, but implies a gap in numbering (e.g., slices 1,2,4,5)
+            validation_status = 'GAPPED_SLICES'
         else:
             validation_status = 'OK'
 
@@ -334,25 +345,31 @@ if __name__ == "__main__":
             item.update(stats_map[original_name])
             del item['folder']
 
-    # 4. Find missing cases and add them to our main list.
+    # 4. Add total_dcms count.
+    for item in name_mapping:
+        # This key will only exist for non-missing cases that had stats.
+        if 'direct_items' in item:
+            item['total_dcms'] = item.get('direct_items', 0) + item.get('items_in_subfolders', 0)
+
+    # 5. Find missing cases and add them to our main list.
     missing_cases = find_missing_cases(name_mapping)
     combined_mapping = name_mapping + missing_cases
     print(f"Found {len(missing_cases)} missing case entries.")
 
-    # 5. Add action codes to the complete list (including missing cases).
+    # 6. Add action codes to the complete list (including missing cases).
     data_with_codes = add_data_codes(combined_mapping)
 
-    # 6. Add the final data paths.
+    # 7. Add the final data paths.
     final_data = add_data_paths(data_with_codes)
 
-    # 7. Validate the DICOM series.
+    # 8. Validate the DICOM series.
     validated_data = validate_dcms(final_data, RAW_DATA_PATH)
 
-    # 8. Write the final, combined data to the CSV in one go.
+    # 9. Write the final, combined data to the CSV in one go.
     with open(OUTPUT_CSV_PATH, 'w', newline='') as csvfile:
         # Define the order of columns for the CSV file.
-        fieldnames = ['original_name', 'fixed_name', 'data_path', 'direct_items',
-                      'items_in_subfolders', 'validation_status', 'series_description',
+        fieldnames = ['original_name', 'fixed_name', 'data_path', 'total_dcms',
+                      'validation_status', 'series_description',
                       'modality', 'slice_thickness', 'is_axial']
         # Use `extrasaction='ignore'` to prevent errors for rows
         # that don't have all the stat fields.
