@@ -20,23 +20,16 @@ def get_subfolders(path):
 
 def get_folder_items(path):
     """
-    Skips .DS_Store files and returns the count of other files (items)
-    within a given directory.
+    Counts the number of .dcm files within a given directory.
     """
-    file_count = 0
+    dcm_file_count = 0
     try:
         with os.scandir(path) as entries:
             for entry in entries:
-                if entry.is_file():
-                    if entry.name == '.DS_Store':
-                        try:
-                            #os.remove(entry.path)
-                            print(f"  - Skipped: {entry.path}")
-                        except OSError as e:
-                            print(f"  - Error Skipping '{entry.path}': {e}")
-                    else:
-                        file_count += 1
-        return file_count
+                # Check if the entry is a file and ends with .dcm (case-insensitive)
+                if entry.is_file() and entry.name.lower().endswith('.dcm'):
+                    dcm_file_count += 1
+        return dcm_file_count
     except (FileNotFoundError, OSError) as e:
         # Handle cases where the directory doesn't exist or can't be accessed
         print(f"Error: Could not count items in '{path}': {e}")
@@ -163,11 +156,11 @@ def get_folder_stats(base_path, folder_list):
             print(f"  - Error scanning folder '{folder_path}': {e}")
     return stats_list
 
-def add_action_codes(name_mapping):
+def add_data_codes(name_mapping):
     """
-    Adds an 'action_code' to each item in the mapping based on folder stats.
+    Adds a 'data_code' to each item in the mapping based on folder stats.
 
-    The logic for the action code is as follows:
+    The logic for the data code is as follows:
     - EMPTY: 0 non-empty subfolders and 0 direct items.
     - READY: 0 non-empty subfolders and >0 direct items.
     - SUBFOLDER_PATH: 1 non-empty subfolder and 0 direct items.
@@ -176,16 +169,16 @@ def add_action_codes(name_mapping):
     - MISSING: The case was not found in the raw data.
 
     Args:
-        name_mapping (list): The list of dictionaries containing folder stats.
+        name_mapping (list): The list of dictionaries, some containing folder stats.
 
     Returns:
-        list: The updated list of dictionaries with an 'action_code' key.
+        list: The updated list of dictionaries with a 'data_code' key.
     """
-    print("Assigning action codes...")
+    print("Assigning data codes...")
     for item in name_mapping:
         # Skip 'missing' entries that were added later and have no stats
         if 'direct_items' not in item:
-            item['action_code'] = 'MISSING'
+            item['data_code'] = 'MISSING'
             continue
 
         direct_items = item['direct_items']
@@ -205,8 +198,8 @@ def add_action_codes(name_mapping):
         else:  # non_empty_subfolders >= 2
             action_code = 'DUPLICATE_DATA'
 
-        item['action_code'] = action_code
-    print("Action codes assigned.")
+        item['data_code'] = action_code
+    print("Data codes assigned.")
     return name_mapping
 
 def add_data_paths(name_mapping):
@@ -220,16 +213,18 @@ def add_data_paths(name_mapping):
     """
     print("Determining data paths...")
     for item in name_mapping:
-        action = item.get('action_code')
+        code = item.get('data_code')
         path = ''  # Default to empty path
 
-        if action == 'READY':
+        if code == 'READY':
             path = item['original_name']
-        elif action == 'SUBFOLDER_PATH':
+        elif code == 'SUBFOLDER_PATH':
             # Path is the single non-empty subfolder.
-            # The check for len == 1 is implicitly handled by the action code logic.
+            # The check for len == 1 is implicitly handled by the data code logic.
             subfolder_name = item['non_empty_subfolders'][0]
             path = os.path.join(item['original_name'], subfolder_name)
+        elif code in ('MISSING', 'EMPTY', 'DUPLICATE_DATA'):
+            path = code
         
         item['data_path'] = path
 
@@ -266,7 +261,7 @@ if __name__ == "__main__":
     print(f"Found {len(missing_cases)} missing case entries.")
 
     # 5. Add action codes to the complete list (including missing cases).
-    data_with_codes = add_action_codes(combined_mapping)
+    data_with_codes = add_data_codes(combined_mapping)
 
     # 6. Add the final data paths.
     final_data = add_data_paths(data_with_codes)
@@ -274,8 +269,8 @@ if __name__ == "__main__":
     # 7. Write the final, combined data to the CSV in one go.
     with open(OUTPUT_CSV_PATH, 'w', newline='') as csvfile:
         # Define the order of columns for the CSV file.
-        fieldnames = ['original_name', 'fixed_name', 'action_code', 'data_path',
-                      'direct_items', 'items_in_subfolders']
+        fieldnames = ['original_name', 'fixed_name', 'data_path', 'direct_items',
+                      'items_in_subfolders']
         # Use `extrasaction='ignore'` to prevent errors for rows
         # that don't have all the stat fields.
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames, extrasaction='ignore')
