@@ -1,6 +1,5 @@
 import os
 import csv
-import argparse
 import pydicom
 from pydicom.errors import InvalidDicomError
 
@@ -82,11 +81,14 @@ def extract_dicom_metadata_to_csv(input_dir, output_csv_path):
         print(f"Error writing to file: {e}")
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Extract DICOM metadata from all files in a folder to a CSV.")
-    parser.add_argument("input_dir", help="Path to the directory containing DICOM files.")
-    parser.add_argument("-o", "--output", dest="output_csv", default="dicom_metadata.csv",
-                        help="Path for the output CSV file (default: dicom_metadata.csv).")
+    # --- Configuration ---
+    # TODO: Set the path to the exam folder you want to process.
+    INPUT_DIRECTORY = "/path/to/your/exam/folder"
     
-    args = parser.parse_args()
+    # You can also change the output file name if you wish.
+    # A good practice is to name it after the folder.
+    folder_name = os.path.basename(INPUT_DIRECTORY)
+    OUTPUT_CSV_PATH = f"{folder_name}_metadata.csv"
+    # --- End Configuration ---
     
-    extract_dicom_metadata_to_csv(args.input_dir, args.output_csv)
+    extract_dicom_metadata_to_csv(INPUT_DIRECTORY, OUTPUT_CSV_PATH)
