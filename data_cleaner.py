@@ -209,27 +209,27 @@ def add_action_codes(name_mapping):
     print("Action codes assigned.")
     return name_mapping
 
-def add_data_paths(name_mapping, base_path):
+def add_data_paths(name_mapping):
     """
     Adds a 'data_path' to each item based on its action code.
 
-    - READY: Path to the original folder.
-    - SUBFOLDER_PATH: Path to the single non-empty subfolder.
+    The path is relative to the main raw data directory.
+    - READY: The original folder name (e.g., 'bp1').
+    - SUBFOLDER_PATH: Path to the single non-empty subfolder (e.g., 'bp2/data').
     - Other codes (MISSING, EMPTY, DUPLICATE_DATA): Path is empty.
     """
     print("Determining data paths...")
     for item in name_mapping:
         action = item.get('action_code')
-        path = '' # Default to empty path
+        path = ''  # Default to empty path
 
         if action == 'READY':
-            # Path is the original folder itself.
-            path = os.path.join(base_path, item['original_name'])
+            path = item['original_name']
         elif action == 'SUBFOLDER_PATH':
             # Path is the single non-empty subfolder.
             # The check for len == 1 is implicitly handled by the action code logic.
             subfolder_name = item['non_empty_subfolders'][0]
-            path = os.path.join(base_path, item['original_name'], subfolder_name)
+            path = os.path.join(item['original_name'], subfolder_name)
         
         item['data_path'] = path
 
@@ -269,7 +269,7 @@ if __name__ == "__main__":
     data_with_codes = add_action_codes(combined_mapping)
 
     # 6. Add the final data paths.
-    final_data = add_data_paths(data_with_codes, RAW_DATA_PATH)
+    final_data = add_data_paths(data_with_codes)
 
     # 7. Write the final, combined data to the CSV in one go.
     with open(OUTPUT_CSV_PATH, 'w', newline='') as csvfile:
