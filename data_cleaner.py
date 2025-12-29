@@ -2,6 +2,7 @@ import os
 import re
 import csv
 from collections import defaultdict
+import pydicom
 
 RAW_DATA_PATH = "/mnt/data/cases-3/raw"
 OUTPUT_CSV_PATH = "folder_rename_map.csv"
@@ -234,6 +235,84 @@ def add_data_paths(name_mapping):
 
     return name_mapping
 
+def validate_dcms(data_mapping, base_path):
+    """
+    Validates DICOM series for each entry in the data mapping.
+
+    - Ignores entries marked as EMPTY, MISSING, or DUPLICATE_DATA.
+    - For valid data paths, it performs:
+      1. DICOM Header Audit: Checks metadata from the first and last slices.
+      2. Slice Integrity Check: Verifies if the file count matches the max instance number.
+
+    Args:
+        data_mapping (list): The list of data dictionaries.
+        base_path (str): The root directory where the data folders are located.
+
+    Returns:
+        list: The updated list with validation information.
+    """
+    print("\nValidating DICOM series...")
+    for item in data_mapping:
+        data_path = item.get('data_path')
+        validation_status = 'NOT_APPLICABLE'
+
+        if data_path in ('EMPTY', 'MISSING', 'DUPLICATE_DATA'):
+            item['validation_status'] = validation_status
+            continue
+
+        full_path = os.path.join(base_path, data_path)
+        try:
+            dcm_files = sorted([f for f in os.listdir(full_path) if f.lower().endswith('.dcm')])
+        except (FileNotFoundError, OSError) as e:
+            print(f"  - Error accessing path '{full_path}': {e}")
+            item['validation_status'] = 'PATH_ERROR'
+            continue
+
+        if not dcm_files:
+            item['validation_status'] = 'NO_DCM_FILES'
+            continue
+
+        # --- Slice Integrity Check ---
+        instance_numbers = []
+        for dcm_file in dcm_files:
+            try:
+                dcm_path = os.path.join(full_path, dcm_file)
+                ds = pydicom.dcmread(dcm_path, stop_before_pixels=True)
+                instance_numbers.append(ds.InstanceNumber)
+            except Exception as e:
+                print(f"  - Could not read InstanceNumber from {dcm_path}: {e}")
+                # Skip this file for integrity check if it's unreadable
+
+        if not instance_numbers:
+             item['validation_status'] = 'UNREADABLE_DCM'
+             continue
+
+        file_count = len(dcm_files)
+        max_instance = max(instance_numbers)
+
+        if max_instance != file_count:
+            validation_status = 'MISSING_SLICES'
+        else:
+            validation_status = 'OK'
+
+        # --- DICOM Header Audit (on first file) ---
+        try:
+            first_dcm_path = os.path.join(full_path, dcm_files[0])
+            ds = pydicom.dcmread(first_dcm_path, stop_before_pixels=True)
+            item['series_description'] = ds.get('SeriesDescription', 'N/A')
+            item['modality'] = ds.get('Modality', 'N/A')
+            item['slice_thickness'] = ds.get('SliceThickness', 'N/A')
+            # Axial check: ImageOrientationPatient is approx [1, 0, 0, 0, 1, 0]
+            iop = ds.get('ImageOrientationPatient', [0]*6)
+            item['is_axial'] = all(abs(a - b) < 1e-4 for a, b in zip(iop, [1, 0, 0, 0, 1, 0]))
+        except Exception as e:
+            print(f"  - Could not read headers from {first_dcm_path}: {e}")
+            validation_status = 'HEADER_READ_ERROR'
+
+        item['validation_status'] = validation_status
+    print("Validation complete.")
+    return data_mapping
+
 if __name__ == "__main__":
     case_folders = get_subfolders(RAW_DATA_PATH)
     print(f"Found {len(case_folders)} subfolders in '{RAW_DATA_PATH}'.")
@@ -266,11 +345,15 @@ if __name__ == "__main__":
     # 6. Add the final data paths.
     final_data = add_data_paths(data_with_codes)
 
-    # 7. Write the final, combined data to the CSV in one go.
+    # 7. Validate the DICOM series.
+    validated_data = validate_dcms(final_data, RAW_DATA_PATH)
+
+    # 8. Write the final, combined data to the CSV in one go.
     with open(OUTPUT_CSV_PATH, 'w', newline='') as csvfile:
         # Define the order of columns for the CSV file.
         fieldnames = ['original_name', 'fixed_name', 'data_path', 'direct_items',
-                      'items_in_subfolders']
+                      'items_in_subfolders', 'validation_status', 'series_description',
+                      'modality', 'slice_thickness', 'is_axial']
         # Use `extrasaction='ignore'` to prevent errors for rows
         # that don't have all the stat fields.
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames, extrasaction='ignore')
