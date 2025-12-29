@@ -253,6 +253,7 @@ def validate_dcms(data_mapping, base_path):
     """
     print("\nValidating DICOM series...")
     for item in data_mapping:
+        print(f"  - Validating {item['fixed_name']}...")
         data_path = item.get('data_path')
         validation_status = 'NOT_APPLICABLE'
         total_dcms = item.get('total_dcms', 0)
