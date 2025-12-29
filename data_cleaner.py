@@ -3,6 +3,8 @@ import re
 import csv
 from collections import defaultdict
 import pydicom
+import numpy as np
+from collections import Counter
 
 RAW_DATA_PATH = "/mnt/data/cases-3/raw"
 OUTPUT_CSV_PATH = "folder_rename_map.csv"
@@ -235,93 +237,94 @@ def add_data_paths(name_mapping):
 
     return name_mapping
 
+def get_orientation(iop):
+    """Determines if the orientation is Axial, Coronal, Sagittal, or Oblique."""
+    if iop is None or len(iop) < 6:
+        return "UNKNOWN"
+    
+    # Rounding to nearest integer to handle slight scanner tilts
+    r = [round(x) for x in iop]
+    
+    # Standard DICOM directions: [x1, y1, z1, x2, y2, z2]
+    if r == [1, 0, 0, 0, 1, 0]:
+        return "AXIAL"
+    elif r == [1, 0, 0, 0, 0, -1]:
+        return "CORONAL"
+    elif r == [0, 1, 0, 0, 0, -1]:
+        return "SAGITTAL"
+    else:
+        return "OBLIQUE"
+
 def validate_dcms(data_mapping, base_path):
-    """
-    Validates DICOM series for each entry in the data mapping.
-
-    - Ignores entries marked as EMPTY, MISSING, or DUPLICATE_DATA.
-    - For valid data paths, it performs:
-      1. DICOM Header Audit: Checks metadata from the first and last slices.
-      2. Slice Integrity Check: Verifies if the file count matches the max instance number.
-
-    Args:
-        data_mapping (list): The list of data dictionaries.
-        base_path (str): The root directory where the data folders are located.
-
-    Returns:
-        list: The updated list with validation information.
-    """
     print("\nValidating DICOM series...")
+    
     for item in data_mapping:
-        print(f"  - Validating {item['fixed_name']}...")
         data_path = item.get('data_path')
-        validation_status = 'NOT_APPLICABLE'
-        total_dcms = item.get('total_dcms', 0)
-
         if data_path in ('EMPTY', 'MISSING', 'DUPLICATE_DATA'):
-            item['validation_status'] = validation_status
+            item['validation_status'] = 'NOT_APPLICABLE'
             continue
 
         full_path = os.path.join(base_path, data_path)
         try:
-            dcm_files = sorted([f for f in os.listdir(full_path) if f.lower().endswith('.dcm')])
-        except (FileNotFoundError, OSError) as e:
-            print(f"  - Error accessing path '{full_path}': {e}")
-            item['validation_status'] = 'PATH_ERROR'
-            continue
+            # 1. Load all headers
+            metadata_list = []
+            for f in os.listdir(full_path):
+                if f.lower().endswith('.dcm'):
+                    ds = pydicom.dcmread(os.path.join(full_path, f), stop_before_pixels=True)
+                    metadata_list.append(ds)
 
-        if not dcm_files:
-            item['validation_status'] = 'NO_DCM_FILES'
-            continue
+            if not metadata_list:
+                item['validation_status'] = 'NO_DCM_FILES'
+                continue
 
-        # --- Slice Integrity Check ---
-        instance_numbers = []
-        for dcm_file in dcm_files:
-            try:
-                dcm_path = os.path.join(full_path, dcm_file)
-                ds = pydicom.dcmread(dcm_path, stop_before_pixels=True)
-                instance_numbers.append(ds.InstanceNumber)
-            except Exception as e:
-                print(f"  - Could not read InstanceNumber from {dcm_path}: {e}")
-                # Skip this file for integrity check if it's unreadable
+            # 2. Check for Series Consistency (SeriesInstanceUID)
+            uids = [ds.SeriesInstanceUID for ds in metadata_list]
+            unique_uids = set(uids)
+            if len(unique_uids) > 1:
+                # Count which UID is most common to help the user debug
+                occurences = Counter(uids)
+                item['validation_status'] = f'MIXED_SERIES_ERROR ({len(unique_uids)} UIDs found)'
+                continue
 
-        if not instance_numbers:
-             item['validation_status'] = 'UNREADABLE_DCM'
-             continue
+            # 3. Sort by physical Z-axis (ImagePositionPatient)
+            # Use the index 2 (Z) for Axial, but for Sagittal you might need index 0 (X)
+            # A more robust sort uses the dot product with the normal vector, 
+            # but for most clinical work, sorting by Z-coord is standard.
+            metadata_list.sort(key=lambda x: float(x.ImagePositionPatient[2]))
 
-        # The number of files we could successfully read instance numbers from.
-        read_file_count = len(instance_numbers)
-        unique_instance_count = len(set(instance_numbers))
-        max_instance = max(instance_numbers)
+            # 4. Spacing Analysis (Geometric)
+            z_positions = [float(ds.ImagePositionPatient[2]) for ds in metadata_list]
+            z_diffs = np.around(np.abs(np.diff(z_positions)), decimals=3)
+            unique_spacings = np.unique(z_diffs)
+            
+            sample_ds = metadata_list[len(metadata_list)//2]
+            declared_spacing = getattr(sample_ds, 'SpacingBetweenSlices', sample_ds.get('SliceThickness', 0))
 
-        # More robust validation logic
-        if read_file_count != unique_instance_count:
-            # This is the case you identified: more files were read than unique slice numbers exist.
-            validation_status = 'DUPLICATE_SLICES'
-        elif max_instance > total_dcms or read_file_count < total_dcms:
-            # The highest slice number is greater than the number of files we have.
-            validation_status = 'MISSING_SLICES'
-        elif max_instance < total_dcms:
-            # This is an edge case, but implies a gap in numbering (e.g., slices 1,2,4,5)
-            validation_status = 'GAPPED_SLICES'
-        else:
-            validation_status = 'OK'
+            item['spacing_type'] = "CONSISTENT" if len(unique_spacings) <= 1 else "VARIABLE"
+            item['orientation'] = get_orientation(sample_ds.get('ImageOrientationPatient'))
+            
+            # 5. Integrity Logic
+            instance_numbers = [int(ds.InstanceNumber) for ds in metadata_list]
+            is_sequential = all(np.diff(sorted(instance_numbers)) == 1)
 
-        # --- DICOM Header Audit (on first file) ---
-        try:
-            first_dcm_path = os.path.join(full_path, dcm_files[0])
-            ds = pydicom.dcmread(first_dcm_path, stop_before_pixels=True)
-            item['series_description'] = ds.get('SeriesDescription', 'N/A')
-            item['modality'] = ds.get('Modality', 'N/A')
-            item['slice_thickness'] = ds.get('SliceThickness', 'N/A')
-            # Axial check: ImageOrientationPatient is approx [1, 0, 0, 0, 1, 0]
-            iop = ds.get('ImageOrientationPatient', [0]*6)
-            item['is_axial'] = all(abs(a - b) < 1e-4 for a, b in zip(iop, [1, 0, 0, 0, 1, 0]))
+            if len(set(instance_numbers)) != len(instance_numbers):
+                status = 'DUPLICATE_INSTANCES'
+            elif item['spacing_type'] == "CONSISTENT" and len(z_diffs) > 0:
+                # Compare physical spacing to header spacing
+                if not np.isclose(unique_spacings[0], float(declared_spacing), atol=1e-2):
+                    status = 'SPACING_MISMATCH'
+                else:
+                    status = 'OK'
+            elif not is_sequential:
+                status = 'GAPPED_SEQUENCE'
+            else:
+                status = 'OK'
+
+            item['validation_status'] = status
+
         except Exception as e:
-            print(f"  - Could not read headers from {first_dcm_path}: {e}")
-            validation_status = 'HEADER_READ_ERROR'
+            item['validation_status'] = f'VALIDATION_ERROR: {str(e)}'
 
-        item['validation_status'] = validation_status
     print("Validation complete.")
     return data_mapping
 
