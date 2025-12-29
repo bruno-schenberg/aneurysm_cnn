@@ -67,32 +67,31 @@ def validate_dcms(data_mapping, base_path):
                 item['validation_status'] = 'NO_DCM_FILES'
                 continue
 
-            # --- Pre-filter for scout/localizer images ---
-            # These often get mixed into a series but are not part of the main scan.
-            # They can be identified by their SeriesDescription.
-            scout_keywords = ['scout', 'topogram', 'localizer', 'scanogram']
-            
-            main_series_metadata = []
-            scout_series_metadata = []
-
-            for ds in metadata_list:
-                description = getattr(ds, 'SeriesDescription', '').lower()
-                if any(keyword in description for keyword in scout_keywords):
-                    scout_series_metadata.append(ds)
-                else:
-                    main_series_metadata.append(ds)
-
-            # If filtering results in an empty main series, fall back to the original list.
-            # This prevents incorrectly flagging a series that is ONLY scouts.
-            if not main_series_metadata:
-                main_series_metadata = metadata_list
-
             # 2. Check for Mixed Series (SeriesInstanceUID)
-            uids = {ds.SeriesInstanceUID for ds in main_series_metadata}
+            uids = {ds.SeriesInstanceUID for ds in metadata_list}
             if len(uids) > 1:
                 item['validation_status'] = f'MIXED_SERIES_ERROR ({len(uids)} UIDs)'
                 continue
             
+            # --- Filter out scout/localizer images based on orientation ---
+            # Scout images often have a different ImageOrientationPatient than the main series.
+            # We group images by orientation and assume the largest group is the main series.
+            orientation_groups = {}
+            for ds in metadata_list:
+                # Round the IOP to handle minor floating point variations
+                iop_tuple = tuple(np.round(getattr(ds, 'ImageOrientationPatient', [0]*6), 5))
+                if iop_tuple not in orientation_groups:
+                    orientation_groups[iop_tuple] = []
+                orientation_groups[iop_tuple].append(ds)
+
+            if not orientation_groups:
+                # This case should be rare, but as a safeguard...
+                item['validation_status'] = 'NO_VALID_ORIENTATION'
+                continue
+
+            # Find the largest group of images by orientation
+            main_series_metadata = max(orientation_groups.values(), key=len)
+
             # 3. Projection-Based Sorting
             sample_ds = main_series_metadata[0]
             iop = getattr(sample_ds, 'ImageOrientationPatient', None)
