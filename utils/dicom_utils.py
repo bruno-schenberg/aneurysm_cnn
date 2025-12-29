@@ -73,24 +73,18 @@ def validate_dcms(data_mapping, base_path):
                 item['validation_status'] = f'MIXED_SERIES_ERROR ({len(uids)} UIDs)'
                 continue
             
-            # --- Filter out scout/localizer images based on orientation ---
-            # Scout images often have a different ImageOrientationPatient than the main series.
-            # We group images by orientation and assume the largest group is the main series.
-            orientation_groups = {}
+            # --- Filter out scout/localizer images based on ImageType ---
+            # The main series will have 'ORIGINAL' in its ImageType.
+            # Scout/localizer images often have 'DERIVED'.
+            main_series_metadata = []
             for ds in metadata_list:
-                # Round the IOP to handle minor floating point variations
-                iop_tuple = tuple(np.round(getattr(ds, 'ImageOrientationPatient', [0]*6), 5))
-                if iop_tuple not in orientation_groups:
-                    orientation_groups[iop_tuple] = []
-                orientation_groups[iop_tuple].append(ds)
-
-            if not orientation_groups:
-                # This case should be rare, but as a safeguard...
-                item['validation_status'] = 'NO_VALID_ORIENTATION'
+                image_type = getattr(ds, 'ImageType', [])
+                if 'ORIGINAL' in image_type:
+                    main_series_metadata.append(ds)
+            
+            if not main_series_metadata:
+                item['validation_status'] = 'NO_ORIGINAL_IMAGES_FOUND'
                 continue
-
-            # Find the largest group of images by orientation
-            main_series_metadata = max(orientation_groups.values(), key=len)
 
             # Update total_dcms to reflect the main series size and count scouts
             scout_slice_count = len(metadata_list) - len(main_series_metadata)
