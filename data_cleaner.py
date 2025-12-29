@@ -264,6 +264,8 @@ def validate_dcms(data_mapping, base_path):
             item['validation_status'] = 'NOT_APPLICABLE'
             continue
 
+        print(f"  - Validating {item['fixed_name']}...")
+
         full_path = os.path.join(base_path, data_path)
         try:
             # 1. Load all headers
