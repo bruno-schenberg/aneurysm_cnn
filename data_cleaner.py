@@ -133,6 +133,8 @@ def get_folder_stats(base_path, folder_list):
     for folder_name in folder_list:
         folder_path = os.path.join(base_path, folder_name)
         items_in_subfolders, non_empty_subfolders = 0, 0
+        non_empty_subfolder_names = []
+
         try:
             direct_files = get_folder_items(folder_path)
             subfolders = get_subfolders(folder_path)
@@ -146,7 +148,7 @@ def get_folder_stats(base_path, folder_list):
                 
                 # A subfolder is non-empty if it contains files or other folders.
                 if num_items > 0 or num_sub_subfolders > 0:
-                    non_empty_subfolders += 1
+                    non_empty_subfolder_names.append(subfolder_name)
                 
                 # Accumulate the count of files from within the subfolders.
                 items_in_subfolders += num_items
@@ -154,7 +156,7 @@ def get_folder_stats(base_path, folder_list):
             stats_list.append({
                 'folder': folder_name,
                 'direct_items': direct_files,
-                'non_empty_subfolders': non_empty_subfolders,
+                'non_empty_subfolders': non_empty_subfolder_names,
                 'items_in_subfolders': items_in_subfolders
             })
         except OSError as e:
@@ -182,12 +184,12 @@ def add_action_codes(name_mapping):
     print("Assigning action codes...")
     for item in name_mapping:
         # Skip 'missing' entries that were added later and have no stats
-        if 'direct_items' not in item or 'non_empty_subfolders' not in item:
+        if 'direct_items' not in item:
             item['action_code'] = 'MISSING'
             continue
 
         direct_items = item['direct_items']
-        non_empty_subfolders = item['non_empty_subfolders']
+        non_empty_subfolders = len(item.get('non_empty_subfolders', []))
         action_code = ''
 
         if non_empty_subfolders == 0:
@@ -205,6 +207,36 @@ def add_action_codes(name_mapping):
 
         item['action_code'] = action_code
     print("Action codes assigned.")
+    return name_mapping
+
+def add_data_paths(name_mapping, base_path):
+    """
+    Adds a 'data_path' to each item based on its action code.
+
+    - READY: Path to the original folder.
+    - SUBFOLDER_PATH: Path to the single non-empty subfolder.
+    - Other codes (MISSING, EMPTY, DUPLICATE_DATA): Path is empty.
+    """
+    print("Determining data paths...")
+    for item in name_mapping:
+        action = item.get('action_code')
+        path = '' # Default to empty path
+
+        if action == 'READY':
+            # Path is the original folder itself.
+            path = os.path.join(base_path, item['original_name'])
+        elif action == 'SUBFOLDER_PATH':
+            # Path is the single non-empty subfolder.
+            # The check for len == 1 is implicitly handled by the action code logic.
+            subfolder_name = item['non_empty_subfolders'][0]
+            path = os.path.join(base_path, item['original_name'], subfolder_name)
+        
+        item['data_path'] = path
+
+        # Clean up the subfolder list from the final output if it exists
+        if 'non_empty_subfolders' in item:
+            del item['non_empty_subfolders']
+
     return name_mapping
 
 if __name__ == "__main__":
@@ -234,14 +266,17 @@ if __name__ == "__main__":
     print(f"Found {len(missing_cases)} missing case entries.")
 
     # 5. Add action codes to the complete list (including missing cases).
-    final_data = add_action_codes(combined_mapping)
+    data_with_codes = add_action_codes(combined_mapping)
 
-    # 6. Write the final, combined data to the CSV in one go.
+    # 6. Add the final data paths.
+    final_data = add_data_paths(data_with_codes, RAW_DATA_PATH)
+
+    # 7. Write the final, combined data to the CSV in one go.
     with open(OUTPUT_CSV_PATH, 'w', newline='') as csvfile:
         # Define the order of columns for the CSV file.
-        fieldnames = ['original_name', 'fixed_name', 'action_code', 'direct_items',
-                      'non_empty_subfolders', 'items_in_subfolders']
-        # Use `extrasaction='ignore'` to prevent errors for rows (like 'missing')
+        fieldnames = ['original_name', 'fixed_name', 'action_code', 'data_path',
+                      'direct_items', 'items_in_subfolders']
+        # Use `extrasaction='ignore'` to prevent errors for rows
         # that don't have all the stat fields.
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames, extrasaction='ignore')
         writer.writeheader()
