@@ -42,8 +42,18 @@ def main():
         all_series_reports.extend(reports)
 
     if all_series_reports:
-        # Ensure 'parent_case_name' is the first column for clarity
-        fieldnames = ['parent_case_name'] + [k for k in all_series_reports[0].keys() if k != 'parent_case_name']
+        # Collect all unique keys from all report dictionaries to build a complete header.
+        # This prevents errors if the first report is missing optional keys.
+        all_keys = set()
+        for report in all_series_reports:
+            all_keys.update(report.keys())
+        
+        # Ensure 'parent_case_name' is the first column for readability.
+        fieldnames = sorted(list(all_keys))
+        if 'parent_case_name' in fieldnames:
+            fieldnames.remove('parent_case_name')
+            fieldnames.insert(0, 'parent_case_name')
+
         with open(OUTPUT_CSV_PATH, 'w', newline='') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
