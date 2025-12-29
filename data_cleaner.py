@@ -88,36 +88,31 @@ def generate_new_names(folder_list):
 
     return rename_map
 
-def add_missing_cases_to_csv(csv_path, name_mapping):
+def find_missing_cases(name_mapping):
     """
-    Finds missing case numbers (1-999) and appends them to the CSV.
+    Finds missing case numbers (1-999) and returns them as a list of dicts.
 
     Args:
-        csv_path (str): The path to the CSV file to append to.
         name_mapping (list): The list of dicts already written to the CSV.
+
+    Returns:
+        list: A list of dictionaries for the missing cases.
     """
     print("Checking for missing case numbers...")
     # Regex to extract the number from names like 'BP024' or 'BP024A'
     pattern = re.compile(r"BP(\d+)")
     existing_numbers = set()
-
     for item in name_mapping:
         match = pattern.match(item['fixed_name'])
         if match:
             existing_numbers.add(int(match.group(1)))
 
     missing_rows = []
-    for i in range(1, 1000): # Check for numbers 1 through 999
+    for i in range(1, 1000):  # Check for numbers 1 through 999
         if i not in existing_numbers:
-            fixed_name = f"BP{i:03d}" # e.g., 24 -> BP024
+            fixed_name = f"BP{i:03d}"  # e.g., 24 -> BP024
             missing_rows.append({'original_name': 'missing', 'fixed_name': fixed_name})
-
-    with open(csv_path, 'a', newline='') as csvfile:
-        fieldnames = ['original_name', 'fixed_name']
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-        writer.writerows(missing_rows)
-
-    print(f"Appended {len(missing_rows)} missing case entries to '{csv_path}'")
+    return missing_rows
 
 def get_folder_stats(base_path, folder_list):
     """
@@ -233,19 +228,23 @@ if __name__ == "__main__":
             item.update(stats_map[original_name])
             del item['folder']
 
-    # 4. Add action codes based on the gathered statistics.
-    name_mapping_with_actions = add_action_codes(name_mapping)
+    # 4. Find missing cases and add them to our main list.
+    missing_cases = find_missing_cases(name_mapping)
+    combined_mapping = name_mapping + missing_cases
+    print(f"Found {len(missing_cases)} missing case entries.")
 
-    # 5. Write the combined data to the CSV.
+    # 5. Add action codes to the complete list (including missing cases).
+    final_data = add_action_codes(combined_mapping)
+
+    # 6. Write the final, combined data to the CSV in one go.
     with open(OUTPUT_CSV_PATH, 'w', newline='') as csvfile:
         # Define the order of columns for the CSV file.
         fieldnames = ['original_name', 'fixed_name', 'action_code', 'direct_items',
                       'non_empty_subfolders', 'items_in_subfolders']
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        # Use `extrasaction='ignore'` to prevent errors for rows (like 'missing')
+        # that don't have all the stat fields.
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames, extrasaction='ignore')
         writer.writeheader()
-        writer.writerows(name_mapping_with_actions)
+        writer.writerows(final_data)
 
     print(f"Successfully created rename map at '{OUTPUT_CSV_PATH}'")
-
-    # 6. Find and append missing cases to the CSV.
-    add_missing_cases_to_csv(OUTPUT_CSV_PATH, name_mapping)
