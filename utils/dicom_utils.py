@@ -205,10 +205,13 @@ def analyze_mixed_series(folder_path):
         # Use a sample for common metadata
         sample_ds = main_series_metadata[0]
         iop = getattr(sample_ds, 'ImageOrientationPatient', None)
+        rows = getattr(sample_ds, 'Rows', 'N/A')
+        cols = getattr(sample_ds, 'Columns', 'N/A')
         report['orientation'] = get_orientation(iop)
-        report['series_description'] = getattr(sample_ds, 'SeriesDescription', 'N/A')
         report['modality'] = getattr(sample_ds, 'Modality', 'N/A')
         report['slice_thickness'] = getattr(sample_ds, 'SliceThickness', 'N/A')
+        report['exam_date'] = getattr(sample_ds, 'StudyDate', 'N/A')
+        report['image_dimensions'] = f"{rows}x{cols}"
 
         # Projection-Based Sorting
         try:
