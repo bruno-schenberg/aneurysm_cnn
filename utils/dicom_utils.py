@@ -115,6 +115,8 @@ def validate_dcms(data_mapping, base_path):
             item['series_description'] = getattr(sample_ds, 'SeriesDescription', 'N/A')
             item['modality'] = getattr(sample_ds, 'Modality', 'N/A')
             item['slice_thickness'] = getattr(sample_ds, 'SliceThickness', 'N/A')
+            item['patient_age'] = getattr(sample_ds, 'PatientAge', 'N/A')
+            item['patient_sex'] = getattr(sample_ds, 'PatientSex', 'N/A')
 
             num_duplicates = np.sum(deltas < 0.001)
             item['duplicate_slice_count'] = int(num_duplicates)
@@ -210,6 +212,8 @@ def analyze_mixed_series(folder_path):
         report['orientation'] = get_orientation(iop)
         report['modality'] = getattr(sample_ds, 'Modality', 'N/A')
         report['slice_thickness'] = getattr(sample_ds, 'SliceThickness', 'N/A')
+        report['patient_age'] = getattr(sample_ds, 'PatientAge', 'N/A')
+        report['patient_sex'] = getattr(sample_ds, 'PatientSex', 'N/A')
         report['exam_date'] = getattr(sample_ds, 'StudyDate', 'N/A')
         report['image_dimensions'] = f"{rows}x{cols}"
 
