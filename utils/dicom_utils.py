@@ -129,6 +129,13 @@ def validate_dcms(data_mapping, base_path):
             item['patient_sex'] = getattr(sample_ds, 'PatientSex', 'N/A')
             item['image_dimensions'] = f"{rows}x{cols}"
 
+            # Calculate exam_size (total coverage)
+            exam_size = 'N/A'
+            # Ensure slice thickness is a number before multiplying
+            if isinstance(effective_slice_thickness, (int, float, np.number)):
+                exam_size = item['total_dcms'] * effective_slice_thickness
+            item['exam_size'] = exam_size
+
             num_duplicates = np.sum(deltas < 0.001)
             item['duplicate_slice_count'] = int(num_duplicates)
 
@@ -157,5 +164,46 @@ def validate_dcms(data_mapping, base_path):
         except Exception as e:
             item['validation_status'] = f'VALIDATION_ERROR: {str(e)}'
 
+    # After initial validation, perform outlier detection on 'OK' series
+    data_mapping = validate_dcm_count(data_mapping)
+
     print("Validation complete.")
+    return data_mapping
+
+def validate_dcm_count(data_mapping):
+    """
+    Identifies outliers in exam size for validated series using the IQR method.
+
+    Calculates quartiles for exam sizes of 'OK' series and flags those
+    outside the fences (Q1 - 1.5*IQR, Q3 + 1.5*IQR).
+
+    Args:
+        data_mapping (list): The list of dictionaries, where each dictionary
+                             represents a DICOM series and its metadata.
+
+    Returns:
+        list: The updated data_mapping with outlier statuses.
+    """
+    ok_exams = [item for item in data_mapping if item.get('validation_status') == 'OK']
+    exam_sizes = [item['exam_size'] for item in ok_exams if isinstance(item.get('exam_size'), (int, float, np.number))]
+
+    if not exam_sizes:
+        return data_mapping
+
+    q1 = np.percentile(exam_sizes, 25)
+    q3 = np.percentile(exam_sizes, 75)
+    iqr = q3 - q1
+    lower_fence = q1 - 1.5 * iqr
+    upper_fence = q3 + 1.5 * iqr
+
+    print("\nAnalyzing exam size distribution for 'OK' series...")
+    print(f"  - Q1: {q1:.2f}, Q3: {q3:.2f}, IQR: {iqr:.2f}")
+    print(f"  - Lower Fence: {lower_fence:.2f}, Upper Fence: {upper_fence:.2f}")
+
+    for item in ok_exams:
+        if isinstance(item.get('exam_size'), (int, float, np.number)):
+            if item['exam_size'] < lower_fence:
+                item['validation_status'] = 'BELOW_LIMIT'
+            elif item['exam_size'] > upper_fence:
+                item['validation_status'] = 'ABOVE_LIMIT'
     return data_mapping

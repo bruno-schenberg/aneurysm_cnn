@@ -68,7 +68,7 @@ if __name__ == "__main__":
         fieldnames = ['original_name', 'fixed_name', 'data_path', 'total_dcms',
                       'validation_status', 'duplicate_slice_count', 'scout_slice_count', 'orientation',
                       'modality', 'slice_thickness', 'patient_age', 'patient_sex', 'image_dimensions',
-                      'class', 'location']
+                      'class', 'location', 'exam_size']
 
         # Use `extrasaction='ignore'` to prevent errors for rows
         # that don't have all the stat fields.
