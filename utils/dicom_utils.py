@@ -115,7 +115,6 @@ def validate_dcms(data_mapping, base_path):
             item['orientation'] = get_orientation(iop)
             item['modality'] = getattr(sample_ds, 'Modality', 'N/A')
             item['slice_thickness'] = getattr(sample_ds, 'SliceThickness', 'N/A')
-            item['patient_age'] = getattr(sample_ds, 'PatientAge', 'N/A')
             item['patient_sex'] = getattr(sample_ds, 'PatientSex', 'N/A')
             item['image_dimensions'] = f"{rows}x{cols}"
 
