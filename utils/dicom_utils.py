@@ -185,7 +185,15 @@ def validate_dcm_count(data_mapping):
         list: The updated data_mapping with outlier statuses.
     """
     ok_exams = [item for item in data_mapping if item.get('validation_status') == 'OK']
-    exam_sizes = [item['exam_size'] for item in ok_exams if isinstance(item.get('exam_size'), (int, float, np.number))]
+    
+    # Safely convert exam_size to float for calculation, skipping non-numeric values.
+    # This mirrors the logic from the successful debug script.
+    exam_sizes = []
+    for item in ok_exams:
+        try:
+            exam_sizes.append(float(item['exam_size']))
+        except (ValueError, TypeError):
+            continue # Skip if exam_size is 'N/A' or otherwise not convertible
 
     if not exam_sizes:
         return data_mapping
