@@ -112,9 +112,20 @@ def validate_dcms(data_mapping, base_path):
             # 5. Update item metadata
             rows = getattr(sample_ds, 'Rows', 'N/A')
             cols = getattr(sample_ds, 'Columns', 'N/A')
+            
+            # Calculate effective slice thickness/spacing from projection distances
+            effective_slice_thickness = 'N/A'
+            if len(deltas) > 0:
+                # Use the most common spacing as the representative value
+                vals, counts = np.unique(np.around(deltas, decimals=2), return_counts=True)
+                effective_slice_thickness = vals[np.argmax(counts)]
+            elif len(main_series_metadata) == 1:
+                # If only one slice, fall back to the DICOM tag
+                effective_slice_thickness = getattr(sample_ds, 'SliceThickness', 'N/A')
+
             item['orientation'] = get_orientation(iop)
             item['modality'] = getattr(sample_ds, 'Modality', 'N/A')
-            item['slice_thickness'] = getattr(sample_ds, 'SliceThickness', 'N/A')
+            item['slice_thickness'] = effective_slice_thickness
             item['patient_sex'] = getattr(sample_ds, 'PatientSex', 'N/A')
             item['image_dimensions'] = f"{rows}x{cols}"
 
