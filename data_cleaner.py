@@ -2,11 +2,13 @@ import csv
 from utils.file_utils import get_subfolders, organize_data
 from utils.dicom_utils import validate_dcms
 from utils.class_utils import join_class_data, check_missing_class
-from utils.nifti_utils import filter_for_conversion
+from utils.nifti_utils import filter_for_conversion, process_and_convert_exams
 
 RAW_DATA_PATH = "/mnt/data/cases-3/raw"
 OUTPUT_CSV_PATH = "folder_rename_map.csv"
 CLASSES_CSV_PATH = "classes.csv"
+OUTPUT_NIFTI_PATH = "/mnt/data/cases-3/nifti"
+
 
 if __name__ == "__main__":
     case_folders = get_subfolders(RAW_DATA_PATH)
@@ -24,11 +26,13 @@ if __name__ == "__main__":
     # 4. Check for missing classes in 'OK' exams
     final_data = check_missing_class(data_with_classes)
 
-    # 5. (Example) Filter the data for NIfTI conversion before saving
-    # The `eligible_for_conversion` list can now be passed to a conversion function.
+    # 5. Filter the data for NIfTI conversion before saving
     eligible_for_conversion = filter_for_conversion(final_data)
 
-    # 6. Write the final, combined data to the CSV in one go.
+    # 6. Convert to NIfTI
+    process_and_convert_exams(eligible_for_conversion, RAW_DATA_PATH, OUTPUT_NIFTI_PATH)
+
+    # 7. Write the final, combined data to the CSV in one go.
     with open(OUTPUT_CSV_PATH, 'w', newline='') as csvfile:
         # Define the order of columns for the CSV file.
         fieldnames = ['original_name', 'fixed_name', 'data_path', 'total_dcms',

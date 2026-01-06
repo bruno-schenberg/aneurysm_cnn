@@ -4,6 +4,33 @@ import pydicom
 from pydicom.errors import InvalidDicomError
 import nibabel as nib
 
+def filter_for_conversion(exam_data):
+    """
+    Filters a list of exams for those ready for NIfTI conversion.
+
+    An exam is considered ready if its 'validation_status' is 'OK' and its
+    'class' is either '0' or '1'. These are the cases that have been
+    successfully validated and have a definitive classification.
+
+    Args:
+        exam_data (list): A list of dictionaries, where each dictionary
+                          represents a processed exam.
+
+    Returns:
+        list: A list of dictionaries, where each dictionary represents an exam
+              that meets the criteria. Returns an empty list if no exams
+              meet the criteria.
+    """
+    print("\nFiltering exams for NIfTI conversion...")
+
+    eligible_exams = [
+        exam for exam in exam_data
+        if exam.get('validation_status') == 'OK' and exam.get('class') in ('0', '1')
+    ]
+
+    print(f"  - Found {len(eligible_exams)} exams eligible for conversion.")
+    return eligible_exams
+
 def filter_and_sort_dcms(input_path):
     """
     Loads, filters, and sorts DICOM files from a directory.
@@ -94,11 +121,13 @@ def convert_dcms_to_nifti(sorted_dcms, output_nifti_path):
     ipp = getattr(first_slice, 'ImagePositionPatient', [0, 0, 0])
     pixel_spacing = getattr(first_slice, 'PixelSpacing', [1.0, 1.0])
 
-    # Calculate slice spacing from the sorted slice positions for robustness
+    # Simplified slice spacing calculation. Since validation in dicom_utils.py
+    # ensures uniform spacing for 'OK' exams, we can just calculate the
+    # distance between the first two slices.
     if len(sorted_dcms) > 1:
-        slice_spacing = abs(last_slice.dist - first_slice.dist) / (len(sorted_dcms) - 1)
+        slice_spacing = abs(sorted_dcms[1].dist - first_slice.dist)
     else:
-        slice_spacing = getattr(first_slice, 'SliceThickness', 1.0)
+        slice_spacing = getattr(first_slice, 'SpacingBetweenSlices', getattr(first_slice, 'SliceThickness', 1.0))
 
     # Define the affine matrix
     affine = np.identity(4)
@@ -106,8 +135,12 @@ def convert_dcms_to_nifti(sorted_dcms, output_nifti_path):
     col_vec = np.array(iop[3:])
     slice_vec = np.cross(row_vec, col_vec)
 
-    affine[:3, 0] = row_vec * pixel_spacing[1]  # Column spacing
-    affine[:3, 1] = col_vec * pixel_spacing[0]  # Row spacing
+    # Corrected affine calculation:
+    # The DICOM standard specifies PixelSpacing as [Row Spacing, Column Spacing].
+    # The first affine column corresponds to the step along the first image axis (rows).
+    # The second affine column corresponds to the step along the second image axis (columns).
+    affine[:3, 0] = col_vec * pixel_spacing[0]  # Step along rows
+    affine[:3, 1] = row_vec * pixel_spacing[1]  # Step along columns
     affine[:3, 2] = slice_vec * slice_spacing
     affine[:3, 3] = ipp
 
@@ -116,33 +149,6 @@ def convert_dcms_to_nifti(sorted_dcms, output_nifti_path):
     nib.save(nifti_img, output_nifti_path)
     print(f"  - Successfully converted to {output_nifti_path}")
     return True
-
-def filter_for_conversion(exam_data):
-    """
-    Filters a list of exams for those ready for NIfTI conversion.
-
-    An exam is considered ready if its 'validation_status' is 'OK' and its
-    'class' is either '0' or '1'. These are the cases that have been
-    successfully validated and have a definitive classification.
-
-    Args:
-        exam_data (list): A list of dictionaries, where each dictionary
-                          represents a processed exam.
-
-    Returns:
-        list: A list of dictionaries, where each dictionary represents an exam
-              that meets the criteria. Returns an empty list if no exams
-              meet the criteria.
-    """
-    print("\nFiltering exams for NIfTI conversion...")
-
-    eligible_exams = [
-        exam for exam in exam_data
-        if exam.get('validation_status') == 'OK' and exam.get('class') in ('0', '1')
-    ]
-
-    print(f"  - Found {len(eligible_exams)} exams eligible for conversion.")
-    return eligible_exams
 
 def process_and_convert_exams(eligible_exams, dicom_base_path, nifti_output_dir):
     """
