@@ -2,7 +2,11 @@ import os
 import numpy as np
 import pydicom
 from pydicom.errors import InvalidDicomError
-import nibabel as nib
+import dicom2nifti
+import dicom2nifti.settings as settings
+
+# Optional: Disable validation if you trust your 'OK' status from earlier
+# settings.disable_validate_slice_increment() 
 
 def filter_for_conversion(exam_data):
     """
@@ -76,80 +80,27 @@ def filter_and_sort_dcms(input_path):
 
 def convert_dcms_to_nifti(sorted_dcms, output_nifti_path):
     """
-    Converts a sorted list of DICOM datasets to a NIfTI file.
-
-    This function reads the full pixel data from the sorted DICOMs, stacks them
-    into a 3D volume, and calculates the affine transformation matrix to ensure
-    the NIfTI file has the correct orientation, spacing, and position.
-
-    Args:
-        sorted_dcms (list): A list of pydicom.Dataset objects, pre-sorted
-                            in anatomical order (e.g., by filter_and_sort_dcms).
-        output_nifti_path (str): The full path where the .nii.gz file will be saved.
-
-    Returns:
-        bool: True if conversion was successful, False otherwise.
+    Converts a sorted list of DICOM datasets to a NIfTI file using dicom2nifti.
     """
     if not sorted_dcms:
         print("  - Error: Cannot convert to NIfTI, the provided DICOM list is empty.")
         return False
 
-    # 1. Load pixel data and stack into a 3D array
-    pixel_arrays = []
-    for ds in sorted_dcms:
-        try:
-            # Re-read the file to get pixel data since we used stop_before_pixels earlier
-            full_ds = pydicom.dcmread(ds.filename)
-            pixel_arrays.append(full_ds.pixel_array)
-        except Exception as e:
-            print(f"  - Error: Could not read pixel data from {ds.filename}: {e}")
-            return False
-
-    # Stack along the 3rd axis (slice direction)
     try:
-        volume_3d = np.stack(pixel_arrays, axis=-1)
-    except ValueError:
-        print("  - Error: Could not stack DICOMs. Slices may have different dimensions.")
+        # dicom2nifti can take a list of pydicom datasets directly.
+        # It handles orientation, scaling, and stacking for you.
+        dicom2nifti.convert_dicom.dicom_array_to_nifti(
+            sorted_dcms, 
+            output_nifti_path, 
+            reorient_nifti=True
+        )
+        print(f"  - Successfully converted to {output_nifti_path}")
+        return True
+        
+    except Exception as e:
+        print(f"  - Error during conversion for {output_nifti_path}: {e}")
         return False
-
-    # 2. Calculate the Affine Transformation Matrix
-    first_slice = sorted_dcms[0]
-    last_slice = sorted_dcms[-1]
-
-    # Get required DICOM tags with defaults
-    iop = getattr(first_slice, 'ImageOrientationPatient', [1, 0, 0, 0, 1, 0])
-    ipp = getattr(first_slice, 'ImagePositionPatient', [0, 0, 0])
-    pixel_spacing = getattr(first_slice, 'PixelSpacing', [1.0, 1.0])
-
-    # Simplified slice spacing calculation. Since validation in dicom_utils.py
-    # ensures uniform spacing for 'OK' exams, we can just calculate the
-    # distance between the first two slices.
-    if len(sorted_dcms) > 1:
-        slice_spacing = abs(sorted_dcms[1].dist - first_slice.dist)
-    else:
-        slice_spacing = getattr(first_slice, 'SpacingBetweenSlices', getattr(first_slice, 'SliceThickness', 1.0))
-
-    # Define the affine matrix
-    affine = np.identity(4)
-    row_vec = np.array(iop[:3])
-    col_vec = np.array(iop[3:])
-    slice_vec = np.cross(row_vec, col_vec)
-
-    # Corrected affine calculation:
-    # The DICOM standard specifies PixelSpacing as [Row Spacing, Column Spacing].
-    # The first affine column corresponds to the step along the first image axis (rows).
-    # The second affine column corresponds to the step along the second image axis (columns).
-    affine[:3, 0] = col_vec * pixel_spacing[0]  # Step along rows
-    affine[:3, 1] = row_vec * pixel_spacing[1]  # Step along columns
-    affine[:3, 2] = slice_vec * slice_spacing
-    affine[:3, 3] = ipp
-
-    # 3. Create and save the NIfTI image
-    nifti_img = nib.Nifti1Image(volume_3d, affine)
-    nib.save(nifti_img, output_nifti_path)
-    print(f"  - Successfully converted to {output_nifti_path}")
-    return True
-
+    
 def process_and_convert_exams(eligible_exams, dicom_base_path, nifti_output_dir):
     """
     Orchestrates the conversion of eligible DICOM series to NIfTI format.
