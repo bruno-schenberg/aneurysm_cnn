@@ -58,7 +58,7 @@ def filter_and_sort_dcms(input_path):
         if f.lower().endswith('.dcm'):
             try:
                 dcm_path = os.path.join(input_path, f)
-                metadata_list.append(pydicom.dcmread(dcm_path, stop_before_pixels=True))
+                metadata_list.append(pydicom.dcmread(dcm_path))
             except InvalidDicomError:
                 print(f"  - Warning: Skipping invalid DICOM file: {dcm_path}")
 
