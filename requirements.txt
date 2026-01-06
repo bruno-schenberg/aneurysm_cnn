@@ -1,2 +1,3 @@
 pydicom
 numpy
+dicom2nifti
