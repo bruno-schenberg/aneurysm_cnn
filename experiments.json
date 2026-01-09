@@ -1,0 +1,8 @@
+[
+    {
+        "name": "UNet3D_DatasetD_Weighted_20",
+        "model": "UNet3D",
+        "balancing": "weighted_cost_function",
+        "data_path_key": "DATASET_D"
+    }
+]
