@@ -100,7 +100,7 @@ def get_transforms(spatial_size=(128, 128, 128), augment=False):
     """
     keys = ["image"]
     transforms = [
-        LoadImaged(keys=keys),
+        LoadImaged(keys=keys, image_only=True),
         EnsureChannelFirstd(keys=keys),
         Resized(keys=keys, spatial_size=spatial_size),
         ScaleIntensityd(keys=keys), # Robust 0-1 scaling
