@@ -20,7 +20,8 @@ DEFAULT_CONFIG = {
     "BATCH_SIZE": 5,
     "EPOCHS": 20,
     "N_SPLITS": 5,
-    "QUICK_TEST": False,      # Set to True to run only one fold for quick testing
+    "QUICK_TEST": True,      # Set to True to run only one fold for quick testing
+    "HOLD_OUT_TEST_SET": True, # If True, per-fold evaluation uses the val set, not the test set.
     "TEST_SPLIT_RATIO": 0.15,  # Ratio of the total dataset to be held out for testing
     "VAL_BATCH_SIZE": 5,
     "CLASSES": ['0', '1'],  # 0: healthy, 1: aneurysm

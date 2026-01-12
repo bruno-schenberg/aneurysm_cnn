@@ -57,27 +57,40 @@ def run_one_fold(
     else:
         print(f"\n[Fold {fold}] Warning: No best model state found. Evaluating using the last epoch's model.")
 
-    # [Step 4] Final evaluation on the test set for this fold
-    print(f"\n[Fold {fold}] Final Test Set Evaluation...")
-    test_criterion = nn.CrossEntropyLoss() # Un-weighted for standard test loss
-    test_loss, test_acc, detailed_results = validate_one_epoch(
-        model, test_loader, test_criterion, config['DEVICE'], return_details=True
+    # [Step 4] Final evaluation for this fold.
+    # If HOLD_OUT_TEST_SET is True, we evaluate on the validation set for fold-level metrics.
+    # Otherwise, we evaluate on the test set as before.
+    eval_loader = val_loader if config.get('HOLD_OUT_TEST_SET', False) else test_loader
+    eval_set_name = "Validation" if config.get('HOLD_OUT_TEST_SET', False) else "Test"
+
+    print(f"\n[Fold {fold}] Final {eval_set_name} Set Evaluation...")
+    eval_criterion = nn.CrossEntropyLoss() # Un-weighted for standard eval loss
+    eval_loss, eval_acc, detailed_results = validate_one_epoch(
+        model, eval_loader, eval_criterion, config['DEVICE'], return_details=True
     )
-    assert isinstance(detailed_results, list)
-    print(f"Fold {fold} Test Results (using best model):")
-    print(f"  -> Test Loss: {test_loss:.4f} | Test Acc: {test_acc:.4f}")
+    assert isinstance(detailed_results, list), "validate_one_epoch did not return detailed results as a list."
+    print(f"Fold {fold} {eval_set_name} Results (using best model):")
+    print(f"  -> {eval_set_name} Loss: {eval_loss:.4f} | {eval_set_name} Acc: {eval_acc:.4f}")
 
     # [Step 5] Generate and save all evaluation artifacts for the fold
+    # The loader passed here determines which dataset is used for plots and predictions.
     save_fold_artifacts(
-        model=model, test_loader=test_loader, best_model_state=best_model_state,
-        detailed_results=detailed_results, metrics_history=metrics_history, experiment_name=config['name'],
-        fold=fold, fold_output_dir=fold_output_dir,
+        model=model,
+        eval_loader=eval_loader,
+        best_model_state=best_model_state,
+        detailed_results=detailed_results,
+        metrics_history=metrics_history,
+        experiment_name=config['name'],
+        fold=fold,
+        fold_output_dir=fold_output_dir,
         config=config
     )
 
     # Return all necessary results for aggregation
     return {
-        'test_loss': test_loss, 'test_acc': test_acc,
+        # Consistently name these keys for the summary table
+        'eval_loss': eval_loss,
+        'eval_acc': eval_acc,
         'detailed_results': detailed_results
     }
 
@@ -149,8 +162,8 @@ def run_experiment(config: Dict[str, Any]) -> None:
         all_fold_predictions[fold_model_name] = {
             'predictions': fold_results['detailed_results'],
             'metrics': final_metrics,
-            'test_acc': fold_results['test_acc'],
-            'test_loss': fold_results['test_loss']
+            'eval_acc': fold_results['eval_acc'],
+            'eval_loss': fold_results['eval_loss']
         }
 
         # If quick test is enabled, break after the first fold

@@ -186,11 +186,11 @@ def evaluate_models(all_fold_predictions: Dict[str, List[Dict[str, Any]]], outpu
             fold_results = {
                 'Model Name': model_name,
                 **fold_data['metrics'], # Precision, Recall, F2-Score
-                'Test Accuracy': fold_data['test_acc'],
-                'Test Loss': fold_data['test_loss']
+                'Eval Accuracy': fold_data['eval_acc'],
+                'Eval Loss': fold_data['eval_loss']
             }
             results.append(fold_results)
-            print(f"  Test Acc: {fold_results['Test Accuracy']:.4f}, Test Loss: {fold_results['Test Loss']:.4f}, F2-Score: {fold_results['F2-Score']:.4f}")
+            print(f"  Eval Acc: {fold_results['Eval Accuracy']:.4f}, Eval Loss: {fold_results['Eval Loss']:.4f}, F2-Score: {fold_results['F2-Score']:.4f}")
 
     # Create and display final summary table
     if results:
@@ -202,16 +202,16 @@ def evaluate_models(all_fold_predictions: Dict[str, List[Dict[str, Any]]], outpu
             'Precision': results_df['Precision'].mean(),
             'Recall': results_df['Recall'].mean(),
             'F2-Score': results_df['F2-Score'].mean(),
-            'Test Accuracy': results_df['Test Accuracy'].mean(),
-            'Test Loss': results_df['Test Loss'].mean()
+            'Eval Accuracy': results_df['Eval Accuracy'].mean(),
+            'Eval Loss': results_df['Eval Loss'].mean()
         }
         std_metrics = {
             'Model Name': 'Std. Dev.',
             'Precision': results_df['Precision'].std(),
             'Recall': results_df['Recall'].std(),
             'F2-Score': results_df['F2-Score'].std(),
-            'Test Accuracy': results_df['Test Accuracy'].std(),
-            'Test Loss': results_df['Test Loss'].std()
+            'Eval Accuracy': results_df['Eval Accuracy'].std(),
+            'Eval Loss': results_df['Eval Loss'].std()
         }
         results_df = pd.concat([results_df, pd.DataFrame([avg_metrics, std_metrics])], ignore_index=True)
 
@@ -227,7 +227,7 @@ def evaluate_models(all_fold_predictions: Dict[str, List[Dict[str, Any]]], outpu
 
 def save_fold_artifacts(
     model: torch.nn.Module,
-    test_loader: torch.utils.data.DataLoader,
+    eval_loader: torch.utils.data.DataLoader,
     best_model_state: Dict[str, Any],
     detailed_results: List[Dict[str, Any]],
     metrics_history: List[Dict[str, Any]],
@@ -265,7 +265,7 @@ def save_fold_artifacts(
 
     # --- 2. Generate artifacts that require re-running inference ---
     # ROC curve requires probabilities, not just final labels, so inference is needed here.
-    plot_roc_curve(model, test_loader, config['DEVICE'], config['CLASSES'], ROC_FILENAME)
+    plot_roc_curve(model, eval_loader, config['DEVICE'], config['CLASSES'], ROC_FILENAME)
 
     # --- 3. Save training history and final metrics to a single CSV ---
     # The function now handles both epoch history and final metrics calculation.
