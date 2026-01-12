@@ -8,7 +8,7 @@ from monai.transforms import (
     ScaleIntensityd, RandFlipd, RandRotate90d, RandGaussianNoised,
     EnsureTyped,
 )
-from monai.data import DataLoader, CacheDataset
+from monai.data import DataLoader, Dataset
 from monai.utils import set_determinism
 from sklearn.model_selection import StratifiedKFold, train_test_split
 
@@ -100,7 +100,7 @@ def get_transforms(spatial_size=(128, 128, 128), augment=False):
     """
     keys = ["image"]
     transforms = [
-        LoadImaged(keys=keys, image_only=True),
+        LoadImaged(keys=keys),
         EnsureChannelFirstd(keys=keys),
         Resized(keys=keys, spatial_size=spatial_size),
         ScaleIntensityd(keys=keys), # Robust 0-1 scaling
@@ -165,10 +165,10 @@ def get_folds(data_dir: str, n_splits: int, batch_size: int, val_batch_size: int
                 weights=samples_weights, num_samples=len(samples_weights), replacement=True
             )
 
-        # Using CacheDataset significantly speeds up 3D training
-        train_ds = CacheDataset(data=train_files, transform=train_trans, cache_rate=1.0)
-        val_ds = CacheDataset(data=val_files, transform=val_trans, cache_rate=1.0)
-        test_ds = CacheDataset(data=test_files, transform=val_trans, cache_rate=1.0) # Use non-augmenting transforms
+        # Use MONAI's standard Dataset to load data on-the-fly and avoid high memory usage.
+        train_ds = Dataset(data=train_files, transform=train_trans)
+        val_ds = Dataset(data=val_files, transform=val_trans)
+        test_ds = Dataset(data=test_files, transform=val_trans) # Use non-augmenting transforms
 
         train_loader = DataLoader(
             train_ds, batch_size=batch_size, sampler=sampler, 
