@@ -53,7 +53,7 @@ def main():
 
             # 2. Perform isotropic resize with padding
             output_isotropic_file = os.path.join(output_isotropic_class_path, filename)
-            resize_isotropic_with_padding(file_path, output_isotropic_file, target_shape=TARGET_SHAPE)
+            resize_isotropic_with_padding(file_path, output_isotropic_file, target_size=TARGET_SHAPE[0])
 
     print("\nResizing process complete.")
 
