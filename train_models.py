@@ -30,10 +30,10 @@ DEFAULT_CONFIG = {
 
 # This dictionary maps keys from the JSON file to actual file paths.
 DATASET_PATHS = {
-    "DATASET_A": '/mnt/data/cases-2/datasets/resize_crop',
-    "DATASET_B": '/mnt/data/cases-2/datasets/resize_shrink',
-    "DATASET_C": '/mnt/data/cases-2/datasets/no_resize_crop',
-    "DATASET_D": '/mnt/data/cases-2/datasets/no_resize_shrink'
+    "DATASET_A": '/mnt/data/cases-2/datasets/resample_crop',
+    "DATASET_B": '/mnt/data/cases-2/datasets/resample_shrink',
+    "DATASET_C": '/mnt/data/cases-2/datasets/no_resample_crop',
+    "DATASET_D": '/mnt/data/cases-2/datasets/no_resample_shrink'
 }
 
 # --- 2. Configuration Preparation ---
@@ -72,7 +72,7 @@ def prepare_experiment_configs(raw_experiments: List[Dict]) -> List[Dict[str, An
 if __name__ == "__main__":
 
     # --- Load Experiments from JSON ---
-    experiments_file = os.path.join(os.path.dirname(__file__), '..', 'experiments.json')
+    experiments_file = os.path.join(os.path.dirname(__file__), '.', 'experiments.json')
     try:
         with open(experiments_file, 'r') as f:
             experiments_to_run = json.load(f)

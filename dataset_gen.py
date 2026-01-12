@@ -2,7 +2,7 @@ import os
 import glob
 from src.resizing.nifti_resize import resize_nifti, resize_isotropic_with_padding
 
-INPUT_NIFTI_PATH = "/mnt/data/cases-3/test"
+INPUT_NIFTI_PATH = "/mnt/data/cases-3/nifti"
 OUTPUT_RESIZED_PATH = "/mnt/data/cases-3/resized_shrunk" # For standard resize
 OUTPUT_ISOTROPIC_PATH = "/mnt/data/cases-3/resized_isotropic_padded" # For isotropic resize
 TARGET_SHAPE = (128, 128, 128)
