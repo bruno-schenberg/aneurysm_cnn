@@ -34,7 +34,7 @@ DATASET_PATHS = {
     "DATASET_B": '/mnt/data/cases-2/datasets/resample_shrink',
     "DATASET_C": '/mnt/data/cases-2/datasets/no_resample_crop',
     "DATASET_D": '/mnt/data/cases-2/datasets/no_resample_shrink',
-    "test": '/mnt/data/cases-2/datasets/test'
+    "test": 'test'
 }
 
 # --- 2. Configuration Preparation ---
