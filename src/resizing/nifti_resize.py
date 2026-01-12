@@ -1,13 +1,7 @@
 import os
 import numpy as np
 import nibabel as nib
-from scipy.ndimage import zoom
-
-try:
-    from nilearn.image import resample_img
-except ImportError:
-    print("Nilearn is not installed. Please install it using: pip install nilearn")
-    exit(1)
+from nilearn.image import resample_img
 
 TARGET_SHAPE = np.array([128, 128, 128])
 
