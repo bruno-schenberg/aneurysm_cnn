@@ -49,7 +49,7 @@ def main():
 
             # 1. Perform standard resize
             output_resized_file = os.path.join(output_resized_class_path, filename)
-            resize_nifti(file_path, output_resized_file, new_shape=TARGET_SHAPE)
+            resize_nifti(file_path, output_resized_file, target_shape=TARGET_SHAPE)
 
             # 2. Perform isotropic resize with padding
             output_isotropic_file = os.path.join(output_isotropic_class_path, filename)
