@@ -1,4 +1,6 @@
 .venv
 folder_rename_map.csv
 mixed_series_analysis.csv
-utils/__pycache__
+src/resizing/__pycache__
+src/cleaning/__pycache__
+src/training/__pycache__
