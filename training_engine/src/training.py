@@ -100,23 +100,15 @@ def run_training_loop(model: torch.nn.Module, train_loader: torch.utils.data.Dat
         tuple[List[Dict[str, Any]], float]: (metrics_history, total_training_time_minutes)
     """
 
+    # Ensure criterion_cls is a class type, not an instance.
+    if not isinstance(criterion_cls, type):
+        raise TypeError("criterion_cls must be the class type (e.g., torch.nn.CrossEntropyLoss), not an instance.")
+
     # Initialize the criterion with optional class weights
     if class_weights is not None:
-        if isinstance(criterion_cls, type): # Check if it's a class definition
-            # Ensure weights are on the correct device if provided
-            weighted_criterion = criterion_cls(weight=class_weights.to(device))
-            print(f"Using class weights in loss function: {class_weights.tolist()}")
-        else:
-            raise TypeError("criterion_cls must be the class type (e.g., torch.nn.CrossEntropyLoss), not an instance.")
+        criterion = criterion_cls(weight=class_weights.to(device))
     else:
-        # Instantiate without weights if it's a class type
-        if isinstance(criterion_cls, type):
-            weighted_criterion = criterion_cls()
-        else:
-            # If an already instantiated criterion was passed, use it (though passing the class is preferred)
-            weighted_criterion = criterion_cls
-            print("Warning: Passed an instantiated criterion. Class weighting option will be ignored unless it was already applied.")
-
+        criterion = criterion_cls()
 
     metrics_history = []
     print("\nStarting training...")
@@ -127,12 +119,12 @@ def run_training_loop(model: torch.nn.Module, train_loader: torch.utils.data.Dat
     for epoch in range(num_epochs):
         print(f"\n--- Epoch {epoch+1}/{num_epochs} ---")
 
-        # Use the weighted_criterion for training and validation
-        train_loss, train_acc = train_one_epoch(model, train_loader, weighted_criterion, optimizer, device)
+        # Use the instantiated criterion for training and validation
+        train_loss, train_acc = train_one_epoch(model, train_loader, criterion, optimizer, device)
 
         # NOTE: It's common practice to use the weighted criterion for validation loss reporting too,
         # but if you need an unweighted validation loss, you'd create an unweighted criterion here.
-        val_loss, val_acc = validate_one_epoch(model, val_loader, weighted_criterion, device)
+        val_loss, val_acc = validate_one_epoch(model, val_loader, criterion, device)
 
         print(f"Epoch {epoch+1} | Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.4f}")
         print(f"Epoch {epoch+1} | Val Loss: {val_loss:.4f}  | Val Acc: {val_acc:.4f}")

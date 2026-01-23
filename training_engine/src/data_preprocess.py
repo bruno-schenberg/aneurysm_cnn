@@ -147,7 +147,11 @@ def get_folds(data_dir: str, n_splits: int, batch_size: int, val_batch_size: int
     # ---
 
     train_trans = get_transforms(augment=True)
-    val_trans = get_transforms(augment=False)
+    eval_trans = get_transforms(augment=False) # Use one transform for both val and test
+
+    # Create the test dataset and loader once, outside the loop
+    test_ds = Dataset(data=test_files, transform=eval_trans)
+    test_loader = DataLoader(test_ds, batch_size=val_batch_size, num_workers=2)
 
     # The K-Fold split is now performed only on the development data
     for fold, (train_idx, val_idx) in enumerate(skf.split(dev_data, dev_labels)):
@@ -167,15 +171,12 @@ def get_folds(data_dir: str, n_splits: int, batch_size: int, val_batch_size: int
 
         # Use MONAI's standard Dataset to load data on-the-fly and avoid high memory usage.
         train_ds = Dataset(data=train_files, transform=train_trans)
-        val_ds = Dataset(data=val_files, transform=val_trans)
-        test_ds = Dataset(data=test_files, transform=val_trans) # Use non-augmenting transforms
+        val_ds = Dataset(data=val_files, transform=eval_trans)
 
         train_loader = DataLoader(
             train_ds, batch_size=batch_size, sampler=sampler, 
             num_workers=4, worker_init_fn=seed_worker, shuffle=(sampler is None)
         )
         val_loader = DataLoader(val_ds, batch_size=val_batch_size, num_workers=2)
-        # The test loader is the same for every fold
-        test_loader = DataLoader(test_ds, batch_size=val_batch_size, num_workers=2)
 
         yield fold, train_loader, val_loader, test_loader

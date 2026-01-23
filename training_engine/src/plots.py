@@ -106,28 +106,32 @@ def plot_roc_curve(model, dataloader, device, classes, filename):
     print(f"ROC curve saved to {filename}")
 
 def save_metrics_to_csv(
-    metrics_history: List[Dict[str, Any]],
-    filename: str,
-    detailed_results: List[Dict[str, Any]] = None
+    metrics_history: List[Dict[str, Any]], filename: str, detailed_results: List[Dict[str, Any]]
 ):
     """
     Saves the training/validation metrics history to a CSV file.
-    If detailed_results are provided, it also calculates and appends
-    final classification metrics (Precision, Recall, F2).
+    It also calculates and appends the final evaluation metrics (Precision,
+    Recall, F2-Score) as the last row for a complete summary.
     """
-    csv_headers = ['epoch', 'train_loss', 'train_acc', 'val_loss', 'val_acc']
-    with open(filename, 'w', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=csv_headers)
-        writer.writeheader()
-        writer.writerows(metrics_history)
-        
-        if detailed_results:
-            final_metrics = calculate_classification_metrics(detailed_results)
-            writer.writerow({}) # Add a blank line for separation
-            writer.writerow({'epoch': 'Metric', 'train_loss': 'Value'}) # Use epoch/train_loss as headers
-            writer.writerow({'epoch': 'Precision', 'train_loss': f"{final_metrics['Precision']:.4f}"})
-            writer.writerow({'epoch': 'Recall', 'train_loss': f"{final_metrics['Recall']:.4f}"})
-            writer.writerow({'epoch': 'F2-Score', 'train_loss': f"{final_metrics['F2-Score']:.4f}"})
+    if not metrics_history:
+        print("Warning: metrics_history is empty. Cannot save metrics CSV.")
+        return
+
+    # Convert training history to a DataFrame
+    history_df = pd.DataFrame(metrics_history)
+
+    # Calculate final evaluation metrics
+    final_metrics = calculate_classification_metrics(detailed_results)
+
+    # Create a DataFrame for the final metrics row
+    final_metrics_row = pd.DataFrame([{
+        'epoch': 'final_eval',
+        **final_metrics
+    }])
+
+    # Combine history and the final evaluation row
+    full_metrics_df = pd.concat([history_df, final_metrics_row], ignore_index=True)
+    full_metrics_df.to_csv(filename, index=False, float_format="%.4f")
     print(f"Metrics saved to {filename}")
 
 def calculate_classification_metrics(detailed_results: List[Dict[str, Any]]) -> Dict[str, float]:
@@ -271,8 +275,7 @@ def save_fold_artifacts(
     # The function now handles both epoch history and final metrics calculation.
     save_metrics_to_csv(
         metrics_history=metrics_history,
-        filename=METRICS_CSV,
-        detailed_results=detailed_results
+        filename=METRICS_CSV, detailed_results=detailed_results
     )
 
     # --- 4. Save model states ---
