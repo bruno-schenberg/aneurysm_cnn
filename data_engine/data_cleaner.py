@@ -1,8 +1,8 @@
 import csv
-from src.cleaning.file_utils import get_subfolders, organize_data
-from src.cleaning.dicom_utils import validate_dcms
-from src.cleaning.class_utils import join_class_data, check_missing_class
-from src.cleaning.nifti_utils import filter_for_conversion, process_and_convert_exams
+from src.file_utils import get_subfolders, organize_data
+from src.dicom_utils import validate_dcms
+from src.class_utils import join_class_data, check_missing_class
+from src.nifti_utils import filter_for_conversion, process_and_convert_exams
 
 RAW_DATA_PATH = "/mnt/data/cases-3/raw"
 OUTPUT_CSV_PATH = "folder_rename_map.csv"

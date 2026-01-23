@@ -3,6 +3,5 @@ folder_rename_map.csv
 mixed_series_analysis.csv
 experiments
 test
-src/resizing/__pycache__
-src/cleaning/__pycache__
-src/training/__pycache__
+training_engine/src/__pycache__
+data_engine/src/__pycache__

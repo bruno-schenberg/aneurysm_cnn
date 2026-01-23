@@ -1,6 +1,6 @@
 import os
 import glob
-from src.resizing.nifti_resize import resize_nifti, resize_isotropic_with_padding
+from data_engine.src.nifti_resize import resize_nifti, resize_isotropic_with_padding
 
 INPUT_NIFTI_PATH = "/mnt/data/cases-3/nifti"
 OUTPUT_RESIZED_PATH = "/mnt/data/cases-3/resized_shrunk" # For standard resize

@@ -180,25 +180,3 @@ def run_experiment(config: Dict[str, Any]) -> None:
     evaluate_models(all_fold_predictions, summary_csv_path)
 
     print("\n" + "="*80)
-
-# --- 4. Main Orchestrator ---
-
-def run_all_experiments(prepared_configs: List[Dict[str, Any]]):
-    """
-    Iterates through a list of experiment configurations and runs each experiment.
-    """
-    print(f"Found {len(prepared_configs)} experiments to run.")
-    if prepared_configs:
-        print(f"Using device: {prepared_configs[0]['DEVICE']}")
-
-    for exp_config in prepared_configs:
-        try:
-            run_experiment(exp_config)
-        except FileNotFoundError as e:
-            print(f"\nFATAL ERROR: Data path missing for experiment {exp_config['name']}. {e}")
-        except Exception as e:
-            print(f"\nFATAL ERROR running experiment {exp_config['name']}: {e}")
-
-    print("\n\n" + "*"*80)
-    print("EXPERIMENTS FINISHED")
-    print("*"*80)

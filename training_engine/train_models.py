@@ -1,7 +1,7 @@
 import json
 import os
 import torch
-from src.training.orchestrator import run_all_experiments
+from src.orchestrator import run_experiment
 from typing import List, Dict, Any
 
 # --- 1. Default Configuration ---
@@ -69,7 +69,28 @@ def prepare_experiment_configs(raw_experiments: List[Dict]) -> List[Dict[str, An
             exit(1)
     return prepared_configs
 
-# --- 3. Main Execution Block ---
+# --- 3. Main Orchestrator ---
+def run_all_experiments(prepared_configs: List[Dict[str, Any]]):
+    """
+    Iterates through a list of experiment configurations and runs each experiment.
+    """
+    print(f"Found {len(prepared_configs)} experiments to run.")
+    if prepared_configs:
+        print(f"Using device: {prepared_configs[0]['DEVICE']}")
+
+    for exp_config in prepared_configs:
+        try:
+            run_experiment(exp_config)
+        except FileNotFoundError as e:
+            print(f"\nFATAL ERROR: Data path missing for experiment {exp_config['name']}. {e}")
+        except Exception as e:
+            print(f"\nFATAL ERROR running experiment {exp_config['name']}: {e}")
+
+    print("\n\n" + "*"*80)
+    print("EXPERIMENTS FINISHED")
+    print("*"*80)
+
+# --- 4. Main Execution Block ---
 if __name__ == "__main__":
 
     # --- Load Experiments from JSON ---
