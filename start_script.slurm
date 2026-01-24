@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=teste_aneurysm_cnn
-#SBATCH --partition=gn01
+#SBATCH --partition=cpu
 #SBATCH --output=%x_%j.out
 #SBATCH --error=%x_%j.err
 #SBATCH --nodes=1
