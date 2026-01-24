@@ -2,6 +2,7 @@ torch
 torchvision
 numpy
 monai
+nibabel
 scikit-learn
 pandas
 tqdm
