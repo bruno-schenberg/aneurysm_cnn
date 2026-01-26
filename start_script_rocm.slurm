@@ -59,7 +59,7 @@ python -c "import torch; print(f'PyTorch Version: {torch.__version__}'); print(f
 
 ## Check system-level GPU status (The AMD equivalent of nvidia-smi)
 echo -e "\n## rocm-smi Output:"
-rocm-smi --showid --showtemp --showusage
+rocm-smi
 echo -e "## ...Verification Complete. ##\n"
 
 ## 5. Execute Training Script
