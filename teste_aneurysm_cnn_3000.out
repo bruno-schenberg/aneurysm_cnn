@@ -1,0 +1,99 @@
+
+## Job started at 27-01-2026 as 13:14:26 #####################
+
+## Job ID:                        3000
+## Execution Node:                gn03
+## Submit Directory:              /home/bschenberg/aneurysm_cnn
+## Scratch Directory:             /scratch/local/3000 
+
+
+## Verifying Environment & GPU... ##
+Active Conda Env: aneurysm_cnn_rocm
+Python Path: /home/bschenberg/miniconda3/envs/aneurysm_cnn_rocm/bin/python
+
+## rocminfo Output:
+[37mROCk module is loaded[0m
+[31mUnable to open /dev/kfd read-write: Permission denied[0m
+[31mFailed to get user name to check for video group membership[0m
+rocminfo command failed. This indicates a problem with the Conda environment's ROCm stack.
+
+## Checking PyTorch library dependencies (ldd):
+	linux-vdso.so.1 (0x00007fffe2dfb000)
+	libc10_hip.so => /home/bschenberg/miniconda3/envs/aneurysm_cnn_rocm/lib/python3.10/site-packages/torch/lib/libc10_hip.so (0x00001511f5fa6000)
+	libamdhip64.so => /home/bschenberg/miniconda3/envs/aneurysm_cnn_rocm/lib/python3.10/site-packages/torch/lib/libamdhip64.so (0x00001511a5057000)
+	libMIOpen.so => /home/bschenberg/miniconda3/envs/aneurysm_cnn_rocm/lib/python3.10/site-packages/torch/lib/libMIOpen.so (0x000015116d488000)
+	libhiprtc.so => /home/bschenberg/miniconda3/envs/aneurysm_cnn_rocm/lib/python3.10/site-packages/torch/lib/libhiprtc.so (0x000015116d1a2000)
+	libroctx64.so => /home/bschenberg/miniconda3/envs/aneurysm_cnn_rocm/lib/python3.10/site-packages/torch/lib/libroctx64.so (0x000015116cfa0000)
+	libhipblaslt.so => /home/bschenberg/miniconda3/envs/aneurysm_cnn_rocm/lib/python3.10/site-packages/torch/lib/libhipblaslt.so (0x000015116c757000)
+	libhipblas.so => /home/bschenberg/miniconda3/envs/aneurysm_cnn_rocm/lib/python3.10/site-packages/torch/lib/libhipblas.so (0x000015116c481000)
+	libhipfft.so => /home/bschenberg/miniconda3/envs/aneurysm_cnn_rocm/lib/python3.10/site-packages/torch/lib/libhipfft.so (0x00001511f5f91000)
+	libhiprand.so => /home/bschenberg/miniconda3/envs/aneurysm_cnn_rocm/lib/python3.10/site-packages/torch/lib/libhiprand.so (0x00001511f5f89000)
+	libhipsparse.so => /home/bschenberg/miniconda3/envs/aneurysm_cnn_rocm/lib/python3.10/site-packages/torch/lib/libhipsparse.so (0x000015116c239000)
+	libhipsolver.so => /home/bschenberg/miniconda3/envs/aneurysm_cnn_rocm/lib/python3.10/site-packages/torch/lib/libhipsolver.so (0x000015116bfd8000)
+	libc10.so => /home/bschenberg/miniconda3/envs/aneurysm_cnn_rocm/lib/python3.10/site-packages/torch/lib/libc10.so (0x000015116becb000)
+	libtorch_cpu.so => /home/bschenberg/miniconda3/envs/aneurysm_cnn_rocm/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so (0x0000151153f93000)
+	libpthread.so.0 => /lib64/libpthread.so.0 (0x0000151153d73000)
+	libm.so.6 => /lib64/libm.so.6 (0x00001511539f1000)
+	librccl.so => /home/bschenberg/miniconda3/envs/aneurysm_cnn_rocm/lib/python3.10/site-packages/torch/lib/librccl.so (0x0000151144506000)
+	librt.so.1 => /lib64/librt.so.1 (0x00001511442fe000)
+	libmagma.so => /home/bschenberg/miniconda3/envs/aneurysm_cnn_rocm/lib/python3.10/site-packages/torch/lib/libmagma.so (0x000015111c3f4000)
+	libstdc++.so.6 => /lib64/libstdc++.so.6 (0x000015111c05f000)
+	libgcc_s.so.1 => /lib64/libgcc_s.so.1 (0x000015111be46000)
+	libc.so.6 => /lib64/libc.so.6 (0x000015111ba81000)
+	/lib64/ld-linux-x86-64.so.2 (0x00001511f5ebe000)
+	libdl.so.2 => /lib64/libdl.so.2 (0x000015111b87d000)
+	libamd_comgr.so => /home/bschenberg/miniconda3/envs/aneurysm_cnn_rocm/lib/python3.10/site-packages/torch/lib/libamd_comgr.so (0x000015111321e000)
+	libhsa-runtime64.so => /home/bschenberg/miniconda3/envs/aneurysm_cnn_rocm/lib/python3.10/site-packages/torch/lib/libhsa-runtime64.so (0x0000151112d59000)
+	libnuma.so => /home/bschenberg/miniconda3/envs/aneurysm_cnn_rocm/lib/python3.10/site-packages/torch/lib/libnuma.so (0x0000151112b4c000)
+	librocblas.so => /home/bschenberg/miniconda3/envs/aneurysm_cnn_rocm/lib/python3.10/site-packages/torch/lib/librocblas.so (0x00001510e0a41000)
+	librocsolver.so => /home/bschenberg/miniconda3/envs/aneurysm_cnn_rocm/lib/python3.10/site-packages/torch/lib/librocsolver.so (0x0000151082a66000)
+	librocfft.so => /home/bschenberg/miniconda3/envs/aneurysm_cnn_rocm/lib/python3.10/site-packages/torch/lib/librocfft.so (0x00001510820cb000)
+	librocrand.so => /home/bschenberg/miniconda3/envs/aneurysm_cnn_rocm/lib/python3.10/site-packages/torch/lib/librocrand.so (0x000015107e542000)
+	librocsparse.so => /home/bschenberg/miniconda3/envs/aneurysm_cnn_rocm/lib/python3.10/site-packages/torch/lib/librocsparse.so (0x0000151034eb7000)
+	libgomp.so => /home/bschenberg/miniconda3/envs/aneurysm_cnn_rocm/lib/python3.10/site-packages/torch/lib/libgomp.so (0x0000151034c8d000)
+	libroctracer64.so => /home/bschenberg/miniconda3/envs/aneurysm_cnn_rocm/lib/python3.10/site-packages/torch/lib/libroctracer64.so (0x0000151034a2e000)
+	librocm_smi64.so => /home/bschenberg/miniconda3/envs/aneurysm_cnn_rocm/lib/python3.10/site-packages/torch/lib/librocm_smi64.so (0x000015103470d000)
+	libz.so.1 => /lib64/libz.so.1 (0x00001510344f5000)
+	libtinfo.so => /home/bschenberg/miniconda3/envs/aneurysm_cnn_rocm/lib/python3.10/site-packages/torch/lib/libtinfo.so (0x00001510342c9000)
+	libelf.so => /home/bschenberg/miniconda3/envs/aneurysm_cnn_rocm/lib/python3.10/site-packages/torch/lib/libelf.so (0x00001510340b0000)
+	libdrm.so => /home/bschenberg/miniconda3/envs/aneurysm_cnn_rocm/lib/python3.10/site-packages/torch/lib/libdrm.so (0x00001511f5f5e000)
+	libdrm_amdgpu.so => /home/bschenberg/miniconda3/envs/aneurysm_cnn_rocm/lib/python3.10/site-packages/torch/lib/libdrm_amdgpu.so (0x00001511f5f4f000)
+PyTorch Version: 2.3.1+rocm6.0
+HSA_OVERRIDE_GFX_VERSION: 10.3.0
+ROCm/HIP Available: False
+Device Name: N/A
+
+## rocm-smi Output:
+
+
+====================================== ROCm System Management Interface ======================================
+================================================ Concise Info ================================================
+Device  [Model : Revision]    Temp    Power  Partitions      SCLK    MCLK     Fan  Perf  PwrCap  VRAM%  GPU%  
+[3m        Name (20 chars)       (Edge)  (Avg)  (Mem, Compute)                                                   [0m
+==============================================================================================================
+0       [0x0c34 : 0x02]       34.0°C  40.0W  N/A, N/A        800Mhz  1600Mhz  0%   auto  300.0W    0%   0%    
+        Instinct MI210                                                                                        
+1       [0x0c34 : 0x02]       34.0°C  40.0W  N/A, N/A        800Mhz  1600Mhz  0%   auto  300.0W    0%   0%    
+        Instinct MI210                                                                                        
+==============================================================================================================
+============================================ End of ROCm SMI Log =============================================
+## ...Verification Complete. ##
+
+Found 1 experiments to run.
+Using device: cpu
+
+================================================================================
+STARTING EXPERIMENT: R3D18_DatasetD_Weighted_20
+  - Model: R3D18, Epochs: 2, BS: 4, LR: 0.0001
+  - Balancing: weighted_cost_function, Folds: 2
+  - Results will be saved to: ./experiments/R3D18_DatasetD_Weighted_20
+================================================================================
+
+FATAL ERROR: Data path missing for experiment R3D18_DatasetD_Weighted_20. Data directory not found: test
+
+
+********************************************************************************
+EXPERIMENTS FINISHED
+********************************************************************************
+
+## Job finished at 27-01-2026 as 13:14:47 ###################

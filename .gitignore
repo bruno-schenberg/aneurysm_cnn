@@ -5,5 +5,4 @@ experiments
 test
 training_engine/src/__pycache__
 data_engine/src/__pycache__
-*.err
-*.out
+logs/
