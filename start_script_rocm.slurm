@@ -54,6 +54,13 @@ echo -e "\n## Verifying Environment & GPU... ##"
 echo "Active Conda Env: $CONDA_DEFAULT_ENV"
 echo "Python Path: $(which python)"
 
+## Check user group permissions (The root cause of the issue)
+echo -e "\n## Checking User and Group Permissions:"
+echo -n "User Groups: "; groups
+echo "Device Permissions:"
+ls -l /dev/kfd
+ls -l /dev/dri/card*
+
 ## Check if the HIP runtime in Conda can see the GPU (bypasses PyTorch)
 echo -e "\n## rocminfo Output:"
 rocminfo || echo "rocminfo command failed. This indicates a problem with the Conda environment's ROCm stack."
