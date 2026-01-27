@@ -1,0 +1,13 @@
+free(): invalid pointer
+/var/spool/slurmd/job03010/slurm_script: line 61: 1349653 Aborted                 (core dumped) python  <<EOF
+import torch
+print(f'PyTorch Version: {torch.__version__}')
+print(f'ROCm/HIP Available: {torch.cuda.is_available()}')
+if torch.cuda.is_available():
+    print(f'Found {torch.cuda.device_count()} GPUs.')
+    for i in range(torch.cuda.device_count()):
+        print(f'  - Device {i}: {torch.cuda.get_device_name(i)}')
+EOF
+
+free(): invalid pointer
+/var/spool/slurmd/job03010/slurm_script: line 67: 1349665 Aborted                 (core dumped) python -u train_models.py
