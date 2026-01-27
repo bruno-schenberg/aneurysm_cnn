@@ -62,10 +62,13 @@ echo -e "\n## rocm-smi Output:"
 rocm-smi
 echo -e "## ...Verification Complete. ##\n"
 
-## 5. Execute Training Script
-## --export=ALL ensures environment variables (like HSA_OVERRIDE_GFX_VERSION) are passed to the job step.
-## -u ensures unbuffered output so logs appear in real-time.
-srun --export=ALL python -u train_models.py
+## 5. Execute Training Script.
+## Unsetting LD_LIBRARY_PATH forces PyTorch to use its own bundled ROCm libraries,
+## avoiding conflicts with the system's `rocm/6.0.1` module.
+## We run python directly without `srun` to ensure a clean environment.
+echo "Unsetting LD_LIBRARY_PATH to prioritize PyTorch's ROCm libraries..."
+unset LD_LIBRARY_PATH
+python -u train_models.py
 
 ## Cleanup Scratch
 rm -rf $WRKDIR
