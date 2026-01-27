@@ -42,7 +42,7 @@ module purge
 
 ## 2. Architecture Override
 ## This is required for PyTorch to work correctly with the Instinct MI210 (gfx90a) GPU.
-export HSA_OVERRIDE_GFX_VERSION=9.0.9
+export HSA_OVERRIDE_GFX_VERSION=9.0.a
 
 ## 3. Activate Conda Environment
 source $HOME/miniconda3/bin/activate
