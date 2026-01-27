@@ -40,10 +40,9 @@ cd $WRKDIR/training_engine
 ## self-contained and should not conflict with system-level ROCm libraries.
 module purge
 
-## 2. OPTIONAL: Architecture Override
-## Uncomment the line below ONLY if you get "hipErrorNoBinaryForGpu" errors.
-## This forces PyTorch to treat the GPU as a specific architecture (common fix for MI200 series, including MI210).
-export HSA_OVERRIDE_GFX_VERSION=10.3.0
+## 2. Architecture Override
+## This is required for PyTorch to work correctly with the Instinct MI210 (gfx90a) GPU.
+export HSA_OVERRIDE_GFX_VERSION=9.0.9
 
 ## 3. Activate Conda Environment
 source $HOME/miniconda3/bin/activate
@@ -51,31 +50,12 @@ conda activate aneurysm_cnn_rocm  # <--- Updated environment name
 
 ## 4. Debugging/Verification
 echo -e "\n## Verifying Environment & GPU... ##"
-echo "Active Conda Env: $CONDA_DEFAULT_ENV"
-echo "Python Path: $(which python)"
-
-## Check user group permissions (The root cause of the issue)
-echo -e "\n## Checking User and Group Permissions:"
-echo -n "User Groups: "; groups
-echo "Device Permissions:"
-ls -l /dev/kfd
-ls -l /dev/dri/card*
-
-## Check if the HIP runtime in Conda can see the GPU (bypasses PyTorch)
-echo -e "\n## rocminfo Output:"
-rocminfo || echo "rocminfo command failed. This indicates a problem with the Conda environment's ROCm stack."
-
-## Check for missing shared libraries in PyTorch
-echo -e "\n## Checking PyTorch library dependencies (ldd):"
-ldd $(python -c "import torch; print(torch.__path__[0])")/lib/libtorch_hip.so
-
-## Check if ROCm is visible to PyTorch
-python -c "import os, torch; print(f'PyTorch Version: {torch.__version__}'); print(f'HSA_OVERRIDE_GFX_VERSION: {os.environ.get(\"HSA_OVERRIDE_GFX_VERSION\")}') ; print(f'ROCm/HIP Available: {torch.cuda.is_available()}'); print(f'Device Name: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"N/A\"}')"
-
-## Check system-level GPU status (The AMD equivalent of nvidia-smi)
-echo -e "\n## rocm-smi Output:"
-## Use the absolute path to rocm-smi since we did not load the module
-/opt/rocm/bin/rocm-smi
+python -c "import torch; print(f'PyTorch Version: {torch.__version__}'); \
+    print(f'ROCm/HIP Available: {torch.cuda.is_available()}'); \
+    if torch.cuda.is_available(): \
+        print(f'Found {torch.cuda.device_count()} GPUs.'); \
+        for i in range(torch.cuda.device_count()): \
+            print(f'  - Device {i}: {torch.cuda.get_device_name(i)}')"
 echo -e "## ...Verification Complete. ##\n"
 
 ## 5. Execute Training Script.
