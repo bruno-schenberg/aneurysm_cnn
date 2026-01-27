@@ -55,7 +55,7 @@ echo "Active Conda Env: $CONDA_DEFAULT_ENV"
 echo "Python Path: $(which python)"
 
 ## Check if ROCm is visible to PyTorch
-python -c "import torch; print(f'PyTorch Version: {torch.__version__}'); print(f'ROCm/HIP Available: {torch.cuda.is_available()}'); print(f'Device Name: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"N/A\"}')"
+python -c "import os, torch; print(f'PyTorch Version: {torch.__version__}'); print(f'HSA_OVERRIDE_GFX_VERSION: {os.environ.get(\"HSA_OVERRIDE_GFX_VERSION\")}') ; print(f'ROCm/HIP Available: {torch.cuda.is_available()}'); print(f'Device Name: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"N/A\"}')"
 
 ## Check system-level GPU status (The AMD equivalent of nvidia-smi)
 echo -e "\n## rocm-smi Output:"
@@ -63,8 +63,9 @@ rocm-smi
 echo -e "## ...Verification Complete. ##\n"
 
 ## 5. Execute Training Script
-## -u ensures unbuffered output so logs appear in real-time
-srun python -u train_models.py
+## --export=ALL ensures environment variables (like HSA_OVERRIDE_GFX_VERSION) are passed to the job step.
+## -u ensures unbuffered output so logs appear in real-time.
+srun --export=ALL python -u train_models.py
 
 ## Cleanup Scratch
 rm -rf $WRKDIR
