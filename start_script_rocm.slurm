@@ -42,7 +42,7 @@ module purge
 
 ## 2. Architecture Override
 ## This is required for PyTorch to work correctly with the Instinct MI210 (gfx90a) GPU.
-#export HSA_OVERRIDE_GFX_VERSION=9.0.a
+export HSA_OVERRIDE_GFX_VERSION=10.3.0
 
 ## 3. Activate Conda Environment
 source $HOME/miniconda3/bin/activate
@@ -50,6 +50,8 @@ conda activate aneurysm_cnn_rocm  # <--- Updated environment name
 
 # 4. Debugging/Verification
 echo -e "\n## Verifying Environment & GPU... ##"
+echo "Active Conda Env: $CONDA_DEFAULT_ENV"
+echo "Python Path: $(which python)"
 python -c '
 import torch
 print(f"PyTorch Version: {torch.__version__}")
@@ -64,7 +66,7 @@ echo -e "## ...Verification Complete. ##\n"
 ## 5. Execute Training Script.
 ## Run the python script directly. The environment is now clean and fully
 ## controlled by Conda, which should resolve the detection issue.
-srun python -u train_models.py
+python -u train_models.py
 
 ## Cleanup Scratch
 rm -rf $WRKDIR
