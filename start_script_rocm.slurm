@@ -36,8 +36,7 @@ cd $WRKDIR/training_engine
 #########################################
 
 ## 1. Environment Setup
-## We will NOT load the system's rocm module. The PyTorch Conda environment is
-## self-contained and should not conflict with system-level ROCm libraries.
+## We will load the system's rocm module.
 module purge
 module load rocm/6.0.1
 
@@ -50,17 +49,17 @@ source $HOME/miniconda3/bin/activate
 conda activate aneurysm_cnn_rocm  # <--- Updated environment name
 
 ## 4. Debugging/Verification
-echo -e "\n## Verifying Environment & GPU... ##"
-python -c '
-import torch
-print(f"PyTorch Version: {torch.__version__}")
-print(f"ROCm/HIP Available: {torch.cuda.is_available()}")
-if torch.cuda.is_available():
-    print(f"Found {torch.cuda.device_count()} GPUs.")
-    for i in range(torch.cuda.device_count()):
-        print(f"  - Device {i}: {torch.cuda.get_device_name(i)}")
-'
-echo -e "## ...Verification Complete. ##\n"
+# echo -e "\n## Verifying Environment & GPU... ##"
+# python -c '
+# import torch
+# print(f"PyTorch Version: {torch.__version__}")
+# print(f"ROCm/HIP Available: {torch.cuda.is_available()}")
+# if torch.cuda.is_available():
+#     print(f"Found {torch.cuda.device_count()} GPUs.")
+#     for i in range(torch.cuda.device_count()):
+#         print(f"  - Device {i}: {torch.cuda.get_device_name(i)}")
+# '
+# echo -e "## ...Verification Complete. ##\n"
 
 ## 5. Execute Training Script.
 ## Run the python script directly. The environment is now clean and fully
