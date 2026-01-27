@@ -42,8 +42,8 @@ module load rocm/6.0.1
 
 ## 2. OPTIONAL: Architecture Override
 ## Uncomment the line below ONLY if you get "hipErrorNoBinaryForGpu" errors.
-## This forces PyTorch to treat the GPU as a specific architecture (common fix for MI200 series).
-# export HSA_OVERRIDE_GFX_VERSION=10.3.0
+## This forces PyTorch to treat the GPU as a specific architecture (common fix for MI200 series, including MI210).
+export HSA_OVERRIDE_GFX_VERSION=10.3.0
 
 ## 3. Activate Conda Environment
 source $HOME/miniconda3/bin/activate
