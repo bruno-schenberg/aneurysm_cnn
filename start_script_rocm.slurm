@@ -51,15 +51,15 @@ conda activate aneurysm_cnn_rocm  # <--- Updated environment name
 
 ## 4. Debugging/Verification
 echo -e "\n## Verifying Environment & GPU... ##"
-python <<'END_OF_PYTHON_SCRIPT'
+python -c '
 import torch
-print(f'PyTorch Version: {torch.__version__}')
-print(f'ROCm/HIP Available: {torch.cuda.is_available()}')
+print(f"PyTorch Version: {torch.__version__}")
+print(f"ROCm/HIP Available: {torch.cuda.is_available()}")
 if torch.cuda.is_available():
-    print(f'Found {torch.cuda.device_count()} GPUs.')
+    print(f"Found {torch.cuda.device_count()} GPUs.")
     for i in range(torch.cuda.device_count()):
-        print(f'  - Device {i}: {torch.cuda.get_device_name(i)}')
-END_OF_PYTHON_SCRIPT
+        print(f"  - Device {i}: {torch.cuda.get_device_name(i)}")
+'
 echo -e "## ...Verification Complete. ##\n"
 
 ## 5. Execute Training Script.
