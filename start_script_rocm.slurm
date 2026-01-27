@@ -22,11 +22,11 @@ echo -e "## Submit Directory:              $SLURM_SUBMIT_DIR"
 echo -e "## Scratch Directory:             $WRKDIR \n"
 
 ## Create scratch directory
-mkdir -p $WRKDIR
+srun mkdir -p $WRKDIR
 
 ## Copy necessary files to scratch
 ## Assuming 'train_models.py' is in 'training_engine'
-cp -r $HOME/aneurysm_cnn/training_engine $WRKDIR/
+srun cp -r $HOME/aneurysm_cnn/training_engine $WRKDIR/
 
 ## Enter work directory
 cd $WRKDIR/training_engine
