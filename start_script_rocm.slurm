@@ -68,6 +68,9 @@ echo -e "## ...Verification Complete. ##\n"
 ## controlled by Conda, which should resolve the detection issue.
 python -u train_models.py
 
+## 6. Copy the output experiments.
+srun cp -r $WRKDIR/experiments $HOME/aneurysm_cnn/training_engine 
+
 ## Cleanup Scratch
 rm -rf $WRKDIR
 
