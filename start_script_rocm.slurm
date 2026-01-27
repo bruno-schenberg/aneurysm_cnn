@@ -38,7 +38,7 @@ echo -e "## Scratch Directory:             $WRKDIR \n"
 ## 1. Environment Setup
 ## We will load the system's rocm module.
 module purge
-#module load rocm/6.0.1
+module load rocm/6.0.1
 
 ## 2. Architecture Override
 ## This is required for PyTorch to work correctly with the Instinct MI210 (gfx90a) GPU.
