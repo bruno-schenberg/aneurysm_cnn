@@ -54,6 +54,14 @@ echo -e "\n## Verifying Environment & GPU... ##"
 echo "Active Conda Env: $CONDA_DEFAULT_ENV"
 echo "Python Path: $(which python)"
 
+## Check if the HIP runtime in Conda can see the GPU (bypasses PyTorch)
+echo -e "\n## rocminfo Output:"
+rocminfo || echo "rocminfo command failed. This indicates a problem with the Conda environment's ROCm stack."
+
+## Check for missing shared libraries in PyTorch
+echo -e "\n## Checking PyTorch library dependencies (ldd):"
+ldd $(python -c "import torch; print(torch.__path__[0])")/lib/libtorch_hip.so
+
 ## Check if ROCm is visible to PyTorch
 python -c "import os, torch; print(f'PyTorch Version: {torch.__version__}'); print(f'HSA_OVERRIDE_GFX_VERSION: {os.environ.get(\"HSA_OVERRIDE_GFX_VERSION\")}') ; print(f'ROCm/HIP Available: {torch.cuda.is_available()}'); print(f'Device Name: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"N/A\"}')"
 
