@@ -39,10 +39,11 @@ cd $WRKDIR/training_engine
 ## We will NOT load the system's rocm module. The PyTorch Conda environment is
 ## self-contained and should not conflict with system-level ROCm libraries.
 module purge
+module load rocm/6.0.1
 
 ## 2. Architecture Override
 ## This is required for PyTorch to work correctly with the Instinct MI210 (gfx90a) GPU.
-export HSA_OVERRIDE_GFX_VERSION=9.0.a
+#export HSA_OVERRIDE_GFX_VERSION=9.0.a
 
 ## 3. Activate Conda Environment
 source $HOME/miniconda3/bin/activate
