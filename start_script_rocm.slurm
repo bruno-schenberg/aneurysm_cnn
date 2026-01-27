@@ -35,10 +35,10 @@ cd $WRKDIR/training_engine
 ##-------    Start of Work     ------##
 #########################################
 
-## 1. LOAD SYSTEM MODULES (Crucial for ROCm)
-## This must happen before activating Conda
+## 1. Environment Setup
+## We will NOT load the system's rocm module. The PyTorch Conda environment is
+## self-contained and should not conflict with system-level ROCm libraries.
 module purge
-module load rocm/6.0.1
 
 ## 2. OPTIONAL: Architecture Override
 ## Uncomment the line below ONLY if you get "hipErrorNoBinaryForGpu" errors.
@@ -59,15 +59,13 @@ python -c "import os, torch; print(f'PyTorch Version: {torch.__version__}'); pri
 
 ## Check system-level GPU status (The AMD equivalent of nvidia-smi)
 echo -e "\n## rocm-smi Output:"
-rocm-smi
+## Use the absolute path to rocm-smi since we did not load the module
+/opt/rocm/bin/rocm-smi
 echo -e "## ...Verification Complete. ##\n"
 
 ## 5. Execute Training Script.
-## Unsetting LD_LIBRARY_PATH forces PyTorch to use its own bundled ROCm libraries,
-## avoiding conflicts with the system's `rocm/6.0.1` module.
-## We run python directly without `srun` to ensure a clean environment.
-echo "Unsetting LD_LIBRARY_PATH to prioritize PyTorch's ROCm libraries..."
-unset LD_LIBRARY_PATH
+## Run the python script directly. The environment is now clean and fully
+## controlled by Conda, which should resolve the detection issue.
 python -u train_models.py
 
 ## Cleanup Scratch
