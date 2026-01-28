@@ -8,3 +8,5 @@ data_engine/mixed_series_analysis.csv
 training_engine/src/__pycache__
 training_engine/experiments
 training_engine/datasets/
+
+old_training_engine/__pycache__
