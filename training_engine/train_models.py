@@ -22,18 +22,18 @@ DEFAULT_CONFIG = {
     "N_SPLITS": 2,
     "QUICK_TEST": True,      # Set to True to run only one fold for quick testing
     "HOLD_OUT_TEST_SET": True, # If True, per-fold evaluation uses the val set, not the test set.
-    "TEST_SPLIT_RATIO": 0.34,  # Ratio of the total dataset to be held out for testing
-    "VAL_BATCH_SIZE": 5,
+    "TEST_SPLIT_RATIO": 0.20,  # Ratio of the total dataset to be held out for testing
+    "VAL_BATCH_SIZE": 4,
     "CLASSES": ['0', '1'],  # 0: healthy, 1: aneurysm
     "OUTPUT_DIR": './experiments'
 }
 
 # This dictionary maps keys from the JSON file to actual file paths.
 DATASET_PATHS = {
-    "DATASET_A": '/mnt/data/cases-2/datasets/resample_crop',
-    "DATASET_B": '/mnt/data/cases-2/datasets/resample_shrink',
-    "DATASET_C": '/mnt/data/cases-2/datasets/no_resample_crop',
-    "DATASET_D": '/mnt/data/cases-2/datasets/no_resample_shrink',
+    "A": 'datasets/resample_crop',
+    "B": 'datasets/resample_shrink',
+    "C": 'datasets/no_resample_crop',
+    "D": 'datasets/no_resample_shrink',
     "test": 'test'
 }
 

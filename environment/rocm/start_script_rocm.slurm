@@ -19,7 +19,6 @@ WRKDIR=$SCRATCH/$SLURM_JOB_ID
 srun mkdir -p $WRKDIR
 
 ## Copy necessary files to scratch
-## Assuming 'train_models.py' is in 'training_engine'
 srun cp -r $HOME/aneurysm_cnn/training_engine $WRKDIR/
 
 ## Enter work directory
@@ -46,7 +45,7 @@ export HSA_OVERRIDE_GFX_VERSION=9.0.a
 
 ## 3. Activate Conda Environment
 source $HOME/miniconda3/bin/activate
-conda activate aneurysm_cnn_rocm  # <--- Updated environment name
+conda activate aneurysm_cnn_rocm
 
 # 4. Debugging/Verification
 echo -e "\n## Verifying Environment & GPU... ##"

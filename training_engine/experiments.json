@@ -1,8 +1,26 @@
 [
     {
-        "name": "R3D18_DatasetD_Weighted_20",
+        "name": "R3D18_Dataset_A_Weighted_20",
         "model": "R3D18",
         "balancing": "weighted_cost_function",
-        "data_path_key": "test"
+        "data_path_key": "A"
+    },
+    {
+        "name": "R3D18_Dataset_B_Weighted_20",
+        "model": "R3D18",
+        "balancing": "weighted_cost_function",
+        "data_path_key": "B"
+    },
+    {
+        "name": "R3D18_Dataset_C_Weighted_20",
+        "model": "R3D18",
+        "balancing": "weighted_cost_function",
+        "data_path_key": "C"
+    },
+    {
+        "name": "R3D18_Dataset_D_Weighted_20",
+        "model": "R3D18",
+        "balancing": "weighted_cost_function",
+        "data_path_key": "D"
     }
 ]

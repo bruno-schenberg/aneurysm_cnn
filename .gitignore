@@ -1,8 +1,10 @@
-.venv
-folder_rename_map.csv
-mixed_series_analysis.csv
-experiments
-test
-training_engine/src/__pycache__
-data_engine/src/__pycache__
+.venv/
 logs/
+
+data_engine/src/__pycache__
+data_engine/folder_rename_map.csv
+data_engine/mixed_series_analysis.csv
+
+training_engine/src/__pycache__
+training_engine/experiments
+training_engine/datasets/

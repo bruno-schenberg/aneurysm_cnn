@@ -1,3 +1,0 @@
-/home/bschenberg/miniconda3/envs/aneurysm_cnn_rocm/lib/python3.10/site-packages/sklearn/model_selection/_split.py:811: UserWarning: The least populated class in y has only 1 members, which is less than n_splits=2.
-  warnings.warn(
-/var/spool/slurmd/job03023/slurm_script: line 69: 1353613 Segmentation fault      (core dumped) python -u train_models.py
