@@ -1,5 +1,6 @@
 .venv/
-logs/
+environment/rocm/logs/
+environment/cuda/logs/
 
 data_engine/src/__pycache__
 data_engine/folder_rename_map.csv

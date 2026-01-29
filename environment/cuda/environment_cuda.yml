@@ -1,4 +1,4 @@
-name: aneurysm_cnn
+name: aneurysm_cnn_cuda
 channels:
   - pytorch
   - nvidia

@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=teste_aneurysm_cnn
 #SBATCH --partition=gpu-amd
-#SBATCH --output=logs/%x_%j.out
-#SBATCH --error=logs/%x_%j.err
+#SBATCH --output=environment/rocm/logs/%x_%j.out
+#SBATCH --error=environment/rocmlogs/%x_%j.err
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=8      # CPUs for PyTorch DataLoader
