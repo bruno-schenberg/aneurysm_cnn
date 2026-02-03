@@ -7,7 +7,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=8      # CPUs for PyTorch DataLoader
 #SBATCH --gpus-per-task=1      # Request 1 GPU
-#SBATCH --time=1:00:00
+#SBATCH --time=6:00:00
 
 echo -e "## Job started at $(date +'%d-%m-%Y as %T') #####################\n"
 
