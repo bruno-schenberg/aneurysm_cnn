@@ -1,8 +1,7 @@
 import torch
 import torch.nn as nn
 import torchvision.models.video as video_models
-from monai.networks.nets import ResNet, DenseNet, SwinUNETR
-from monai.networks.blocks import ResNetBlock, Bottleneck, get_conv_layer
+from monai.networks.nets import DenseNet, SwinUNETR
 from monai.apps import MedicalNet
 from typing import Optional
 
@@ -155,9 +154,12 @@ class SwinUNETRClassifier(nn.Module):
             print("  -> Loading pre-trained weights for SwinUNETR backbone...")
             try:
                 # These weights were trained on the BTCV dataset for multi-organ segmentation
-                weights = torch.load("/root/.cache/monai/models/swin_unetr.base_5000ep_f48_fe.pth")
-                self.swin_unetr.load_from(weights)
-                print("  -> Pre-trained weights loaded successfully.")
+                # The official way to load weights for transfer learning is to load the state_dict
+                # into the `swinViT` part of the model, not the whole SwinUNETR.
+                model_dict = torch.load("/root/.cache/monai/models/swin_unetr.base_5000ep_f48_fe.pth")
+                state_dict = model_dict["state_dict"]
+                self.swin_unetr.swinViT.load_state_dict(state_dict)
+                print("  -> SwinUNETR backbone weights loaded successfully from state_dict.")
             except FileNotFoundError:
                 print("  -> Warning: Pre-trained weights not found. The model will be trained from scratch.")
             except Exception as e:
@@ -475,6 +477,6 @@ def get_model(model_name: str, num_classes: int) -> torch.nn.Module:
         # Get the base model to use as the instance extractor
         instance_extractor = get_r3d18_monai_model(num_classes)
         # The feature dimension of ResNet-18 is 512
-        return MILClassifier(instance_extractor, num_classes, feature_dim=512)
+        return MILClassifier(instance_extractor, num_classes, feature_dim=512) # type: ignore
     else:
-        raise ValueError(f"Unknown model name: {model_name}. Choose from 'R3D18_PyTorch', 'R3D50_PyTorch', 'R3D18_MONAI', 'R3D50_MONAI', 'DenseNet121_MONAI', 'SwinUNETR', 'ViT', 'UNet3D', 'UNet3D_ResNet_Backbone', or 'MIL_R3D18'.")
+        raise ValueError(f"Unknown model name: {model_name}. Choose from 'R3D18_PyTorch', 'R3D50_PyTorch', 'R3D18_MONAI', 'R3D50_MONAI', 'DenseNet121_MONAI', 'ResNeXt50_MONAI', 'SwinUNETR', 'UNETR', 'UNet3D', 'UNet3D_ResNet_Backbone', or 'MIL_R3D18'.")
