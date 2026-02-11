@@ -54,18 +54,24 @@ echo -e "## ...rocm-smi complete. ##"
 
 # 5. Debugging/Verification
 echo -e "\n## Verifying Environment & GPU... ##"
+echo "## Relevant environment variables from batch script:"
+env | grep -E 'ROCR_VISIBLE_DEVICES|CUDA_VISIBLE_DEVICES|GPU_DEVICE_ORDINAL|HSA_OVERRIDE_GFX_VERSION' || echo " -> No relevant ROCm/GPU environment variables found in batch shell."
 echo "Active Conda Env: $CONDA_DEFAULT_ENV"
 echo "Python Path: $(which python)"
-python -c '
+
+echo -e "\n## Running Python verification with srun... ##"
+srun python -c '
 import torch
+import os
 print(f"PyTorch Version: {torch.__version__}")
 print(f"ROCm/HIP Available: {torch.cuda.is_available()}")
+print(f"ROCR_VISIBLE_DEVICES (from Python): {os.environ.get(\"ROCR_VISIBLE_DEVICES\")}")
 if torch.cuda.is_available():
     print(f"Found {torch.cuda.device_count()} GPUs.")
     for i in range(torch.cuda.device_count()):
         print(f"  - Device {i}: {torch.cuda.get_device_name(i)}")
 '
-echo -e "## ...Verification Complete. ##\n"
+echo -e "## ...srun verification complete. ##\n"
 
 ## 6. Execute Training Script.
 srun python -u test_rocm.py
