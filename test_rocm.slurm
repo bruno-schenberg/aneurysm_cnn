@@ -47,29 +47,27 @@ export HSA_OVERRIDE_GFX_VERSION=9.0.a
 source $HOME/miniconda3/bin/activate
 conda activate aneurysm_cnn_rocm
 
-## 3. Diagnostic: Check if ROCm can see the GPU
+## 4. Diagnostic: Check if ROCm can see the GPU
 echo -e "\n## Running rocm-smi for diagnostics... ##"
 srun rocm-smi
 echo -e "## ...rocm-smi complete. ##"
 
-# 4. Debugging/Verification
-## We activate the environment first, then run python.
+# 5. Debugging/Verification
 echo -e "\n## Verifying Environment & GPU... ##"
-srun python -c '
+echo "Active Conda Env: $CONDA_DEFAULT_ENV"
+echo "Python Path: $(which python)"
+python -c '
 import torch
-import os
-import sys
-print(f"Active Conda Env: {os.environ.get(\"CONDA_DEFAULT_ENV\", \"Not set\")}")
-print(f"Python Path: {sys.executable}")
 print(f"PyTorch Version: {torch.__version__}")
 print(f"ROCm/HIP Available: {torch.cuda.is_available()}")
 if torch.cuda.is_available():
     print(f"Found {torch.cuda.device_count()} GPUs.")
     for i in range(torch.cuda.device_count()):
-        print(f"  - Device {i}: {torch.cuda.get_device_name(i)}")'
+        print(f"  - Device {i}: {torch.cuda.get_device_name(i)}")
+'
 echo -e "## ...Verification Complete. ##\n"
 
-## 5. Execute Training Script.
+## 6. Execute Training Script.
 srun python -u test_rocm.py
 
 ## Cleanup Scratch
