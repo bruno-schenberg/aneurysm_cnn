@@ -53,11 +53,11 @@ echo -e "## ...rocm-smi complete. ##"
 ## within a conda environment from scripts. It handles pathing more robustly
 ## than 'source activate'.
 echo -e "\n## Verifying Environment & GPU... ##"
-srun conda run -n aneurysm_cnn_rocm python -c '
+srun conda run -n aneurysm_cnn_rocm python - <<EOF
 import torch
 import os
 import sys
-print(f"Active Conda Env: {os.environ.get(\"CONDA_DEFAULT_ENV\", \"Not set\")}")
+print(f"Active Conda Env: {os.environ.get('CONDA_DEFAULT_ENV', 'Not set')}")
 print(f"Python Path: {sys.executable}")
 print(f"PyTorch Version: {torch.__version__}")
 print(f"ROCm/HIP Available: {torch.cuda.is_available()}")
@@ -65,7 +65,7 @@ if torch.cuda.is_available():
     print(f"Found {torch.cuda.device_count()} GPUs.")
     for i in range(torch.cuda.device_count()):
         print(f"  - Device {i}: {torch.cuda.get_device_name(i)}")
-'
+EOF
 echo -e "## ...Verification Complete. ##\n"
 
 ## 5. Execute Training Script.
