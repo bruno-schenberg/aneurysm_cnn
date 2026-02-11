@@ -15,14 +15,6 @@ echo -e "## Job started at $(date +'%d-%m-%Y as %T') #####################\n"
 SCRATCH=/scratch/local
 WRKDIR=$SCRATCH/$SLURM_JOB_ID
 
-## Setup trap to remove scratch directory on exit
-cleanup() {
-    echo -e "\n## Cleaning up scratch directory: $WRKDIR ##"
-    rm -rf "$WRKDIR"
-    echo "## Cleanup complete. ##"
-}
-trap cleanup EXIT
-
 ## Create scratch directory
 srun mkdir -p $WRKDIR
 
@@ -43,25 +35,21 @@ echo -e "## Scratch Directory:             $WRKDIR \n"
 #########################################
 
 ## 1. Environment Setup
-## The PyTorch ROCm build is self-contained and includes the necessary libraries.
-## Loading a system-level ROCm module can cause library conflicts.
-## We will rely on the libraries bundled with PyTorch in the Conda environment.
-# module purge
-# module load rocm/6.0.1
+## We will load the system's rocm module.
+module purge
+module load rocm/6.0.1
 
 ## 2. Architecture Override
 ## This is required for PyTorch to work correctly with the Instinct MI210 (gfx90a) GPU.
 export HSA_OVERRIDE_GFX_VERSION=9.0.a
 
 ## 3. Activate Conda Environment
-# The following is the recommended way to initialize conda in a script
-eval "$(conda shell.bash hook)"
+source $HOME/miniconda3/bin/activate
 conda activate aneurysm_cnn_rocm
 
 ## 4. Diagnostic: Check if ROCm can see the GPU
 echo -e "\n## Running rocm-smi for diagnostics... ##"
-# We use the full path since we are not loading the rocm module
-srun /opt/rocm/bin/rocm-smi
+srun rocm-smi
 echo -e "## ...rocm-smi complete. ##"
 
 # 5. Debugging/Verification
@@ -72,14 +60,12 @@ echo "Active Conda Env: $CONDA_DEFAULT_ENV"
 echo "Python Path: $(which python)"
 
 echo -e "\n## Running Python verification with srun... ##"
-srun --export=ALL python -c '
+srun python -c '
 import torch
 import os
 print(f"PyTorch Version: {torch.__version__}")
 print(f"ROCm/HIP Available: {torch.cuda.is_available()}")
-print(f"  - ROCR_VISIBLE_DEVICES: {os.environ.get('ROCR_VISIBLE_DEVICES')}")
-print(f"  - HSA_OVERRIDE_GFX_VERSION: {os.environ.get('HSA_OVERRIDE_GFX_VERSION')}")
-print(f"  - LD_LIBRARY_PATH: {os.environ.get('LD_LIBRARY_PATH')}")
+print(f"ROCR_VISIBLE_DEVICES (from Python): {os.environ.get('ROCR_VISIBLE_DEVICES')}")
 if torch.cuda.is_available():
     print(f"Found {torch.cuda.device_count()} GPUs.")
     for i in range(torch.cuda.device_count()):
@@ -88,6 +74,9 @@ if torch.cuda.is_available():
 echo -e "## ...srun verification complete. ##\n"
 
 ## 6. Execute Training Script.
-srun --export=ALL python -u test_rocm.py
+srun python -u test_rocm.py
+
+## Cleanup Scratch
+rm -rf $WRKDIR
 
 echo -e "\n## Job finished at $(date +'%d-%m-%Y as %T') ###################"
