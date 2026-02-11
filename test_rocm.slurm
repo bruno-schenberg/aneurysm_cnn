@@ -43,33 +43,34 @@ module purge
 ## This is required for PyTorch to work correctly with the Instinct MI210 (gfx90a) GPU.
 export HSA_OVERRIDE_GFX_VERSION=9.0.a
 
+## 3. Activate Conda Environment
+source $HOME/miniconda3/bin/activate
+conda activate aneurysm_cnn_rocm
+
 ## 3. Diagnostic: Check if ROCm can see the GPU
 echo -e "\n## Running rocm-smi for diagnostics... ##"
-srun conda run -n aneurysm_cnn_rocm rocm-smi
+srun rocm-smi
 echo -e "## ...rocm-smi complete. ##"
 
 # 4. Debugging/Verification
-## We will use 'conda run' which is the recommended way to execute commands
-## within a conda environment from scripts. It handles pathing more robustly
-## than 'source activate'.
+## We activate the environment first, then run python.
 echo -e "\n## Verifying Environment & GPU... ##"
-srun conda run -n aneurysm_cnn_rocm python - <<EOF
+srun python -c '
 import torch
 import os
 import sys
-print(f"Active Conda Env: {os.environ.get('CONDA_DEFAULT_ENV', 'Not set')}")
+print(f"Active Conda Env: {os.environ.get(\"CONDA_DEFAULT_ENV\", \"Not set\")}")
 print(f"Python Path: {sys.executable}")
 print(f"PyTorch Version: {torch.__version__}")
 print(f"ROCm/HIP Available: {torch.cuda.is_available()}")
 if torch.cuda.is_available():
     print(f"Found {torch.cuda.device_count()} GPUs.")
     for i in range(torch.cuda.device_count()):
-        print(f"  - Device {i}: {torch.cuda.get_device_name(i)}")
-EOF
+        print(f"  - Device {i}: {torch.cuda.get_device_name(i)}")'
 echo -e "## ...Verification Complete. ##\n"
 
 ## 5. Execute Training Script.
-srun conda run -n aneurysm_cnn_rocm python -u test_rocm.py
+srun python -u test_rocm.py
 
 ## Cleanup Scratch
 rm -rf $WRKDIR
