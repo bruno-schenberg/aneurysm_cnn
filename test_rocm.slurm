@@ -35,21 +35,25 @@ echo -e "## Scratch Directory:             $WRKDIR \n"
 #########################################
 
 ## 1. Environment Setup
-## We will load the system's rocm module.
-module purge
-module load rocm/6.0.1
+## The PyTorch ROCm build is self-contained and includes the necessary libraries.
+## Loading a system-level ROCm module can cause library conflicts.
+## We will rely on the libraries bundled with PyTorch in the Conda environment.
+# module purge
+# module load rocm/6.0.1
 
 ## 2. Architecture Override
 ## This is required for PyTorch to work correctly with the Instinct MI210 (gfx90a) GPU.
 export HSA_OVERRIDE_GFX_VERSION=9.0.a
 
 ## 3. Activate Conda Environment
-source $HOME/miniconda3/bin/activate
+# The following is the recommended way to initialize conda in a script
+eval "$(conda shell.bash hook)"
 conda activate aneurysm_cnn_rocm
 
 ## 4. Diagnostic: Check if ROCm can see the GPU
 echo -e "\n## Running rocm-smi for diagnostics... ##"
-srun rocm-smi
+# We use the full path since we are not loading the rocm module
+srun /opt/rocm/bin/rocm-smi
 echo -e "## ...rocm-smi complete. ##"
 
 # 5. Debugging/Verification
@@ -65,7 +69,9 @@ import torch
 import os
 print(f"PyTorch Version: {torch.__version__}")
 print(f"ROCm/HIP Available: {torch.cuda.is_available()}")
-print(f"ROCR_VISIBLE_DEVICES (from Python): {os.environ.get('ROCR_VISIBLE_DEVICES')}")
+print(f"  - ROCR_VISIBLE_DEVICES: {os.environ.get('ROCR_VISIBLE_DEVICES')}")
+print(f"  - HSA_OVERRIDE_GFX_VERSION: {os.environ.get('HSA_OVERRIDE_GFX_VERSION')}")
+print(f"  - LD_LIBRARY_PATH: {os.environ.get('LD_LIBRARY_PATH')}")
 if torch.cuda.is_available():
     print(f"Found {torch.cuda.device_count()} GPUs.")
     for i in range(torch.cuda.device_count()):
