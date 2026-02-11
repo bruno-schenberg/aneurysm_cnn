@@ -43,16 +43,22 @@ module purge
 ## This is required for PyTorch to work correctly with the Instinct MI210 (gfx90a) GPU.
 export HSA_OVERRIDE_GFX_VERSION=9.0.a
 
-## 3. Activate Conda Environment
-source $HOME/miniconda3/bin/activate
-conda activate aneurysm_cnn_rocm
+## 3. Diagnostic: Check if ROCm can see the GPU
+echo -e "\n## Running rocm-smi for diagnostics... ##"
+srun conda run -n aneurysm_cnn_rocm rocm-smi
+echo -e "## ...rocm-smi complete. ##"
 
 # 4. Debugging/Verification
+## We will use 'conda run' which is the recommended way to execute commands
+## within a conda environment from scripts. It handles pathing more robustly
+## than 'source activate'.
 echo -e "\n## Verifying Environment & GPU... ##"
-echo "Active Conda Env: $CONDA_DEFAULT_ENV"
-echo "Python Path: $(which python)"
-srun python -c '
+srun conda run -n aneurysm_cnn_rocm python -c '
 import torch
+import os
+import sys
+print(f"Active Conda Env: {os.environ.get(\"CONDA_DEFAULT_ENV\", \"Not set\")}")
+print(f"Python Path: {sys.executable}")
 print(f"PyTorch Version: {torch.__version__}")
 print(f"ROCm/HIP Available: {torch.cuda.is_available()}")
 if torch.cuda.is_available():
@@ -63,9 +69,7 @@ if torch.cuda.is_available():
 echo -e "## ...Verification Complete. ##\n"
 
 ## 5. Execute Training Script.
-## Run the python script directly. The environment is now clean and fully
-## controlled by Conda, which should resolve the detection issue.
-srun python -u test_rocm.py
+srun conda run -n aneurysm_cnn_rocm python -u test_rocm.py
 
 ## Cleanup Scratch
 rm -rf $WRKDIR
