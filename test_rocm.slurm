@@ -19,7 +19,7 @@ WRKDIR=$SCRATCH/$SLURM_JOB_ID
 srun mkdir -p $WRKDIR
 
 ## Copy necessary files to scratch
-srun cp -r $HOME/test_rocm.py $WRKDIR/
+srun cp -r $SLURM_SUBMIT_DIR/test_rocm.py $WRKDIR/
 
 ## Enter work directory
 cd $WRKDIR
@@ -51,7 +51,7 @@ conda activate aneurysm_cnn_rocm
 echo -e "\n## Verifying Environment & GPU... ##"
 echo "Active Conda Env: $CONDA_DEFAULT_ENV"
 echo "Python Path: $(which python)"
-python -c '
+srun python -c '
 import torch
 print(f"PyTorch Version: {torch.__version__}")
 print(f"ROCm/HIP Available: {torch.cuda.is_available()}")
@@ -65,7 +65,7 @@ echo -e "## ...Verification Complete. ##\n"
 ## 5. Execute Training Script.
 ## Run the python script directly. The environment is now clean and fully
 ## controlled by Conda, which should resolve the detection issue.
-python -u test_rocm.slurm
+srun python -u test_rocm.py
 
 ## Cleanup Scratch
 rm -rf $WRKDIR
