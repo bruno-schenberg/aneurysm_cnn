@@ -15,6 +15,14 @@ echo -e "## Job started at $(date +'%d-%m-%Y as %T') #####################\n"
 SCRATCH=/scratch/local
 WRKDIR=$SCRATCH/$SLURM_JOB_ID
 
+## Setup trap to remove scratch directory on exit
+cleanup() {
+    echo -e "\n## Cleaning up scratch directory: $WRKDIR ##"
+    rm -rf "$WRKDIR"
+    echo "## Cleanup complete. ##"
+}
+trap cleanup EXIT
+
 ## Create scratch directory
 srun mkdir -p $WRKDIR
 
@@ -64,7 +72,7 @@ echo "Active Conda Env: $CONDA_DEFAULT_ENV"
 echo "Python Path: $(which python)"
 
 echo -e "\n## Running Python verification with srun... ##"
-srun python -c '
+srun --export=ALL python -c '
 import torch
 import os
 print(f"PyTorch Version: {torch.__version__}")
@@ -80,9 +88,6 @@ if torch.cuda.is_available():
 echo -e "## ...srun verification complete. ##\n"
 
 ## 6. Execute Training Script.
-srun python -u test_rocm.py
-
-## Cleanup Scratch
-rm -rf $WRKDIR
+srun --export=ALL python -u test_rocm.py
 
 echo -e "\n## Job finished at $(date +'%d-%m-%Y as %T') ###################"
