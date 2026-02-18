@@ -1,50 +1,68 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+Sync Impact Report:
+- Version change: Uninitialized → 1.0.0
+- List of principles:
+  - I. Scientific Reproducibility & Rigor (New)
+  - II. Modularity & Separation of Concerns (New)
+  - III. Modern Technical Standards (New)
+  - IV. Testability & Verification (New)
+  - V. Clean Architecture & Readable Code (New)
+- Added sections: Governance, Organization
+- Templates requiring updates: None (Generic templates are compatible with these principles)
+-->
+
+# Aneurysm CNN Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Scientific Reproducibility & Rigor
+As a scientific research project, the primary deliverable is not just code, but verifiable truth. Results must be replicable by independent researchers.
+*   **Determinism**: Fixed random seeds MUST be used and logged for all non-deterministic operations (dataset splitting, weight initialization, training shuffling).
+*   **Configurability**: All experimental parameters (hyperparameters, architecture choices) MUST be defined in configuration files (e.g., `experiments.json`), never hardcoded in logic.
+*   **Artifacts**: Every training run MUST produce a unique, traceable output directory containing its configuration, logs, and results.
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+### II. Modularity & Separation of Concerns
+The project consists of distinct phases that must not be entangled. 'Spaghetti code' is strictly prohibited.
+*   **Phase Isolation**: The `data_engine` (dataset generation, run once) and `training_engine` (experimentation, run many times) MUST remain separate sub-projects. They should not import from each other directly; they communicate via file artifacts (datasets on disk).
+*   **Single Responsibility**: Each module or script should have a single, clear purpose (e.g., `data_cleaner.py` cleans, `models.py` defines architectures).
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### III. Modern Technical Standards
+We utilize state-of-the-art ecosystem tools to ensure performance and standardization.
+*   **Library Selection**: PyTorch, MONAI, and NiBabel are the standard libraries for deep learning and medical imaging. Custom implementations of standard layers or metrics should be avoided in favor of library implementations unless strictly necessary for research novelty.
+*   **Type Hinting**: Python type hints SHOULD be used for function signatures to aid readability and static analysis.
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+### IV. Testability & Verification
+Code must be demonstrably accurate. In scientific computing, a silent bug is worse than a crash.
+*   **Unit Testing**: Core utility functions (especially mathematical or data manipulation logic) MUST be covered by unit tests.
+*   **Validation Strategy**: Cross-validation (k-fold) and a strict Hold-Out Test Set are mandatory for final evaluation. Information leakage between train/val/test splits is a critical failure.
+*   **Sanity Checks**: Pipelines SHOULD include assert statements or runtime checks for data shape and integrity (e.g., ensuring no patient ID overlaps between splits).
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### V. Clean Architecture & Readable Code
+The codebase is a communication tool for researchers.
+*   **Self-Documenting**: Variable and function names MUST be descriptive and verbose enough to explain their scientific meaning (e.g., `aneurysm_volume_mm3` vs `vol`).
+*   **Contextual Comments**: Comments should explain the *why* (scientific rationale), not the *what* (syntax).
+*   **Directory Structure**: The project file structure MUST reflect the logical separation of the engines (see Organization section).
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+## Organization
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+The project is strictly divided into two logical engines:
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
-
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+1.  **Data Engine** (`data_engine/`):
+    *   Responsible for parsing raw data, cleaning, and generating training-ready NIfTI/Tensor datasets.
+    *   Output: Static dataset files on disk.
+2.  **Training Engine** (`training_engine/`):
+    *   Responsible for loading processed datasets, defining models, and executing training/evaluation loops.
+    *   Input: Static dataset files from Data Engine.
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+This constitution defines the non-negotiable standards for the Aneurysm CNN project.
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+*   **Amendments**: Changes to these principles require a version bump and justification (e.g., switching core libraries).
+*   **Compliance**: All Pull Requests and Code Reviews MUST verify adherence to these principles.
+*   **Version Strategy**: Semantic Versioning (MAJOR.MINOR.PATCH).
+    *   MAJOR: Change in core libraries or fundamental workflow (e.g., merging engines).
+    *   MINOR: Addition of new principles or significant modules.
+    *   PATCH: Clarifications or non-breaking refactors.
+
+**Version**: 1.0.0 | **Ratified**: 2026-02-18 | **Last Amended**: 2026-02-18
