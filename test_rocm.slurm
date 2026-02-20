@@ -60,21 +60,11 @@ echo "Active Conda Env: $CONDA_DEFAULT_ENV"
 echo "Python Path: $(which python)"
 
 echo -e "\n## Running Python verification with srun... ##"
-srun python -c '
-import torch
-import os
-print(f"PyTorch Version: {torch.__version__}")
-print(f"ROCm/HIP Available: {torch.cuda.is_available()}")
-print(f"ROCR_VISIBLE_DEVICES (from Python): {os.environ.get('ROCR_VISIBLE_DEVICES')}")
-if torch.cuda.is_available():
-    print(f"Found {torch.cuda.device_count()} GPUs.")
-    for i in range(torch.cuda.device_count()):
-        print(f"  - Device {i}: {torch.cuda.get_device_name(i)}")
-'
-echo -e "## ...srun verification complete. ##\n"
 
 ## 6. Execute Training Script.
 srun python -u test_rocm.py
+
+echo -e "## ...srun verification complete. ##\n"
 
 ## Cleanup Scratch
 rm -rf $WRKDIR
