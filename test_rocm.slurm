@@ -62,7 +62,7 @@ echo "Python Path: $(which python)"
 echo -e "\n## Running Python verification with srun... ##"
 
 ## 6. Execute Training Script.
-srun python -u test_rocm.py
+run python -u test_rocm.py
 
 echo -e "## ...srun verification complete. ##\n"
 
