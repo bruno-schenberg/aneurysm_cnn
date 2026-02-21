@@ -47,27 +47,23 @@ export HSA_OVERRIDE_GFX_VERSION=9.0.a
 source $HOME/miniconda3/bin/activate
 conda activate aneurysm_cnn_rocm
 
-# 4. Debugging/Verification
+## 4. Diagnostic: Check if ROCm can see the GPU
+echo -e "\n## Running rocm-smi for diagnostics... ##"
+srun rocm-smi
+echo -e "## ...rocm-smi complete. ##"
+
+# 5. Debugging/Verification
 echo -e "\n## Verifying Environment & GPU... ##"
 echo "Active Conda Env: $CONDA_DEFAULT_ENV"
 echo "Python Path: $(which python)"
-python -c '
-import torch
-print(f"PyTorch Version: {torch.__version__}")
-print(f"ROCm/HIP Available: {torch.cuda.is_available()}")
-if torch.cuda.is_available():
-    print(f"Found {torch.cuda.device_count()} GPUs.")
-    for i in range(torch.cuda.device_count()):
-        print(f"  - Device {i}: {torch.cuda.get_device_name(i)}")
-'
 echo -e "## ...Verification Complete. ##\n"
 
-## 5. Execute Training Script.
+## 6. Execute Training Script.
 ## Run the python script directly. The environment is now clean and fully
 ## controlled by Conda, which should resolve the detection issue.
 python -u train_models.py
 
-## 6. Copy the output experiments.
+## 7. Copy the output experiments.
 srun cp -r $WRKDIR/training_engine/experiments $HOME/aneurysm_cnn/training_engine 
 
 ## Cleanup Scratch
