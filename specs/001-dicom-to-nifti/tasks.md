@@ -1,64 +1,133 @@
-# Implementation Tasks: DICOM Ingestion & NIfTI Standardization
+---
+description: "Task list for DICOM Ingestion & NIfTI Standardization implementation"
+---
 
-**Feature Branch**: `001-dicom-to-nifti`
-**Implementation Plan**: `specs/001-dicom-to-nifti/plan.md`
+# Tasks: DICOM Ingestion & NIfTI Standardization
+
+**Input**: Design documents from `/specs/001-dicom-to-nifti/`
+**Prerequisites**: plan.md, spec.md, data-model.md, research.md, quickstart.md, contracts/cli.md
 
 ## Phase 1: Setup
-*Goal: Initialize the project with necessary dependencies.*
 
-- [ ] T001 Update dependencies in `data_engine/requirements.txt` to include pinned versions of `monai` and `nibabel` (to ensure scientific reproducibility per Constitution), and ensure `pytest` is present for testing.
+**Purpose**: Project initialization and basic structure
 
-## Phase 2: Foundational
-*Goal: Implement blocking prerequisites for all user stories.*
-
-- [ ] T002 Implement centralized logging setup (file and stdout) in `data_engine/src/logging_utils.py` to be used across the ingestion pipeline.
-
-## Phase 3: User Story 1 - Process Valid DICOM Series (P1)
-*Goal: Convert raw DICOM series into NIfTI volumes using MONAI while preserving metadata and normalizing to Float32, using in-memory name mapping.*
-*Independent Test*: Given a valid DICOM directory, verify a `.nii.gz` file is produced with a sanitized name in the output directory, while the source folder remains unchanged.
-
-- [ ] T003 [P] [US1] Create unit tests for happy path conversion and name sanitization in `data_engine/tests/test_nifti_utils.py`.
-- [ ] T004 [US1] Implement in-memory directory analysis and folder-name-to-sanitized-name mapping in `data_engine/src/file_utils.py`.
-- [ ] T005 [US1] Implement `convert_series_to_nifti` using MONAI `LoadImage` and `SaveImage` transforms in `data_engine/src/nifti_utils.py`.
-- [ ] T006 [US1] Implement `process_and_convert_exams` in `data_engine/src/nifti_utils.py` to handle batch iteration and skip existing outputs (idempotency), using the name mapping.
-- [ ] T007 [US1] Update `data_engine/data_cleaner.py` to orchestrate the new analysis and conversion steps without modifying source disk structure.
-
-## Phase 4: User Story 2 - Resilient Handling of Corrupted DICOM Data (P1)
-*Goal: Prevent pipeline crashes by catching corrupted slices/files, logging them as warnings, and continuing.*
-*Independent Test*: Given a batch with a corrupted DICOM slice, verify the corrupted series is skipped, a warning is logged, and the rest of the batch completes.
-
-- [ ] T008 [P] [US2] Add unit tests for handling corrupted series (e.g., missing spatial tags, invalid format) in `data_engine/tests/test_nifti_utils.py`.
-- [ ] T009 [US2] Update `convert_series_to_nifti` in `data_engine/src/nifti_utils.py` to catch specific MONAI/pydicom exceptions.
-- [ ] T010 [US2] Update `process_and_convert_exams` in `data_engine/src/nifti_utils.py` to log caught errors using `logging_utils.py` and continue to the next series.
-
-## Phase 5: User Story 3 - Comprehensive Processing Audit Log (P2)
-*Goal: Output a complete summary CSV log containing the outcome of every processed exam.*
-*Independent Test*: Verify `ingestion_summary.csv` matches the total number of input exams and correctly maps success/failure statuses and reasons.
-
-- [ ] T011 [P] [US3] Add unit tests for `ConversionResult` dictionary generation and CSV formatting in `data_engine/tests/test_nifti_utils.py`.
-- [ ] T012 [US3] Refactor `process_and_convert_exams` in `data_engine/src/nifti_utils.py` to aggregate and return a list of `ConversionResult` objects (including sanitized names).
-- [ ] T013 [US3] Update `data_engine/data_cleaner.py` to write the returned `ConversionResult` list to `ingestion_summary.csv` using Python's `csv` module.
-
-## Phase 6: Polish
-*Goal: Address cross-cutting concerns, clean code, and verify end-to-end functionality.*
-
-- [ ] T014 Update type hints, docstrings, and inline comments in `data_engine/src/nifti_utils.py` and `data_engine/data_cleaner.py` to adhere to constitution standards.
-- [ ] T015 Run full pipeline sanity check via `data_engine/data_cleaner.py` using a representative data sample, including a specific test against a read-only source directory, to verify zero modifications to raw data.
+- [ ] T001 Update dependencies by adding `monai` to `data_engine/requirements.txt`
+- [ ] T002 [P] Create new file `data_engine/src/logging_utils.py`
+- [ ] T003 [P] Create empty test files: `tests/data_engine/test_file_utils.py`, `tests/data_engine/test_dicom_utils.py`, `tests/data_engine/test_nifti_utils.py`
 
 ---
 
-## Dependencies
+## Phase 2: Foundational
 
-- **US1** requires Foundational setup (T001, T002) and name mapping (T004) to be completed.
-- **US2** builds upon the conversion logic established in US1.
-- **US3** modifies the reporting structure established in US2.
+**Purpose**: Core infrastructure that MUST be complete before ANY user story can be implemented
 
-## Parallel Execution Examples
+- [ ] T004 Implement comprehensive audit and error logging mechanism (JSONL and CSV support) in `data_engine/src/logging_utils.py`
 
-- **Test-Driven Parallelism**: Tasks T003 [US1], T008 [US2], and T011 [US3] can be started in parallel while core logic is being implemented.
+**Checkpoint**: Foundation ready - user story implementation can now begin
+
+---
+
+## Phase 3: User Story 1 - Process Valid DICOM Series (Priority: P1) 🎯 MVP
+
+**Goal**: Convert a folder containing a valid DICOM series into a single 3D NIfTI volume with preserved spatial metadata and Float32 normalization.
+
+**Independent Test**: Can be tested by providing a known-good DICOM series directory and verifying the output `.nii.gz` file's dimensions, data type, and affine matrix.
+
+### Tests for User Story 1 ⚠️
+
+- [ ] T005 [P] [US1] Write unit tests for standardized naming and folder stats in `tests/data_engine/test_file_utils.py`
+- [ ] T006 [P] [US1] Write unit tests for basic DICOM loading and metadata extraction in `tests/data_engine/test_dicom_utils.py`
+- [ ] T007 [P] [US1] Write unit tests for NIfTI conversion and spatial metadata preservation in `tests/data_engine/test_nifti_utils.py`
+
+### Implementation for User Story 1
+
+- [ ] T008 [P] [US1] Update `data_engine/src/file_utils.py` to standardize case names (e.g., BP001) and assign data codes
+- [ ] T009 [P] [US1] Update `data_engine/src/dicom_utils.py` to load DICOM metadata, extract orientation, spatial tags, and exam size
+- [ ] T010 [US1] Update `data_engine/src/nifti_utils.py` to implement `convert_series_to_nifti` using MONAI for Float32 normalization and affine preservation
+- [ ] T011 [US1] Update `data_engine/data_cleaner.py` to orchestrate valid DICOM conversion using the updated utils
+
+**Checkpoint**: At this point, User Story 1 should be fully functional and testable independently
+
+---
+
+## Phase 4: User Story 2 - Resilient Handling of Corrupted DICOM Data (Priority: P1)
+
+**Goal**: Gracefully handle corrupted or incomplete DICOM slices, missing spatial tags, mixed series, and scout images without crashing.
+
+**Independent Test**: Can be tested by placing a corrupted or non-DICOM file inside a series folder within a batch and verifying the batch completes processing other series.
+
+### Tests for User Story 2 ⚠️
+
+- [ ] T012 [P] [US2] Write unit tests for filtering, projection sorting, and outlier detection in `tests/data_engine/test_dicom_utils.py`
+- [ ] T013 [P] [US2] Write unit tests for error handling and idempotency in `tests/data_engine/test_nifti_utils.py`
+
+### Implementation for User Story 2
+
+- [ ] T014 [P] [US2] Update `data_engine/src/dicom_utils.py` to filter scout images ('DERIVED'), validate single SeriesInstanceUID, check mandatory spatial tags, and analyze spacing
+- [ ] T015 [P] [US2] Update `data_engine/src/dicom_utils.py` to implement projection-based spatial sorting
+- [ ] T016 [US2] Update `data_engine/src/nifti_utils.py` to catch MONAI loading/saving exceptions and skip existing outputs (idempotency check)
+- [ ] T017 [US2] Update `data_engine/data_cleaner.py` to catch exceptions from conversion, log specific error codes, and continue sequential processing
+
+**Checkpoint**: At this point, User Stories 1 AND 2 should both work independently
+
+---
+
+## Phase 5: User Story 3 - Comprehensive Processing Audit Log (Priority: P2)
+
+**Goal**: Generate a complete summary log at the end of a batch run that lists every processed exam, conversion status, and failure reason.
+
+**Independent Test**: Can be tested by providing a known mix of valid and corrupted series and verifying the summary log accounts for 100% of the input folders with correct statuses.
+
+### Implementation for User Story 3
+
+- [ ] T018 [US3] Update `data_engine/data_cleaner.py` to track `ConversionResult` entities for all processed exams
+- [ ] T019 [US3] Update `data_engine/data_cleaner.py` to write final audit log using `logging_utils.py` to `ingestion_summary.csv`
+
+**Checkpoint**: All user stories should now be independently functional
+
+---
+
+## Phase 6: Polish & Cross-Cutting Concerns
+
+**Purpose**: Improvements that affect multiple user stories
+
+- [ ] T020 Run entire pipeline (data_cleaner.py) to validate end-to-end integration and error handling
+- [ ] T021 Code cleanup and architectural review to ensure clean separation of concerns
+
+---
+
+## Dependencies & Execution Order
+
+### Phase Dependencies
+
+- **Setup (Phase 1)**: No dependencies - can start immediately
+- **Foundational (Phase 2)**: Depends on Setup completion - BLOCKS all user stories
+- **User Stories (Phase 3+)**: All depend on Foundational phase completion
+  - User Story 1 (P1) -> User Story 2 (P1) -> User Story 3 (P2)
+- **Polish (Final Phase)**: Depends on all desired user stories being complete
+
+### Parallel Opportunities
+
+- Setup tasks (T002, T003) can run in parallel
+- Unit tests for US1 (T005, T006, T007) can be written in parallel
+- Utils updates for US1 (T008, T009) can run in parallel
+- Unit tests for US2 (T012, T013) can be written in parallel
+- Utilities updates for US2 (T014, T015) can run in parallel
+
+---
 
 ## Implementation Strategy
 
-1. **Analysis & Mapping**: First, ensure the raw data can be correctly analyzed and mapped to sanitized names in memory.
-2. **MVP Conversion**: Deliver the core happy path NIfTI conversion using the new MONAI integration.
-3. **Resilience & Audit**: Layer on error handling and the final audit log.
+### MVP First (User Story 1 Only)
+
+1. Complete Phase 1: Setup
+2. Complete Phase 2: Foundational (CRITICAL - blocks all stories)
+3. Complete Phase 3: User Story 1
+4. **STOP and VALIDATE**: Test User Story 1 independently using quickstart instructions
+
+### Incremental Delivery
+
+1. Complete Setup + Foundational
+2. Add User Story 1 → Test independently
+3. Add User Story 2 → Test independently
+4. Add User Story 3 → Test independently
