@@ -3,6 +3,8 @@
 Auto-generated from all feature plans. Last updated: 2026-02-20
 
 ## Active Technologies
+- Python (existing version) + MONAI, nibabel, pydicom (existing), numpy, python built-in `logging` and `csv`. (001-dicom-to-nifti)
+- Local file system (NIfTI files, log files, CSV summary). (001-dicom-to-nifti)
 
 - Python (existing version) + MONAI, nibabel, pydicom (existing), python built-in `logging` and `csv`. (001-dicom-to-nifti)
 
@@ -22,6 +24,7 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python (existing version): Follow standard conventions
 
 ## Recent Changes
+- 001-dicom-to-nifti: Added Python (existing version) + MONAI, nibabel, pydicom (existing), numpy, python built-in `logging` and `csv`.
 
 - 001-dicom-to-nifti: Added Python (existing version) + MONAI, nibabel, pydicom (existing), python built-in `logging` and `csv`.
 
