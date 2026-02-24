@@ -1,6 +1,11 @@
 import os
+import sys
 import logging
 from pathlib import Path
+
+# Ensure that 'data_engine' and its parent are in the Python path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from data_engine.src.nifti_resize import (
     resize_nifti, 
@@ -75,27 +80,23 @@ def main():
 
     logging.info(f"Found {len(nifti_files)} files to process.")
 
-    with ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        futures = []
-        for file_path in nifti_files:
-            class_dir = file_path.parent.name
-            
-            # Create class-specific subdirectories for each dataset
-            output_paths = {
-                'A': OUTPUT_A_PATH / class_dir,
-                'B': OUTPUT_B_PATH / class_dir,
-                'C': OUTPUT_C_PATH / class_dir,
-                'D': OUTPUT_D_PATH / class_dir,
-                'E': OUTPUT_E_PATH / class_dir,
-            }
+    for file_path in nifti_files:
+        class_dir = file_path.parent.name
+        
+        # Create class-specific subdirectories for each dataset
+        output_paths = {
+            'A': OUTPUT_A_PATH / class_dir,
+            'B': OUTPUT_B_PATH / class_dir,
+            'C': OUTPUT_C_PATH / class_dir,
+            'D': OUTPUT_D_PATH / class_dir,
+            'E': OUTPUT_E_PATH / class_dir,
+        }
 
-            for path in output_paths.values():
-                path.mkdir(parents=True, exist_ok=True)
+        for path in output_paths.values():
+            path.mkdir(parents=True, exist_ok=True)
 
-            futures.append(executor.submit(process_file, file_path, output_paths))
-
-        for future in as_completed(futures):
-            logging.info(future.result())
+        result = process_file(file_path, output_paths)
+        logging.info(result)
 
     logging.info("Resizing process complete.")
 

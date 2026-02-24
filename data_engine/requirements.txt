@@ -3,3 +3,5 @@ numpy
 dicom2nifti
 nibabel
 nilearn
+monai
+itk
