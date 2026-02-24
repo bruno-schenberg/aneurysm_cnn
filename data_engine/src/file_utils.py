@@ -1,3 +1,5 @@
+import logging
+logger = logging.getLogger("dicom_ingestion")
 import os
 import re
 from collections import defaultdict
@@ -11,7 +13,7 @@ def get_subfolders(path):
             subfolders = [entry.name for entry in entries if entry.is_dir()]
         return subfolders
     except FileNotFoundError:
-        print(f"Error: Directory not found at '{path}'")
+        logger.error(f"Error: Directory not found at '{path}'")
         return []
 
 def get_folder_items(path):
@@ -28,7 +30,7 @@ def get_folder_items(path):
         return dcm_file_count
     except (FileNotFoundError, OSError) as e:
         # Handle cases where the directory doesn't exist or can't be accessed
-        print(f"Error: Could not count items in '{path}': {e}")
+        logger.error(f"Error: Could not count items in '{path}': {e}")
         return 0
 
 def generate_new_names(folder_list):
@@ -45,8 +47,8 @@ def generate_new_names(folder_list):
     sorted_folders = sorted(folder_list)
 
     potential_names = []
-    # Regex to find 'bp' (case-insensitive) at the start, followed by digits.
-    pattern = re.compile(r"^(bp)(\d+)", re.IGNORECASE)
+    # Regex to find 'bp' (case-insensitive) at the start, followed by an optional underscore and then digits.
+    pattern = re.compile(r"^(bp)_?(\d+)", re.IGNORECASE)
 
     for original_name in sorted_folders:
         match = pattern.match(original_name)
@@ -87,7 +89,7 @@ def find_missing_cases(name_mapping):
     Returns:
         list: A list of dictionaries for the missing cases.
     """
-    print("Checking for missing case numbers...")
+    logger.info("Checking for missing case numbers...")
     # Regex to extract the number from names like 'BP024' or 'BP024A'
     pattern = re.compile(r"BP(\d+)")
     existing_numbers = set()
@@ -114,7 +116,7 @@ def get_folder_stats(base_path, folder_list):
 
     Returns a list of dictionaries, each containing the stats for a folder.
     """
-    print("\nGathering folder statistics...")
+    logger.info("\nGathering folder statistics...")
     stats_list = []
     # The fields we will be collecting for each folder.
     stat_fields = ['folder', 'direct_items', 'non_empty_subfolders', 'items_in_subfolders']
@@ -149,7 +151,7 @@ def get_folder_stats(base_path, folder_list):
                 'items_in_subfolders': items_in_subfolders
             })
         except OSError as e:
-            print(f"  - Error scanning folder '{folder_path}': {e}")
+            logger.info(f"  - Error scanning folder '{folder_path}': {e}")
     return stats_list
 
 def add_data_codes(name_mapping):
@@ -170,7 +172,7 @@ def add_data_codes(name_mapping):
     Returns:
         list: The updated list of dictionaries with a 'data_code' key.
     """
-    print("Assigning data codes...")
+    logger.info("Assigning data codes...")
     for item in name_mapping:
         # Skip 'missing' entries that were added later and have no stats
         if 'direct_items' not in item:
@@ -195,7 +197,7 @@ def add_data_codes(name_mapping):
             action_code = 'DUPLICATE_DATA'
 
         item['data_code'] = action_code
-    print("Data codes assigned.")
+    logger.info("Data codes assigned.")
     return name_mapping
 
 def add_data_paths(name_mapping):
@@ -207,7 +209,7 @@ def add_data_paths(name_mapping):
     - SUBFOLDER_PATH: Path to the single non-empty subfolder (e.g., 'bp2/data').
     - Other codes (MISSING, EMPTY, DUPLICATE_DATA): Path is empty.
     """
-    print("Determining data paths...")
+    logger.info("Determining data paths...")
     for item in name_mapping:
         code = item.get('data_code')
         path = ''  # Default to empty path
@@ -258,7 +260,7 @@ def organize_data(case_folders, RAW_DATA_PATH):
     # 5. Find missing cases and add them to our main list.
     missing_cases = find_missing_cases(name_mapping)
     combined_mapping = name_mapping + missing_cases
-    print(f"Found {len(missing_cases)} missing case entries.")
+    logger.info(f"Found {len(missing_cases)} missing case entries.")
 
     # 6. Add action codes to the complete list (including missing cases).
     data_with_codes = add_data_codes(combined_mapping)

@@ -1,3 +1,5 @@
+import logging
+logger = logging.getLogger("dicom_ingestion")
 import csv
 import re
 
@@ -16,7 +18,7 @@ def join_class_data(validated_data, classes_csv_path):
     Returns:
         list: The validated_data list, with 'class' and 'location' added.
     """
-    print(f"\nJoining data from '{classes_csv_path}'...")
+    logger.info(f"\nJoining data from '{classes_csv_path}'...")
     class_map = {}
     try:
         with open(classes_csv_path, 'r', newline='', encoding='utf-8') as f:
@@ -31,7 +33,7 @@ def join_class_data(validated_data, classes_csv_path):
                         'patient_age': row.get('Age')
                     }
     except FileNotFoundError:
-        print(f"  - Warning: Classes file not found at '{classes_csv_path}'. Skipping join.")
+        logger.warning(f"  - Warning: Classes file not found at '{classes_csv_path}'. Skipping join.")
         return validated_data
 
     for item in validated_data:
@@ -56,12 +58,12 @@ def check_missing_class(data):
     Returns:
         list: The updated data list.
     """
-    print("\nChecking for missing classifications in 'OK' exams...")
+    logger.info("\nChecking for missing classifications in 'OK' exams...")
     missing_class_count = 0
     for item in data:
         if item.get('validation_status') == 'OK' and not item.get('class'):
             item['validation_status'] = 'MISSING_CLASS'
             missing_class_count += 1
 
-    print(f"  - Flagged {missing_class_count} 'OK' exams with status 'MISSING_CLASS'.")
+    logger.info(f"  - Flagged {missing_class_count} 'OK' exams with status 'MISSING_CLASS'.")
     return data

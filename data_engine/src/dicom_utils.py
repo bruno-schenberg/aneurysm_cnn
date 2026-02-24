@@ -1,4 +1,8 @@
+import logging
+logger = logging.getLogger("dicom_ingestion")
 import os
+import csv
+from collections import defaultdict
 import pydicom
 from pydicom.errors import InvalidDicomError
 import numpy as np
@@ -39,7 +43,7 @@ def load_dicom_metadata(path):
                 ds = pydicom.dcmread(dcm_path, stop_before_pixels=True)
                 metadata_list.append(ds)
             except InvalidDicomError:
-                print(f"  - Warning: Skipping invalid DICOM file: {dcm_path}")
+                logger.warning(f"  - Warning: Skipping invalid DICOM file: {dcm_path}")
     return metadata_list
 
 def validate_dcms(data_mapping, base_path):
@@ -48,7 +52,7 @@ def validate_dcms(data_mapping, base_path):
 
     Updates each item in data_mapping with validation status and DICOM metadata.
     """
-    print("\nValidating DICOM series with Projection-Based Sorting...")
+    logger.info("\nValidating DICOM series with Projection-Based Sorting...")
 
     for item in data_mapping:
         data_path = item.get('data_path')
@@ -56,7 +60,7 @@ def validate_dcms(data_mapping, base_path):
             item['validation_status'] = 'NOT_APPLICABLE'
             continue
 
-        print(f"  - Validating {item['fixed_name']}...")
+        logger.info(f"  - Validating {item['fixed_name']}...")
         full_path = os.path.join(base_path, data_path)
 
         try:
@@ -94,13 +98,25 @@ def validate_dcms(data_mapping, base_path):
             # 3. Projection-Based Sorting
             sample_ds = main_series_metadata[0]
             iop = getattr(sample_ds, 'ImageOrientationPatient', None)
+            ipp_sample = getattr(sample_ds, 'ImagePositionPatient', None)
+            pixel_spacing = getattr(sample_ds, 'PixelSpacing', None)
+            rows = getattr(sample_ds, 'Rows', None)
+            cols = getattr(sample_ds, 'Columns', None)
+
+            if iop is None or ipp_sample is None or pixel_spacing is None or rows is None or cols is None:
+                item['validation_status'] = 'MISSING_MANDATORY_SPATIAL_TAGS'
+                continue
+
             row_vec = np.array(iop[:3])
             col_vec = np.array(iop[3:])
             normal_vec = np.cross(row_vec, col_vec)
 
             for ds in main_series_metadata:
-                ipp = np.array(getattr(ds, 'ImagePositionPatient', [0,0,0]))
-                ds.dist = np.dot(ipp, normal_vec)
+                ipp = getattr(ds, 'ImagePositionPatient', None)
+                if ipp is None:
+                    ds.dist = 0 # Should not happen if ipp_sample passed, but being safe
+                else:
+                    ds.dist = np.dot(np.array(ipp), normal_vec)
 
             main_series_metadata.sort(key=lambda x: x.dist)
 
@@ -167,7 +183,7 @@ def validate_dcms(data_mapping, base_path):
     # After initial validation, perform outlier detection on 'OK' series
     data_mapping = validate_dcm_count(data_mapping)
 
-    print("Validation complete.")
+    logger.info("Validation complete.")
     return data_mapping
 
 def validate_dcm_count(data_mapping):
@@ -204,9 +220,9 @@ def validate_dcm_count(data_mapping):
     lower_fence = q1 - 1.5 * iqr
     upper_fence = q3 + 1.5 * iqr
 
-    print("\nAnalyzing exam size distribution for 'OK' series...")
-    print(f"  - Q1: {q1:.2f}, Q3: {q3:.2f}, IQR: {iqr:.2f}")
-    print(f"  - Lower Fence: {lower_fence:.2f}, Upper Fence: {upper_fence:.2f}")
+    logger.info("\nAnalyzing exam size distribution for 'OK' series...")
+    logger.info(f"  - Q1: {q1:.2f}, Q3: {q3:.2f}, IQR: {iqr:.2f}")
+    logger.info(f"  - Lower Fence: {lower_fence:.2f}, Upper Fence: {upper_fence:.2f}")
 
     for item in ok_exams:
         if isinstance(item.get('exam_size'), (int, float, np.number)):
@@ -214,4 +230,135 @@ def validate_dcm_count(data_mapping):
                 item['validation_status'] = 'BELOW_LIMIT'
             elif item['exam_size'] > upper_fence:
                 item['validation_status'] = 'ABOVE_LIMIT'
+
+    outliers_below = [item for item in ok_exams if item.get('validation_status') == 'BELOW_LIMIT']
+    outliers_above = [item for item in ok_exams if item.get('validation_status') == 'ABOVE_LIMIT']
+
+    if outliers_below:
+        logger.info(f"\nFound {len(outliers_below)} exams BELOW the lower fence:")
+        for item in outliers_below:
+            logger.info(f"  - {item['fixed_name']} (Exam Size: {item['exam_size']:.2f})")
+
+    if outliers_above:
+        logger.info(f"\nFound {len(outliers_above)} exams ABOVE the upper fence:")
+        for item in outliers_above:
+            logger.info(f"  - {item['fixed_name']} (Exam Size: {item['exam_size']:.2f})")
+
     return data_mapping
+
+def analyze_mixed_series(folder_path):
+    """
+    Analyzes a directory with mixed DICOM series by grouping files by SeriesInstanceUID
+    and running validation on each individual series.
+    """
+    if not os.path.isdir(folder_path):
+        return []
+
+    all_metadata = load_dicom_metadata(folder_path)
+    if not all_metadata:
+        return []
+
+    series_groups = defaultdict(list)
+    for ds in all_metadata:
+        series_groups[ds.SeriesInstanceUID].append(ds)
+
+    series_reports = []
+    for i, (uid, series_metadata) in enumerate(series_groups.items()):
+        report = {
+            'series_index': i + 1,
+            'series_instance_uid': uid,
+            'total_dcms': len(series_metadata),
+            'validation_status': 'PENDING',
+        }
+
+        main_series_metadata = [ds for ds in series_metadata if 'ORIGINAL' in getattr(ds, 'ImageType', [])]
+        
+        scout_slice_count = len(series_metadata) - len(main_series_metadata)
+        report['scout_slice_count'] = scout_slice_count
+        report['total_dcms'] = len(main_series_metadata)
+
+        if not main_series_metadata:
+            report['validation_status'] = 'NO_ORIGINAL_IMAGES_FOUND'
+            series_reports.append(report)
+            continue
+
+        sample_ds = main_series_metadata[0]
+        iop = getattr(sample_ds, 'ImageOrientationPatient', None)
+        rows = getattr(sample_ds, 'Rows', 'N/A')
+        cols = getattr(sample_ds, 'Columns', 'N/A')
+        report['orientation'] = get_orientation(iop)
+        report['modality'] = getattr(sample_ds, 'Modality', 'N/A')
+        report['slice_thickness'] = getattr(sample_ds, 'SliceThickness', 'N/A')
+        report['patient_age'] = getattr(sample_ds, 'PatientAge', 'N/A')
+        report['patient_sex'] = getattr(sample_ds, 'PatientSex', 'N/A')
+        report['exam_date'] = getattr(sample_ds, 'StudyDate', 'N/A')
+        report['image_dimensions'] = f"{rows}x{cols}"
+
+        try:
+            row_vec = np.array(iop[:3])
+            col_vec = np.array(iop[3:])
+            normal_vec = np.cross(row_vec, col_vec)
+
+            for ds in main_series_metadata:
+                ipp = getattr(ds, 'ImagePositionPatient', None)
+                if ipp is None:
+                    ds.dist = 0
+                else:
+                    ds.dist = np.dot(np.array(ipp), normal_vec)
+            
+            main_series_metadata.sort(key=lambda x: x.dist)
+
+            distances = np.array([ds.dist for ds in main_series_metadata])
+            deltas = np.abs(np.diff(distances))
+            unique_spacings = np.unique(np.around(deltas, decimals=2))
+
+            num_duplicates = np.sum(deltas < 0.001)
+            report['duplicate_slice_count'] = int(num_duplicates)
+
+            if num_duplicates > 0:
+                report['validation_status'] = 'DUPLICATE_SLICES'
+            elif len(unique_spacings) == 1:
+                report['validation_status'] = 'OK'
+            elif len(unique_spacings) > 1:
+                report['validation_status'] = 'VARIABLE_SPACING'
+
+        except Exception as e:
+            report['validation_status'] = f'VALIDATION_ERROR: {str(e)}'
+
+        series_reports.append(report)
+
+    return series_reports
+
+def analyze_mixed_folders(data_mapping, base_path, output_csv_path):
+    """
+    Analyzes folders flagged with MIXED_SERIES_ERROR and outputs a report.
+    """
+    mixed_cases = [item for item in data_mapping if str(item.get('validation_status')).startswith('MIXED_SERIES_ERROR')]
+    if not mixed_cases:
+        return
+
+    logger.info(f"Analyzing {len(mixed_cases)} cases with mixed series...")
+    all_series_reports = []
+    
+    for case in mixed_cases:
+        folder_path = os.path.join(base_path, case['data_path'])
+        reports = analyze_mixed_series(folder_path)
+        for report in reports:
+            report['parent_case_name'] = case['fixed_name']
+        all_series_reports.extend(reports)
+
+    if all_series_reports:
+        all_keys = set()
+        for report in all_series_reports:
+            all_keys.update(report.keys())
+        
+        fieldnames = sorted(list(all_keys))
+        if 'parent_case_name' in fieldnames:
+            fieldnames.remove('parent_case_name')
+            fieldnames.insert(0, 'parent_case_name')
+
+        with open(output_csv_path, 'w', newline='') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(all_series_reports)
+        logger.info(f"Mixed series analysis complete. Saved to: {output_csv_path}")

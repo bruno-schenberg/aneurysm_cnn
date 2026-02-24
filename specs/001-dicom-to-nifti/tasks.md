@@ -11,9 +11,9 @@ description: "Task list for DICOM Ingestion & NIfTI Standardization implementati
 
 **Purpose**: Project initialization and basic structure
 
-- [ ] T001 Update dependencies by adding `monai` to `data_engine/requirements.txt`
-- [ ] T002 [P] Create new file `data_engine/src/logging_utils.py`
-- [ ] T003 [P] Create empty test files: `tests/data_engine/test_file_utils.py`, `tests/data_engine/test_dicom_utils.py`, `tests/data_engine/test_nifti_utils.py`
+- [x] T001 Update dependencies by adding `monai` to `data_engine/requirements.txt`
+- [x] T002 [P] Create new file `data_engine/src/logging_utils.py`
+- [x] T003 [P] Create empty test files: `data_engine/tests/test_file_utils.py`, `data_engine/tests/test_dicom_utils.py`, `data_engine/tests/test_nifti_utils.py`
 
 ---
 
@@ -21,7 +21,7 @@ description: "Task list for DICOM Ingestion & NIfTI Standardization implementati
 
 **Purpose**: Core infrastructure that MUST be complete before ANY user story can be implemented
 
-- [ ] T004 Implement comprehensive audit and error logging mechanism (JSONL and CSV support) in `data_engine/src/logging_utils.py`
+- [x] T004 Implement comprehensive audit and error logging mechanism (JSONL and CSV support) in `data_engine/src/logging_utils.py`
 
 **Checkpoint**: Foundation ready - user story implementation can now begin
 
@@ -35,16 +35,16 @@ description: "Task list for DICOM Ingestion & NIfTI Standardization implementati
 
 ### Tests for User Story 1 ⚠️
 
-- [ ] T005 [P] [US1] Write unit tests for standardized naming and folder stats in `tests/data_engine/test_file_utils.py`
-- [ ] T006 [P] [US1] Write unit tests for basic DICOM loading and metadata extraction in `tests/data_engine/test_dicom_utils.py`
-- [ ] T007 [P] [US1] Write unit tests for NIfTI conversion and spatial metadata preservation in `tests/data_engine/test_nifti_utils.py`
+- [x] T005 [P] [US1] Write unit tests for standardized naming and folder stats in `data_engine/tests/test_file_utils.py`
+- [x] T006 [P] [US1] Write unit tests for basic DICOM loading and metadata extraction in `data_engine/tests/test_dicom_utils.py`
+- [x] T007 [P] [US1] Write unit tests for NIfTI conversion and spatial metadata preservation in `data_engine/tests/test_nifti_utils.py`
 
 ### Implementation for User Story 1
 
-- [ ] T008 [P] [US1] Update `data_engine/src/file_utils.py` to standardize case names (e.g., BP001) and assign data codes
-- [ ] T009 [P] [US1] Update `data_engine/src/dicom_utils.py` to load DICOM metadata, extract orientation, spatial tags, and exam size
-- [ ] T010 [US1] Update `data_engine/src/nifti_utils.py` to implement `convert_series_to_nifti` using MONAI for Float32 normalization and affine preservation
-- [ ] T011 [US1] Update `data_engine/data_cleaner.py` to orchestrate valid DICOM conversion using the updated utils
+- [x] T008 [P] [US1] Update `data_engine/src/file_utils.py` to standardize case names (e.g., BP001) and assign data codes
+- [x] T009 [P] [US1] Update `data_engine/src/dicom_utils.py` to load DICOM metadata, extract orientation, spatial tags, and exam size
+- [x] T010 [US1] Update `data_engine/src/nifti_utils.py` to implement `convert_series_to_nifti` using MONAI for Float32 normalization and affine preservation
+- [x] T011 [US1] Update `data_engine/data_cleaner.py` to orchestrate valid DICOM conversion using the updated utils
 
 **Checkpoint**: At this point, User Story 1 should be fully functional and testable independently
 
@@ -58,15 +58,15 @@ description: "Task list for DICOM Ingestion & NIfTI Standardization implementati
 
 ### Tests for User Story 2 ⚠️
 
-- [ ] T012 [P] [US2] Write unit tests for filtering, projection sorting, and outlier detection in `tests/data_engine/test_dicom_utils.py`
-- [ ] T013 [P] [US2] Write unit tests for error handling and idempotency in `tests/data_engine/test_nifti_utils.py`
+- [x] T012 [P] [US2] Write unit tests for filtering, projection sorting, and outlier detection in `data_engine/tests/test_dicom_utils.py`
+- [x] T013 [P] [US2] Write unit tests for error handling and idempotency in `data_engine/tests/test_nifti_utils.py`
 
 ### Implementation for User Story 2
 
-- [ ] T014 [P] [US2] Update `data_engine/src/dicom_utils.py` to filter scout images ('DERIVED'), validate single SeriesInstanceUID, check mandatory spatial tags, and analyze spacing
-- [ ] T015 [P] [US2] Update `data_engine/src/dicom_utils.py` to implement projection-based spatial sorting
-- [ ] T016 [US2] Update `data_engine/src/nifti_utils.py` to catch MONAI loading/saving exceptions and skip existing outputs (idempotency check)
-- [ ] T017 [US2] Update `data_engine/data_cleaner.py` to catch exceptions from conversion, log specific error codes, and continue sequential processing
+- [x] T014 [P] [US2] Update `data_engine/src/dicom_utils.py` to filter scout images ('DERIVED'), validate single SeriesInstanceUID, check mandatory spatial tags, and analyze spacing
+- [x] T015 [P] [US2] Update `data_engine/src/dicom_utils.py` to implement projection-based spatial sorting
+- [x] T016 [US2] Update `data_engine/src/nifti_utils.py` to catch MONAI loading/saving exceptions and skip existing outputs (idempotency check)
+- [x] T017 [US2] Update `data_engine/data_cleaner.py` to catch exceptions from conversion, log specific error codes, and continue sequential processing
 
 **Checkpoint**: At this point, User Stories 1 AND 2 should both work independently
 
@@ -80,8 +80,8 @@ description: "Task list for DICOM Ingestion & NIfTI Standardization implementati
 
 ### Implementation for User Story 3
 
-- [ ] T018 [US3] Update `data_engine/data_cleaner.py` to track `ConversionResult` entities for all processed exams
-- [ ] T019 [US3] Update `data_engine/data_cleaner.py` to write final audit log using `logging_utils.py` to `ingestion_summary.csv`
+- [x] T018 [US3] Update `data_engine/data_cleaner.py` to track `ConversionResult` entities for all processed exams
+- [x] T019 [US3] Update `data_engine/data_cleaner.py` to write final audit log using `logging_utils.py` to `ingestion_summary.csv`
 
 **Checkpoint**: All user stories should now be independently functional
 
@@ -91,8 +91,8 @@ description: "Task list for DICOM Ingestion & NIfTI Standardization implementati
 
 **Purpose**: Improvements that affect multiple user stories
 
-- [ ] T020 Run entire pipeline (data_cleaner.py) to validate end-to-end integration and error handling
-- [ ] T021 Code cleanup and architectural review to ensure clean separation of concerns
+- [x] T020 Run entire pipeline (data_cleaner.py) to validate end-to-end integration and error handling
+- [x] T021 Code cleanup and architectural review to ensure clean separation of concerns
 
 ---
 

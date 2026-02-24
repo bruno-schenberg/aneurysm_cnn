@@ -3,9 +3,25 @@ environment/rocm/logs/
 environment/cuda/logs/
 
 data_engine/src/__pycache__
-data_engine/folder_rename_map.csv
-data_engine/mixed_series_analysis.csv
+data_engine/.pytest_cache
+data_engine/dataset
+data_engine/output
 
 training_engine/src/__pycache__
 training_engine/experiments
 training_engine/datasets/
+
+# Python defaults
+__pycache__/
+*.pyc
+venv/
+dist/
+*.egg-info/
+
+# Universal
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+.vscode/
+.idea/
