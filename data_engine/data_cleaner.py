@@ -1,11 +1,6 @@
 import csv
 import os
-import sys
 import argparse
-
-# Ensure that 'data_engine' is in the Python path
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
-
 from src.file_utils import get_subfolders, organize_data
 from src.dicom_utils import validate_dcms, analyze_mixed_folders
 from src.class_utils import join_class_data, check_missing_class
