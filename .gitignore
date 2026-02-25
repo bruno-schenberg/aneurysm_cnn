@@ -1,9 +1,9 @@
-.venv/
 environment/rocm/logs/
 environment/cuda/logs/
 
 data_engine/src/__pycache__
 data_engine/.pytest_cache
+data_engine/.venv
 data_engine/dataset
 data_engine/output
 
