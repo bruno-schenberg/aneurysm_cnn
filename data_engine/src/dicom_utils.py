@@ -1,11 +1,12 @@
 import logging
-logger = logging.getLogger("dicom_ingestion")
 import os
 import csv
 from collections import defaultdict
 import pydicom
 from pydicom.errors import InvalidDicomError
 import numpy as np
+
+logger = logging.getLogger("dicom_ingestion")
 
 def get_orientation(iop):
     """Determines if the orientation is Axial, Coronal, Sagittal, or Oblique."""
@@ -27,13 +28,8 @@ def get_orientation(iop):
 
 def load_dicom_metadata(path):
     """
-    Loads all DICOM file headers from a given directory path.
-
-    Args:
-        path (str): The full path to the directory containing .dcm files.
-
-    Returns:
-        list: A list of pydicom dataset objects, one for each DICOM file.
+    Loads all valid DICOM file headers from a given directory path.
+    Skips files that are not valid DICOMs.
     """
     metadata_list = []
     for f in os.listdir(path):
@@ -43,14 +39,66 @@ def load_dicom_metadata(path):
                 ds = pydicom.dcmread(dcm_path, stop_before_pixels=True)
                 metadata_list.append(ds)
             except InvalidDicomError:
-                logger.warning(f"  - Warning: Skipping invalid DICOM file: {dcm_path}")
+                logger.warning(f"  - Warning: Skipping corrupt/invalid DICOM file: {dcm_path}")
     return metadata_list
+
+def _calculate_projection_distances(metadata_list, iop):
+    """
+    Sorts a list of DICOM metadata objects in 3D space by projecting their
+    ImagePositionPatient onto a normal vector derived from ImageOrientationPatient.
+    """
+    row_vec = np.array(iop[:3])
+    col_vec = np.array(iop[3:])
+    normal_vec = np.cross(row_vec, col_vec)
+
+    for ds in metadata_list:
+        ipp = getattr(ds, 'ImagePositionPatient', None)
+        if ipp is None:
+            ds.dist = 0 # Failsafe, shouldn't happen if validation passed earlier
+        else:
+            ds.dist = np.dot(np.array(ipp), normal_vec)
+
+    # Sort in place based on the calculated physical distance
+    metadata_list.sort(key=lambda x: x.dist)
+
+def _evaluate_spacing(metadata_list):
+    """
+    Analyzes the physical distance between consecutive slices to determine
+    if the sequence is uniform, gapped, or has variable spacing.
+    Returns: (validation_status, unique_spacings, duplicate_count, deltas)
+    """
+    distances = np.array([ds.dist for ds in metadata_list])
+    deltas = np.abs(np.diff(distances))
+    unique_spacings = np.unique(np.around(deltas, decimals=2))
+
+    num_duplicates = int(np.sum(deltas < 0.001))
+
+    if num_duplicates > 0:
+        return 'DUPLICATE_SLICES', unique_spacings, num_duplicates, deltas
+
+    if len(unique_spacings) == 1:
+        # Perfectly uniform spacing, check instance numbers for completeness
+        instance_numbers = sorted([int(getattr(ds, 'InstanceNumber', 0)) for ds in metadata_list])
+        is_gapped_instance = any(np.diff(instance_numbers) != 1)
+        return ('GAPPED_SEQUENCE' if is_gapped_instance else 'OK'), unique_spacings, 0, deltas
+
+    elif len(unique_spacings) == 2:
+        # Check if one spacing is roughly double the other, indicating missing slices
+        sorted_spacings = sorted(unique_spacings)
+        if np.isclose(sorted_spacings[1], 2 * sorted_spacings[0], atol=0.1):
+            gaps = np.sum(np.isclose(deltas, sorted_spacings[1], atol=0.1))
+            return f'GAPPED_SEQUENCE ({gaps} missing)', unique_spacings, 0, deltas
+        else:
+            return 'VARIABLE_SPACING', unique_spacings, 0, deltas
+
+    else:
+        # More than two spacing values
+        return 'VARIABLE_SPACING', unique_spacings, 0, deltas
 
 def validate_dcms(data_mapping, base_path):
     """
     Validates DICOM series using projection-based sorting and integrity checks.
-
-    Updates each item in data_mapping with validation status and DICOM metadata.
+    Updates each item in data_mapping with validation status and metadata.
     """
     logger.info("\nValidating DICOM series with Projection-Based Sorting...")
 
@@ -64,80 +112,58 @@ def validate_dcms(data_mapping, base_path):
         full_path = os.path.join(base_path, data_path)
 
         try:
-            # 1. Load DICOM metadata from the specified path.
+            # 1. Load DICOM metadata
             metadata_list = load_dicom_metadata(full_path)
 
             if not metadata_list:
-                item['validation_status'] = 'NO_DCM_FILES'
+                item['validation_status'] = 'ALL_DCMS_CORRUPT'
                 continue
 
-            # 2. Check for Mixed Series (SeriesInstanceUID)
+            # 2. Check for Mixed Series (Multiple scans dumped in one folder)
             uids = {ds.SeriesInstanceUID for ds in metadata_list}
             if len(uids) > 1:
                 item['validation_status'] = f'MIXED_SERIES_ERROR ({len(uids)} UIDs)'
                 continue
             
-            # --- Filter out scout/localizer images based on ImageType ---
-            # The main series will have 'ORIGINAL' in its ImageType.
-            # Scout/localizer images often have 'DERIVED'.
-            main_series_metadata = []
-            for ds in metadata_list:
-                image_type = getattr(ds, 'ImageType', [])
-                if 'ORIGINAL' in image_type:
-                    main_series_metadata.append(ds)
+            # 3. Filter out scout/localizer images (Keep only 'ORIGINAL')
+            main_series_metadata = [ds for ds in metadata_list if 'ORIGINAL' in getattr(ds, 'ImageType', [])]
             
             if not main_series_metadata:
                 item['validation_status'] = 'NO_ORIGINAL_IMAGES_FOUND'
                 continue
 
-            # Update total_dcms to reflect the main series size and count scouts
-            scout_slice_count = len(metadata_list) - len(main_series_metadata)
             item['total_dcms'] = len(main_series_metadata)
-            item['scout_slice_count'] = scout_slice_count
+            item['scout_slice_count'] = len(metadata_list) - len(main_series_metadata)
 
-            # 3. Projection-Based Sorting
+            # 4. Extract Spatial Tags
             sample_ds = main_series_metadata[0]
             iop = getattr(sample_ds, 'ImageOrientationPatient', None)
-            ipp_sample = getattr(sample_ds, 'ImagePositionPatient', None)
-            pixel_spacing = getattr(sample_ds, 'PixelSpacing', None)
-            rows = getattr(sample_ds, 'Rows', None)
-            cols = getattr(sample_ds, 'Columns', None)
-
-            if iop is None or ipp_sample is None or pixel_spacing is None or rows is None or cols is None:
+            ipp = getattr(sample_ds, 'ImagePositionPatient', None)
+            
+            if iop is None or ipp is None or getattr(sample_ds, 'PixelSpacing', None) is None:
                 item['validation_status'] = 'MISSING_MANDATORY_SPATIAL_TAGS'
                 continue
 
-            row_vec = np.array(iop[:3])
-            col_vec = np.array(iop[3:])
-            normal_vec = np.cross(row_vec, col_vec)
+            # 5. Math: Projection-Based Sorting
+            _calculate_projection_distances(main_series_metadata, iop)
 
-            for ds in main_series_metadata:
-                ipp = getattr(ds, 'ImagePositionPatient', None)
-                if ipp is None:
-                    ds.dist = 0 # Should not happen if ipp_sample passed, but being safe
-                else:
-                    ds.dist = np.dot(np.array(ipp), normal_vec)
+            # 6. Math: Spacing Analysis & Quality Control
+            status, unique_spacings, duplicates, deltas = _evaluate_spacing(main_series_metadata)
+            item['validation_status'] = status
+            item['duplicate_slice_count'] = duplicates
 
-            main_series_metadata.sort(key=lambda x: x.dist)
-
-            # 4. Spacing Analysis
-            distances = np.array([ds.dist for ds in main_series_metadata])
-            deltas = np.abs(np.diff(distances))
-            unique_spacings = np.unique(np.around(deltas, decimals=2))
-
-            # 5. Update item metadata
+            # 7. Extract final item metadata
             rows = getattr(sample_ds, 'Rows', 'N/A')
             cols = getattr(sample_ds, 'Columns', 'N/A')
             
-            # Calculate effective slice thickness/spacing from projection distances
-            effective_slice_thickness = 'N/A'
+            # Calculate effective slice thickness based on real distances
             if len(deltas) > 0:
-                # Use the most common spacing as the representative value
                 vals, counts = np.unique(np.around(deltas, decimals=2), return_counts=True)
                 effective_slice_thickness = vals[np.argmax(counts)]
             elif len(main_series_metadata) == 1:
-                # If only one slice, fall back to the DICOM tag
                 effective_slice_thickness = getattr(sample_ds, 'SliceThickness', 'N/A')
+            else:
+                effective_slice_thickness = 'N/A'
 
             item['orientation'] = get_orientation(iop)
             item['modality'] = getattr(sample_ds, 'Modality', 'N/A')
@@ -145,42 +171,15 @@ def validate_dcms(data_mapping, base_path):
             item['patient_sex'] = getattr(sample_ds, 'PatientSex', 'N/A')
             item['image_dimensions'] = f"{rows}x{cols}"
 
-            # Calculate exam_size (total coverage)
-            exam_size = 'N/A'
-            # Ensure slice thickness is a number before multiplying
             if isinstance(effective_slice_thickness, (int, float, np.number)):
-                exam_size = item['total_dcms'] * effective_slice_thickness
-            item['exam_size'] = exam_size
-
-            num_duplicates = np.sum(deltas < 0.001)
-            item['duplicate_slice_count'] = int(num_duplicates)
-
-            if num_duplicates > 0:
-                item['validation_status'] = f'DUPLICATE_SLICES'
+                item['exam_size'] = item['total_dcms'] * effective_slice_thickness
             else:
-                # Refined check for gapped vs. variable spacing
-                if len(unique_spacings) == 1:
-                    # Perfectly uniform spacing, check instance numbers for completeness
-                    instance_numbers = sorted([int(getattr(ds, 'InstanceNumber', 0)) for ds in main_series_metadata])
-                    is_gapped_instance = any(np.diff(instance_numbers) != 1)
-                    item['validation_status'] = 'GAPPED_SEQUENCE' if is_gapped_instance else 'OK'
-                elif len(unique_spacings) == 2:
-                    # Check if one spacing is roughly double the other, indicating missing slices
-                    sorted_spacings = sorted(unique_spacings)
-                    if np.isclose(sorted_spacings[1], 2 * sorted_spacings[0], atol=0.1):
-                         # Count how many "double gaps" exist
-                        gaps = np.sum(np.isclose(deltas, sorted_spacings[1], atol=0.1))
-                        item['validation_status'] = f'GAPPED_SEQUENCE ({gaps} missing)'
-                    else:
-                        item['validation_status'] = 'VARIABLE_SPACING'
-                elif len(unique_spacings) > 2:
-                    # More than two spacing values is truly variable
-                    item['validation_status'] = 'VARIABLE_SPACING'
+                item['exam_size'] = 'N/A'
 
         except Exception as e:
             item['validation_status'] = f'VALIDATION_ERROR: {str(e)}'
 
-    # After initial validation, perform outlier detection on 'OK' series
+    # 8. Perform statistical outlier detection on 'OK' series sizes
     data_mapping = validate_dcm_count(data_mapping)
 
     logger.info("Validation complete.")
@@ -189,27 +188,16 @@ def validate_dcms(data_mapping, base_path):
 def validate_dcm_count(data_mapping):
     """
     Identifies outliers in exam size for validated series using the IQR method.
-
-    Calculates quartiles for exam sizes of 'OK' series and flags those
-    outside the fences (Q1 - 1.5*IQR, Q3 + 1.5*IQR).
-
-    Args:
-        data_mapping (list): The list of dictionaries, where each dictionary
-                             represents a DICOM series and its metadata.
-
-    Returns:
-        list: The updated data_mapping with outlier statuses.
+    Flags those outside the fences (Q1 - 1.5*IQR, Q3 + 1.5*IQR).
     """
     ok_exams = [item for item in data_mapping if item.get('validation_status') == 'OK']
     
-    # Safely convert exam_size to float for calculation, skipping non-numeric values.
-    # This mirrors the logic from the successful debug script.
     exam_sizes = []
     for item in ok_exams:
         try:
             exam_sizes.append(float(item['exam_size']))
         except (ValueError, TypeError):
-            continue # Skip if exam_size is 'N/A' or otherwise not convertible
+            continue 
 
     if not exam_sizes:
         return data_mapping
@@ -249,7 +237,7 @@ def validate_dcm_count(data_mapping):
 def analyze_mixed_series(folder_path):
     """
     Analyzes a directory with mixed DICOM series by grouping files by SeriesInstanceUID
-    and running validation on each individual series.
+    and running a mini-validation on each individual series.
     """
     if not os.path.isdir(folder_path):
         return []
@@ -272,9 +260,7 @@ def analyze_mixed_series(folder_path):
         }
 
         main_series_metadata = [ds for ds in series_metadata if 'ORIGINAL' in getattr(ds, 'ImageType', [])]
-        
-        scout_slice_count = len(series_metadata) - len(main_series_metadata)
-        report['scout_slice_count'] = scout_slice_count
+        report['scout_slice_count'] = len(series_metadata) - len(main_series_metadata)
         report['total_dcms'] = len(main_series_metadata)
 
         if not main_series_metadata:
@@ -284,44 +270,24 @@ def analyze_mixed_series(folder_path):
 
         sample_ds = main_series_metadata[0]
         iop = getattr(sample_ds, 'ImageOrientationPatient', None)
-        rows = getattr(sample_ds, 'Rows', 'N/A')
-        cols = getattr(sample_ds, 'Columns', 'N/A')
+        
         report['orientation'] = get_orientation(iop)
         report['modality'] = getattr(sample_ds, 'Modality', 'N/A')
         report['slice_thickness'] = getattr(sample_ds, 'SliceThickness', 'N/A')
         report['patient_age'] = getattr(sample_ds, 'PatientAge', 'N/A')
         report['patient_sex'] = getattr(sample_ds, 'PatientSex', 'N/A')
         report['exam_date'] = getattr(sample_ds, 'StudyDate', 'N/A')
-        report['image_dimensions'] = f"{rows}x{cols}"
+        report['image_dimensions'] = f"{getattr(sample_ds, 'Rows', 'N/A')}x{getattr(sample_ds, 'Columns', 'N/A')}"
 
         try:
-            row_vec = np.array(iop[:3])
-            col_vec = np.array(iop[3:])
-            normal_vec = np.cross(row_vec, col_vec)
-
-            for ds in main_series_metadata:
-                ipp = getattr(ds, 'ImagePositionPatient', None)
-                if ipp is None:
-                    ds.dist = 0
-                else:
-                    ds.dist = np.dot(np.array(ipp), normal_vec)
-            
-            main_series_metadata.sort(key=lambda x: x.dist)
-
-            distances = np.array([ds.dist for ds in main_series_metadata])
-            deltas = np.abs(np.diff(distances))
-            unique_spacings = np.unique(np.around(deltas, decimals=2))
-
-            num_duplicates = np.sum(deltas < 0.001)
-            report['duplicate_slice_count'] = int(num_duplicates)
-
-            if num_duplicates > 0:
-                report['validation_status'] = 'DUPLICATE_SLICES'
-            elif len(unique_spacings) == 1:
-                report['validation_status'] = 'OK'
-            elif len(unique_spacings) > 1:
-                report['validation_status'] = 'VARIABLE_SPACING'
-
+            if iop is not None and getattr(sample_ds, 'ImagePositionPatient', None) is not None:
+                _calculate_projection_distances(main_series_metadata, iop)
+                status, _, duplicates, _ = _evaluate_spacing(main_series_metadata)
+                report['validation_status'] = status
+                report['duplicate_slice_count'] = duplicates
+            else:
+                 report['validation_status'] = 'MISSING_MANDATORY_SPATIAL_TAGS'
+                 
         except Exception as e:
             report['validation_status'] = f'VALIDATION_ERROR: {str(e)}'
 

@@ -49,12 +49,12 @@ def test_validate_dcms_with_sample_data():
     
     # Since it's actual sample data, we expect it to be processed
     # validation_status might not be 'OK' if data has variable spacing/gaps,
-    # but it shouldn't fail with an unhandled exception or 'NO_DCM_FILES'.
+    # but it shouldn't fail with an unhandled exception or 'ALL_DCMS_CORRUPT'.
     valid_statuses = ("OK", "VARIABLE_SPACING", "GAPPED_SEQUENCE", "DUPLICATE_SLICES", "BELOW_LIMIT", "ABOVE_LIMIT")
     
     # We use lower checking logic here just to make sure it ran completely
     assert not item["validation_status"].startswith("VALIDATION_ERROR")
-    assert item["validation_status"] != "NO_DCM_FILES"
+    assert item["validation_status"] != "ALL_DCMS_CORRUPT"
 
 def test_projection_sorting_logic():
     # Mocking the distance calculation logic
