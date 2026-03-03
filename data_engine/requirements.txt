@@ -4,3 +4,5 @@ nibabel
 nilearn
 monai
 itk
+pytest
+ruff
