@@ -18,7 +18,6 @@ Usage:
 import csv
 import argparse
 from pathlib import Path
-from typing import List, Dict, Any
 
 from src.file_utils import get_subfolders, organize_data
 from src.dicom_utils import validate_dcms, analyze_mixed_folders
@@ -36,30 +35,32 @@ DEFAULT_OUTPUT_NIFTI_PATH = Path("/mnt/data/cases-3/nifti")
 OUTPUT_DIR = BASE_DIR / "output"
 DATASET_DIR = BASE_DIR / "dataset"
 
-OUTPUT_CSV_PATH = OUTPUT_DIR / "folder_rename_map.csv"
+VALIDATION_SUMMARY_CSV_PATH = OUTPUT_DIR / "folder_rename_map.csv"
 CLASSES_CSV_PATH = DATASET_DIR / "classes.csv"
 MIXED_SERIES_CSV_PATH = OUTPUT_DIR / "mixed_series_analysis.csv"
 INGESTION_LOG_PATH = OUTPUT_DIR / "ingestion.log"
 AUDIT_LOG_PATH = OUTPUT_DIR / "ingestion_summary.csv"
 
 
-def _build_audit_log(conversion_results: List[Dict[str, Any]], final_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _build_audit_log(conversion_results: list[dict], final_data: list[dict]) -> list[dict]:
     """
-    Constructs a complete audit log combining successful conversions and skipped/failed items.
-    
+    Constructs a complete audit log covering every discovered case.
+
+    SC-005 requires 100% coverage: every input series must have a traceable entry,
+    whether it was converted, skipped, or rejected at any earlier pipeline stage.
+
     Args:
-        conversion_results: List of dictionaries detailing successful NIfTI conversions.
-        final_data: The full dataset containing all processed and validated cases.
-        
+        conversion_results: Outcomes from the NIfTI conversion step.
+        final_data: The full dataset including cases that never reached conversion.
+
     Returns:
         A combined list of audit log entries for every discovered case.
     """
-    full_audit_results = []
-    
-    # First, add the conversion results
-    full_audit_results.extend(conversion_results)
-    
-    # Then, add those that weren't eligible (failed validation or missing class)
+    full_audit_results = list(conversion_results)
+
+    # Cases absent from conversion_results were rejected before the conversion
+    # step (failed validation, missing classification, etc.) — include them as failed
+    # so the audit log accounts for every case in the input batch.
     converted_names = {r['exam_name'] for r in conversion_results}
     for item in final_data:
         if item['fixed_name'] not in converted_names:
@@ -69,7 +70,7 @@ def _build_audit_log(conversion_results: List[Dict[str, Any]], final_data: List[
                 "reason": item.get('validation_status', "Unknown validation error"),
                 "output_path": ""
             })
-            
+
     return full_audit_results
 
 
@@ -84,8 +85,7 @@ def run_pipeline(raw_dir: str | Path, nifti_dir: str | Path) -> None:
     raw_dir_str = str(raw_dir)
     nifti_dir_str = str(nifti_dir)
 
-    # 0. Setup logger
-    # Ensure output directory exists before logging
+    # Ensure output directory exists before the logger tries to open its file
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     
     logger = setup_logger(str(INGESTION_LOG_PATH))
@@ -101,30 +101,30 @@ def run_pipeline(raw_dir: str | Path, nifti_dir: str | Path) -> None:
         # 2. Validate the DICOM series.
         validated_data = validate_dcms(organized_data, raw_dir_str)
 
-        # 2.5 Analyze mixed folders
+        # 3. Produce a detailed breakdown of any mixed-series folders for manual review.
         analyze_mixed_folders(validated_data, raw_dir_str, str(MIXED_SERIES_CSV_PATH))
 
-        # 3. Join with classification data from classes.csv
+        # 4. Join with classification data from classes.csv
         data_with_classes = join_class_data(validated_data, str(CLASSES_CSV_PATH))
 
-        # 4. Check for missing classes in 'OK' exams
+        # 5. Check for missing classes in 'OK' exams
         final_data = check_missing_class(data_with_classes)
 
-        # 5. Filter the data for NIfTI conversion before saving
+        # 6. Filter the data for NIfTI conversion before saving
         eligible_for_conversion = filter_for_conversion(final_data)
 
-        # 6. Convert to NIfTI and track results
+        # 7. Convert to NIfTI and track results
         conversion_results = process_and_convert_exams(
             eligible_for_conversion, raw_dir_str, nifti_dir_str
         )
 
-        # 7. Write the final audit log (User Story 3)
+        # 8. Write the audit log — must cover 100% of input cases for traceability.
         full_audit_results = _build_audit_log(conversion_results, final_data)
         write_audit_log(full_audit_results, str(AUDIT_LOG_PATH))
         logger.info(f"Successfully created audit log at '{AUDIT_LOG_PATH}'")
 
-        # 8. Write the folder rename map (legacy support)
-        with open(OUTPUT_CSV_PATH, 'w', newline='') as csvfile:
+        # 9. Write the per-case validation summary used for dataset quality review.
+        with open(VALIDATION_SUMMARY_CSV_PATH, 'w', newline='') as csvfile:
             fieldnames = [
                 'original_name', 'fixed_name', 'data_path', 'total_dcms',
                 'validation_status', 'duplicate_slice_count', 'scout_slice_count', 'orientation',
@@ -135,7 +135,7 @@ def run_pipeline(raw_dir: str | Path, nifti_dir: str | Path) -> None:
             writer.writeheader()
             writer.writerows(final_data)
 
-        logger.info(f"Successfully created rename map at '{OUTPUT_CSV_PATH}'")
+        logger.info(f"Successfully created validation summary at '{VALIDATION_SUMMARY_CSV_PATH}'")
         logger.info("Pipeline execution completed successfully.")
 
     except Exception as e:

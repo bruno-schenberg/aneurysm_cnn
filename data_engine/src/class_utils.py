@@ -3,7 +3,7 @@ logger = logging.getLogger("dicom_ingestion")
 import csv
 import re
 
-def join_class_data(validated_data, classes_csv_path):
+def join_class_data(validated_data: list[dict], classes_csv_path: str) -> list[dict]:
     """
     Joins classification data from classes.csv to the validated data list.
 
@@ -45,7 +45,7 @@ def join_class_data(validated_data, classes_csv_path):
             item.update(class_info)
     return validated_data
 
-def check_missing_class(data):
+def check_missing_class(data: list[dict]) -> list[dict]:
     """
     Checks 'OK' exams and flags those with a missing classification.
 

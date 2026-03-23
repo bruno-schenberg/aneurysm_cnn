@@ -4,7 +4,7 @@ import numpy as np
 from src.dicom_utils import get_orientation, load_dicom_metadata, validate_dcms
 
 # Path to the sample raw dataset
-SAMPLE_RAW_DIR = "/home/aneurysm_cnn/data_engine/dataset/sample-raw"
+SAMPLE_RAW_DIR = "/mnt/data/cases-3/sample-raw"
 SAMPLE_DICOM_DIR = os.path.join(SAMPLE_RAW_DIR, "BP05- 2838474", "Anonymous_Mr_712482402_20170105")
 
 def test_get_orientation():

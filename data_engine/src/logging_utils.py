@@ -4,9 +4,29 @@ import os
 import json
 from datetime import datetime
 
+
+class _JsonlHandler(logging.FileHandler):
+    """Logging handler that writes each log record as a JSON line (JSONL format)."""
+
+    def emit(self, record):
+        try:
+            entry = {
+                "timestamp": datetime.fromtimestamp(record.created).isoformat(),
+                "level": record.levelname,
+                "logger": record.name,
+                "message": record.getMessage(),
+            }
+            if record.exc_info:
+                entry["exception"] = self.formatException(record.exc_info)
+            self.stream.write(json.dumps(entry) + '\n')
+            self.flush()
+        except Exception:
+            self.handleError(record)
+
+
 def setup_logger(log_path: str = "ingestion.log"):
     """
-    Configures the standard logging to write to both a file and the console.
+    Configures the standard logging to write to both a file (JSONL format) and the console.
     """
     logger = logging.getLogger("dicom_ingestion")
     logger.setLevel(logging.DEBUG)
@@ -15,13 +35,11 @@ def setup_logger(log_path: str = "ingestion.log"):
     if logger.handlers:
         return logger
 
-    # File handler for detailed technical logs
-    file_handler = logging.FileHandler(log_path)
+    # File handler writes JSONL for machine-readable audit trail (FR-007)
+    file_handler = _JsonlHandler(log_path)
     file_handler.setLevel(logging.DEBUG)
-    file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    file_handler.setFormatter(file_formatter)
 
-    # Console handler for high-level progress
+    # Console handler for human-readable progress
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.INFO)
     console_formatter = logging.Formatter('%(levelname)s: %(message)s')

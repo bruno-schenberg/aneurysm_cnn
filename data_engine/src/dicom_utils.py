@@ -8,7 +8,7 @@ import numpy as np
 
 logger = logging.getLogger("dicom_ingestion")
 
-def get_orientation(iop):
+def get_orientation(iop: list[float] | None) -> str:
     """Determines if the orientation is Axial, Coronal, Sagittal, or Oblique."""
     if iop is None or len(iop) < 6:
         return "UNKNOWN"
@@ -26,7 +26,7 @@ def get_orientation(iop):
     else:
         return "OBLIQUE"
 
-def load_dicom_metadata(path):
+def load_dicom_metadata(path: str) -> list:
     """
     Loads all valid DICOM file headers from a given directory path.
     Skips files that are not valid DICOMs.
@@ -42,10 +42,15 @@ def load_dicom_metadata(path):
                 logger.warning(f"  - Warning: Skipping corrupt/invalid DICOM file: {dcm_path}")
     return metadata_list
 
-def _calculate_projection_distances(metadata_list, iop):
+def _sort_slices_by_projection(metadata_list: list, iop: list[float]) -> None:
     """
-    Sorts a list of DICOM metadata objects in 3D space by projecting their
-    ImagePositionPatient onto a normal vector derived from ImageOrientationPatient.
+    Sorts DICOM slices into anatomical order using projection-based sorting.
+
+    Instance numbers from scanners are unreliable, so we instead project each
+    slice's ImagePositionPatient onto the scan's normal vector (derived from
+    ImageOrientationPatient) to get a physically meaningful sort key. Each
+    Dataset object receives a `.dist` attribute (mm along the normal) which
+    is used both for sorting and by _evaluate_spacing to compute inter-slice gaps.
     """
     row_vec = np.array(iop[:3])
     col_vec = np.array(iop[3:])
@@ -54,17 +59,17 @@ def _calculate_projection_distances(metadata_list, iop):
     for ds in metadata_list:
         ipp = getattr(ds, 'ImagePositionPatient', None)
         if ipp is None:
-            ds.dist = 0 # Failsafe, shouldn't happen if validation passed earlier
+            ds.dist = 0  # Failsafe, shouldn't happen if validation passed earlier
         else:
             ds.dist = np.dot(np.array(ipp), normal_vec)
 
-    # Sort in place based on the calculated physical distance
     metadata_list.sort(key=lambda x: x.dist)
 
-def _evaluate_spacing(metadata_list):
+def _evaluate_spacing(metadata_list: list) -> tuple:
     """
-    Analyzes the physical distance between consecutive slices to determine
-    if the sequence is uniform, gapped, or has variable spacing.
+    Analyzes inter-slice distances to classify the sequence as uniform, gapped,
+    or variable spacing. Relies on the `.dist` attribute set by _sort_slices_by_projection.
+
     Returns: (validation_status, unique_spacings, duplicate_count, deltas)
     """
     distances = np.array([ds.dist for ds in metadata_list])
@@ -95,7 +100,7 @@ def _evaluate_spacing(metadata_list):
         # More than two spacing values
         return 'VARIABLE_SPACING', unique_spacings, 0, deltas
 
-def validate_dcms(data_mapping, base_path):
+def validate_dcms(data_mapping: list[dict], base_path: str) -> list[dict]:
     """
     Validates DICOM series using projection-based sorting and integrity checks.
     Updates each item in data_mapping with validation status and metadata.
@@ -112,83 +117,100 @@ def validate_dcms(data_mapping, base_path):
         full_path = os.path.join(base_path, data_path)
 
         try:
-            # 1. Load DICOM metadata
+            # 1. Check for any .dcm files before attempting to load (Issue 7)
+            dcm_files = [f for f in os.listdir(full_path) if f.lower().endswith('.dcm')]
+            if not dcm_files:
+                item['validation_status'] = 'NO_DCM_FILES'
+                continue
+
+            # 2. Load DICOM metadata
             metadata_list = load_dicom_metadata(full_path)
 
             if not metadata_list:
                 item['validation_status'] = 'ALL_DCMS_CORRUPT'
                 continue
 
-            # 2. Check for Mixed Series (Multiple scans dumped in one folder)
+            # 3. Check for Mixed Series (Multiple scans dumped in one folder)
             uids = {ds.SeriesInstanceUID for ds in metadata_list}
             if len(uids) > 1:
                 item['validation_status'] = f'MIXED_SERIES_ERROR ({len(uids)} UIDs)'
                 continue
-            
-            # 3. Filter out scout/localizer images (Keep only 'ORIGINAL')
+
+            # 4. Filter out scout/localizer images (Keep only 'ORIGINAL')
             main_series_metadata = [ds for ds in metadata_list if 'ORIGINAL' in getattr(ds, 'ImageType', [])]
-            
+
             if not main_series_metadata:
                 item['validation_status'] = 'NO_ORIGINAL_IMAGES_FOUND'
                 continue
 
             item['total_dcms'] = len(main_series_metadata)
-            item['scout_slice_count'] = len(metadata_list) - len(main_series_metadata)
+            scout_count = len(metadata_list) - len(main_series_metadata)
+            item['scout_slice_count'] = scout_count
+            if scout_count > 0:
+                logger.warning(f"  - {item['fixed_name']}: filtered out {scout_count} scout/derived slice(s)")
 
-            # 4. Extract Spatial Tags
+            # 5. Reject 2D (single-slice) series — cannot form a 3D volume (Issue 5)
+            if len(main_series_metadata) == 1:
+                item['validation_status'] = 'NOT_3D_VOLUME_ERROR'
+                logger.warning(f"  - {item['fixed_name']}: only 1 slice found, cannot form a 3D volume")
+                continue
+
+            # 6. Extract Spatial Tags
             sample_ds = main_series_metadata[0]
             iop = getattr(sample_ds, 'ImageOrientationPatient', None)
             ipp = getattr(sample_ds, 'ImagePositionPatient', None)
-            
+
             if iop is None or ipp is None or getattr(sample_ds, 'PixelSpacing', None) is None:
-                item['validation_status'] = 'MISSING_MANDATORY_SPATIAL_TAGS'
+                item['validation_status'] = 'MISSING_SPATIAL_METADATA_ERROR'
                 continue
 
-            # 5. Math: Projection-Based Sorting
-            _calculate_projection_distances(main_series_metadata, iop)
+            # 7. Math: Projection-Based Sorting
+            _sort_slices_by_projection(main_series_metadata, iop)
 
-            # 6. Math: Spacing Analysis & Quality Control
+            # 8. Math: Spacing Analysis & Quality Control
             status, unique_spacings, duplicates, deltas = _evaluate_spacing(main_series_metadata)
             item['validation_status'] = status
             item['duplicate_slice_count'] = duplicates
 
-            # 7. Extract final item metadata
+            # 9. Extract final item metadata
             rows = getattr(sample_ds, 'Rows', 'N/A')
             cols = getattr(sample_ds, 'Columns', 'N/A')
-            
+
             # Calculate effective slice thickness based on real distances
             if len(deltas) > 0:
                 vals, counts = np.unique(np.around(deltas, decimals=2), return_counts=True)
-                effective_slice_thickness = vals[np.argmax(counts)]
-            elif len(main_series_metadata) == 1:
-                effective_slice_thickness = getattr(sample_ds, 'SliceThickness', 'N/A')
+                effective_slice_thickness = float(vals[np.argmax(counts)])
             else:
                 effective_slice_thickness = 'N/A'
 
             item['orientation'] = get_orientation(iop)
             item['modality'] = getattr(sample_ds, 'Modality', 'N/A')
-            item['slice_thickness'] = effective_slice_thickness
-            item['patient_sex'] = getattr(sample_ds, 'PatientSex', 'N/A')
+            item['patient_sex'] = getattr(sample_ds, 'PatientSex', 'UNKNOWN')
             item['image_dimensions'] = f"{rows}x{cols}"
 
-            if isinstance(effective_slice_thickness, (int, float, np.number)):
-                item['exam_size'] = item['total_dcms'] * effective_slice_thickness
+            if isinstance(effective_slice_thickness, float):
+                item['slice_thickness'] = round(effective_slice_thickness, 2)
+                item['exam_size'] = round(item['total_dcms'] * effective_slice_thickness, 2)
             else:
+                item['slice_thickness'] = 'N/A'
                 item['exam_size'] = 'N/A'
 
         except Exception as e:
             item['validation_status'] = f'VALIDATION_ERROR: {str(e)}'
 
     # 8. Perform statistical outlier detection on 'OK' series sizes
-    data_mapping = validate_dcm_count(data_mapping)
+    data_mapping = _flag_exam_size_outliers(data_mapping)
 
     logger.info("Validation complete.")
     return data_mapping
 
-def validate_dcm_count(data_mapping):
+def _flag_exam_size_outliers(data_mapping: list[dict]) -> list[dict]:
     """
     Identifies outliers in exam size for validated series using the IQR method.
     Flags those outside the fences (Q1 - 1.5*IQR, Q3 + 1.5*IQR).
+
+    Exams with extreme physical sizes are likely to be incorrectly classified
+    or represent pathological edge cases that would distort model training.
     """
     ok_exams = [item for item in data_mapping if item.get('validation_status') == 'OK']
     
@@ -234,7 +256,7 @@ def validate_dcm_count(data_mapping):
 
     return data_mapping
 
-def analyze_mixed_series(folder_path):
+def analyze_mixed_series(folder_path: str) -> list[dict]:
     """
     Analyzes a directory with mixed DICOM series by grouping files by SeriesInstanceUID
     and running a mini-validation on each individual series.
@@ -281,7 +303,7 @@ def analyze_mixed_series(folder_path):
 
         try:
             if iop is not None and getattr(sample_ds, 'ImagePositionPatient', None) is not None:
-                _calculate_projection_distances(main_series_metadata, iop)
+                _sort_slices_by_projection(main_series_metadata, iop)
                 status, _, duplicates, _ = _evaluate_spacing(main_series_metadata)
                 report['validation_status'] = status
                 report['duplicate_slice_count'] = duplicates
@@ -295,7 +317,7 @@ def analyze_mixed_series(folder_path):
 
     return series_reports
 
-def analyze_mixed_folders(data_mapping, base_path, output_csv_path):
+def analyze_mixed_folders(data_mapping: list[dict], base_path: str, output_csv_path: str) -> None:
     """
     Analyzes folders flagged with MIXED_SERIES_ERROR and outputs a report.
     """

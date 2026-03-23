@@ -8,7 +8,7 @@ from monai.data import ITKReader, PydicomReader
 
 logger = logging.getLogger("dicom_ingestion")
 
-def filter_for_conversion(exam_data):
+def filter_for_conversion(exam_data: list[dict]) -> list[dict]:
     """
     Filters a list of exams for those ready for NIfTI conversion.
     """
@@ -22,7 +22,7 @@ def filter_for_conversion(exam_data):
     logger.info(f"  - Found {len(eligible_exams)} exams eligible for conversion.")
     return eligible_exams
 
-def convert_series_to_nifti(dicom_dir, output_path):
+def convert_series_to_nifti(dicom_dir: str, output_path: str) -> bool:
     """
     Uses MONAI to load a DICOM series and save it as a NIfTI file.
     Ensures Float32 normalization and affine preservation.
@@ -33,7 +33,7 @@ def convert_series_to_nifti(dicom_dir, output_path):
         loader = LoadImage(reader=ITKReader(), image_only=True)
         # Load the directory
         image_data = loader(dicom_dir)
-        
+
         # Ensure data type is Float32
         # MONAI images (MetaTensor) can be converted to numpy with specific type
         numpy_data = image_data.numpy().astype(np.float32)
@@ -41,22 +41,25 @@ def convert_series_to_nifti(dicom_dir, output_path):
 
         # Create NiBabel image
         nifti_img = nib.Nifti1Image(numpy_data, affine)
-        
-        # Save to disk
+
+        # Save to disk — OSError (e.g. disk full) is intentionally NOT caught here
+        # so callers can distinguish IO failures from conversion failures (FR-014)
         nib.save(nifti_img, output_path)
-        
+
         logger.info(f"  - Successfully converted {dicom_dir} to {output_path}")
-        
+
         # Explicit garbage collection to free memory before processing the next exam
         del image_data, numpy_data, nifti_img
         gc.collect()
-        
+
         return True
+    except OSError:
+        raise
     except Exception as e:
         logger.error(f"  - Error during MONAI conversion for {dicom_dir}: {e}")
         return False
 
-def process_and_convert_exams(eligible_exams, dicom_base_path, nifti_output_dir):
+def process_and_convert_exams(eligible_exams: list[dict], dicom_base_path: str, nifti_output_dir: str) -> list[dict]:
     """
     Orchestrates the conversion of eligible DICOM series to NIfTI format.
     Returns a list of ConversionResult dictionaries.
@@ -104,6 +107,9 @@ def process_and_convert_exams(eligible_exams, dicom_base_path, nifti_output_dir)
                 result["output_path"] = output_nifti_path
             else:
                 result["reason"] = "MONAI conversion failed"
+        except OSError as e:
+            logger.critical(f"  - IO failure processing {fixed_name}: {e}")
+            result["reason"] = "FAILED_IO"
         except Exception as e:
             result["reason"] = f"Unexpected error: {str(e)}"
         

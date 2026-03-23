@@ -6,7 +6,7 @@ import nibabel as nib
 from src.nifti_utils import filter_for_conversion, process_and_convert_exams, convert_series_to_nifti
 
 # Path to the sample raw dataset
-SAMPLE_RAW_DIR = "/home/aneurysm_cnn/data_engine/dataset/sample-raw"
+SAMPLE_RAW_DIR = "/mnt/data/cases-3/sample-raw"
 SAMPLE_DICOM_DIR = os.path.join(SAMPLE_RAW_DIR, "BP05- 2838474", "Anonymous_Mr_712482402_20170105")
 
 def test_filter_for_conversion():
