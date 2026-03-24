@@ -10,8 +10,10 @@ dependencies:
   - tqdm
   - matplotlib
   - nibabel
+  - pytest
+  - ruff
   - pip
-  
+
   - pip:
     # Strictly target ROCm 6.0 to match your cluster drivers
     - --extra-index-url https://download.pytorch.org/whl/rocm6.0

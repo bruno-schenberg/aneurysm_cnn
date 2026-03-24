@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=teste_aneurysm_cnn
 #SBATCH --partition=gpu-nvidia
-#SBATCH --output=environment/cuda/logs/%x_%j.out
-#SBATCH --error=environment/cuda/logs/%x_%j.err
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=8      # CPUs para o DataLoader do PyTorch
@@ -64,7 +64,7 @@ echo -e "## ...Verification Complete. ##\n"
 python -u train_models.py
 
 ## 6. Copy the output experiments.
-srun cp -r $WRKDIR/training_engine/experiments $HOME/aneurysm_cnn/training_engine 
+srun cp -r $WRKDIR/training_engine/experiments/. $HOME/aneurysm_cnn/experiments/
 
 ## Cleanup Scratch
 rm -rf $WRKDIR

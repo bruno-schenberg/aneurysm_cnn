@@ -16,4 +16,6 @@ dependencies:
   - matplotlib
   - monai
   - nibabel
+  - pytest
+  - ruff
   - pip

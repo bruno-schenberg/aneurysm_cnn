@@ -68,7 +68,7 @@ echo -e "## ...Verification Complete. ##\n"
 python -u train_models.py
 
 ## 6. Copy the output experiments.
-srun cp -r $WRKDIR/training_engine/experiments $HOME/aneurysm_cnn/training_engine 
+srun cp -r $WRKDIR/training_engine/experiments/. $HOME/aneurysm_cnn/experiments/
 
 ## Cleanup Scratch
 rm -rf $WRKDIR

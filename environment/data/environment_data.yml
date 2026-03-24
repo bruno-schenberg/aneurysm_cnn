@@ -1,0 +1,16 @@
+name: aneurysm_cnn_data
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11.15
+  - numpy=1.26.4
+  - nibabel=5.4.0
+  - monai=1.5.2
+  - pydicom=3.0.2
+  - nilearn=0.13.1
+  - itk=5.3.0
+  - setuptools=69.5.1  # itk 5.3.x uses pkg_resources, removed in setuptools 70+
+  - pytest=9.0.2
+  - ruff=0.15.7
+  - pip

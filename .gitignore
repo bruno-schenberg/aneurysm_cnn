@@ -1,15 +1,17 @@
-environment/rocm/logs/
-environment/cuda/logs/
-
 data_engine/src/__pycache__
 data_engine/.pytest_cache
 data_engine/.venv
-data_engine/dataset
 data_engine/output
 
 training_engine/src/__pycache__
-training_engine/experiments
 training_engine/datasets/
+
+# Canonical experiment outputs (model weights, metrics, predictions)
+experiments/
+!experiments/.gitkeep
+
+# Cross-cutting runtime logs
+logs/
 
 # Python defaults
 __pycache__/

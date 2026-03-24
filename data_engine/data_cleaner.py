@@ -82,6 +82,24 @@ def run_pipeline(raw_dir: str | Path, nifti_dir: str | Path) -> None:
         raw_dir: Path to the directory containing raw DICOM case folders.
         nifti_dir: Path to the directory where NIfTI outputs should be saved.
     """
+    raw_dir = Path(raw_dir)
+    nifti_dir = Path(nifti_dir)
+
+    # Fail fast if the output path's mount point is not accessible.
+    # This prevents silent fallback to an in-repo path when the external SSD
+    # (/mnt/data/cases-3/) is not mounted. Walk from nifti_dir upward to find
+    # the deepest mount point; if only root is found the external drive is offline.
+    deepest_mount = Path("/")
+    for candidate in [nifti_dir, *nifti_dir.parents]:
+        if candidate.is_mount():
+            deepest_mount = candidate
+            break
+    if deepest_mount == Path("/"):
+        raise RuntimeError(
+            f"Output path '{nifti_dir}' is not accessible — the external drive does "
+            "not appear to be mounted. Connect the external SSD before running the pipeline."
+        )
+
     raw_dir_str = str(raw_dir)
     nifti_dir_str = str(nifti_dir)
 

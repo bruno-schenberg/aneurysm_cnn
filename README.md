@@ -13,130 +13,156 @@ This project provides a complete pipeline for training and evaluating 3D Convolu
 
 ## Core Libraries
 
-This project is built using Python and relies on several key libraries for deep learning and medical image processing.
-
 *   **PyTorch**: The primary deep learning framework used for building and training the 3D CNN models.
 *   **MONAI**: A PyTorch-based framework for deep learning in healthcare imaging, used for data loading, transformations, and models.
 *   **NiBabel**: For reading and writing medical imaging formats, specifically NIfTI (`.nii.gz`).
 *   **pydicom**: Used in the `data_cleaner.py` script to parse and validate raw DICOM files.
-*   **NumPy & SciPy**: For numerical operations and scientific computing, particularly in image manipulation and data preprocessing.
+*   **NumPy**: For numerical operations, particularly in image manipulation and data preprocessing.
 
-### Installation
+## Environment Setup
 
-It is recommended to install these dependencies using `pip`. You can create a `requirements.txt` file to manage the packages for easy setup.
+Three focused conda environments cover all use cases. No `requirements.txt` files are used — all dependencies are managed by conda.
+
+| Environment | YAML | Where used | Pipeline stage |
+|-------------|------|------------|----------------|
+| `aneurysm_cnn_data` | `environment/data/environment_data.yml` | Local | Data engine only |
+| `aneurysm_cnn_cuda` | `environment/cuda/environment_cuda.yml` | Local | Training engine (CUDA) |
+| `aneurysm_cnn_rocm` | `environment/rocm/environment_rocm.yaml` | HPC cluster | Training engine (ROCm) |
+
 ```bash
-pip install -r requirements.txt
+# Local — data engine
+conda env create -f environment/data/environment_data.yml
+conda activate aneurysm_cnn_data
+
+# Local — training engine (CUDA)
+conda env create -f environment/cuda/environment_cuda.yml
+conda activate aneurysm_cnn_cuda
+
+# HPC cluster — training engine (ROCm)
+conda env create -f environment/rocm/environment_rocm.yaml
+conda activate aneurysm_cnn_rocm
 ```
 
 ## Project Structure
 
 ```
 aneurysm_cnn/
-├── experiments/                # Output directory for all training results
-├── data_engine/
-│   ├── src/
-│   │   ├── class_utils.py      # Joins classification data (e.g., aneurysm labels) from classes.csv.
-│   │   ├── dicom_utils.py      # Validates DICOM series, sorts slices, and extracts key metadata.
-│   │   ├── file_utils.py       # Organizes raw data folders, standardizes names, and identifies data paths.
-│   │   ├── nifti_utils.py      # Converts validated DICOM series into NIfTI (.nii.gz) format.
-│   │   └── nifti_resize.py     # Resizes and pads NIfTI images to a uniform, isotropic shape.
-│   │
-│   ├── dataset_gen.py          # Generates resized datasets (e.g., isotropic) from NIfTI files.
-│   ├── data_cleaner.py         # Main pipeline to validate, clean, and convert raw DICOM data to NIfTI.
-│   ├── requirements.txt        # Lists all Python package dependencies for dataset preparation.
-│   └── classes.csv             # Manifest file with exam IDs, classification labels, and metadata.
+├── data_engine/                    # Stage 1: DICOM → NIfTI pipeline
+│   ├── data_cleaner.py             # Pipeline entry point
+│   ├── dataset_gen.py              # Dataset variant generator
+│   ├── check_nifti_quality.py      # Ad-hoc quality inspection script
+│   ├── pytest.ini                  # Test runner configuration
+│   ├── dataset/                    # TRACKED: static source assets
+│   │   └── classes.csv             # Ground-truth aneurysm labels
+│   ├── output/                     # GITIGNORED: generated pipeline artifacts
+│   ├── src/                        # Library modules
+│   └── tests/                      # Test suite
 │
-├── training_engine/
-│   ├── src/
-│   │   ├── data_preprocess.py  # Handles data loading, MONAI transforms (augmentation), and k-fold splitting.
-│   │   ├── models.py           # Defines 3D CNN architectures (e.g., R3D-18, UNet3D-Classifier).
-│   │   ├── orchestrator.py     # Manages the execution of training folds/experiments
-│   │   ├── plots.py            # Generates evaluation plots (e.g., confusion matrix, ROC) and metric reports.
-│   │   └── training.py         # Implements the core training and validation loops per epoch.
-│   │
-│   ├── train_models.py         # Main entry point to run all training experiments defined in `experiments.json`.
-│   ├── requirements.txt        # Lists all Python package dependencies for training and evaluating the models.
-│   └── experiments.json        # Configuration file defining the list of experiments to run.
+├── training_engine/                # Stage 2: model training pipeline
+│   ├── train_models.py             # Training entry point
+│   ├── experiments.json            # Experiment configuration registry
+│   ├── datasets/                   # GITIGNORED: preprocessed NIfTI variants
+│   └── src/                        # Library modules
 │
-├── .gitignore                  # Specifies files/directories for Git to ignore (e.g., outputs, caches).
-└── README.md                   # This file.
+├── environment/                    # Conda environment definitions ONLY
+│   ├── data/
+│   │   └── environment_data.yml    # Local, data engine (Python 3.11)
+│   ├── cuda/
+│   │   └── environment_cuda.yml    # Local, training engine (Python 3.11, CUDA 12.1)
+│   └── rocm/
+│       └── environment_rocm.yaml   # HPC, training engine (Python 3.10, ROCm 6.0)
+│
+├── hpc/                            # HPC job submission scripts ONLY
+│   ├── cuda/
+│   │   └── start_script_cuda.slurm
+│   └── rocm/
+│       ├── start_script_rocm.slurm
+│       ├── test_rocm.slurm
+│       └── test_rocm.py
+│
+├── experiments/                    # GITIGNORED: all training run outputs
+├── logs/                           # GITIGNORED: cross-cutting runtime logs
+├── specs/                          # Feature specifications
+├── .gitignore
+├── CLAUDE.md
+└── README.md
 ```
 
 ## Workflow
 
-The project follows a three-step workflow: Data Preparation, Experiment Configuration, and Training.
+### 1. Data Preparation (local only)
 
-### 1. Data Preparation
+The data engine runs exclusively on the local development machine. NIfTI output is written to the external SSD at `/mnt/data/cases-3/`.
 
-This stage involves cleaning the raw medical scans and generating datasets suitable for training.
-
-*   **`data_cleaner.py`**: This script should be run first. It is responsible for initial preprocessing tasks such as filtering out corrupted files, standardizing formats.
-*   **`dataset_gen.py`**: After cleaning, this script generates the final datasets. It can create multiple versions of the data with different preprocessing steps, such as resampling, cropping, or shrinking, as defined by the paths in `train_models.py`.
-
-### 2. Configure Experiments
-
-All training runs are defined in the `experiments.json` file. Each object in the JSON array represents a single experiment with a specific configuration.
-
-The main script (`train_models.py`) uses a default configuration, which can be overridden by the parameters you set in `experiments.json`.
-
-**Required Parameters in `experiments.json`:**
-
-*   `name`: A unique name for the experiment (e.g., "ResNet_Balanced_DatasetA").
-*   `model`: The name of the model architecture to use.
-*   `balancing`: The data balancing strategy (e.g., "oversampling", "none").
-*   `data_path_key`: The key corresponding to the desired dataset (e.g., "DATASET_A", "DATASET_B").
-
-**Example `experiments.json`:**
-
-```json
-[
-  {
-    "name": "3D-ResNet_With-Oversampling_On-Cropped-Data",
-    "model": "ResNet3D",
-    "balancing": "oversampling",
-    "data_path_key": "DATASET_A",
-    "LEARNING_RATE": 0.001,
-    "EPOCHS": 50
-  },
-  {
-    "name": "SimpleCNN_No-Balancing_On-Shrunk-Data",
-    "model": "SimpleCNN",
-    "balancing": "none",
-    "data_path_key": "DATASET_B",
-    "EPOCHS": 30
-  }
-]
-```
-
-### 3. Run Training
-
-Once your data is prepared and your experiments are configured, you can start the training process.
-
-Execute the main training script from your terminal:
 ```bash
-python train_models.py
+conda activate aneurysm_cnn_data
+
+# Full DICOM → NIfTI pipeline
+python data_engine/data_cleaner.py --raw-dir /mnt/data/cases-3/raw --nifti-dir /mnt/data/cases-3/nifti
+
+# Generate the 5 dataset preprocessing variants
+python data_engine/dataset_gen.py
+
+# Run tests
+cd data_engine && pytest
+
+# Lint
+cd data_engine && ruff check .
 ```
 
-The script will:
-1.  Load the experiment definitions from `experiments.json`.
-2.  Prepare a configuration for each experiment, merging it with the defaults.
-3.  Call the `run_all_experiments` orchestrator, which will loop through each configuration and run the training and evaluation, including k-fold cross-validation.
+Dataset variants are written to `/mnt/data/cases-3/` on the external SSD — never inside the repository.
 
-### 4. Review Results
+### 2. Transfer Datasets to HPC (if using cluster)
 
-All outputs, including trained model weights, logs, and performance metrics for each fold, will be saved in the `./experiments` directory. Each experiment will have its own sub-directory named after the `name` you provided in the configuration.
+After running the data engine locally, sync the processed datasets to the HPC cluster before submitting training jobs:
+
+```bash
+rsync -avz /mnt/data/cases-3/datasets/ user@hpc-cluster:/path/to/datasets/
+```
+
+Then update `training_engine/experiments.json` on the cluster to point `data_path` at the transferred dataset location.
+
+### 3. Configure Experiments
+
+All training runs are defined in `training_engine/experiments.json`. Each object in the JSON array represents a single experiment.
+
+**Required fields:**
+- `name` — unique experiment identifier
+- `model` — architecture: `R3D18`, `R3D50`
+- `balancing` — strategy: `weighted_cost_function`, `oversampling`, `none`
+- `data_path_key` — dataset variant: `A`, `B`, `C`, `D`, or `E`
+
+**Optional overrides:** `LEARNING_RATE`, `BATCH_SIZE`, `EPOCHS`, `N_SPLITS`, `QUICK_TEST`, `HOLD_OUT_TEST_SET`
+
+### 4. Run Training
+
+```bash
+conda activate aneurysm_cnn_cuda   # or aneurysm_cnn_rocm on HPC
+
+# Run all experiments (from repository root)
+python training_engine/train_models.py
+```
+
+Results are saved to `experiments/<name>/` at the repository root.
+
+### 5. HPC Job Submission
+
+All SLURM scripts are in `hpc/`:
+
+```bash
+# ROCm cluster
+sbatch hpc/rocm/test_rocm.slurm
+sbatch hpc/rocm/start_script_rocm.slurm
+
+# CUDA cluster
+sbatch hpc/cuda/start_script_cuda.slurm
+```
 
 ## Configuration Details
 
-You can modify the default training behavior by changing the `DEFAULT_CONFIG` dictionary in `train_models.py` or by overriding parameters in `experiments.json` for specific runs.
+Key default parameters in `train_models.py`:
 
-Key parameters include:
-
-*   `LEARNING_RATE`: The learning rate for the optimizer.
-*   `BATCH_SIZE`: The number of samples per training batch.
-*   `EPOCHS`: The number of training epochs.
-*   `N_SPLITS`: The number of folds for cross-validation.
-*   `QUICK_TEST`: If `True`, runs only one fold of one experiment for fast debugging.
-*   `HOLD_OUT_TEST_SET`: If `True`, the final test set is held out, and evaluation during cross-validation is performed on the validation set.
-
-This structured approach allows for systematic exploration and robust evaluation of models for aneurysm detection.
+*   `RANDOM_SEED`: 42
+*   `QUICK_TEST`: `True` (single fold, fast debug)
+*   `HOLD_OUT_TEST_SET`: `True` (20% reserved for final evaluation)
+*   `EPOCHS`: 2, `BATCH_SIZE`: 4, `N_SPLITS`: 2
