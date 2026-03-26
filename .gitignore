@@ -20,10 +20,6 @@ venv/
 dist/
 *.egg-info/
 
-# Tooling
-.claude/
-.specify/
-
 # Universal
 .DS_Store
 Thumbs.db
