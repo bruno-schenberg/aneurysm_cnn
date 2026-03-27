@@ -1,232 +1,191 @@
-import os
 import logging
 import numpy as np
 import nibabel as nib
-from nilearn.image import resample_img, resample_to_img
+import torch
+from pathlib import Path
+from monai.data import MetaTensor
+from monai.transforms import Spacing, Resize, ResizeWithPadOrCrop, SpatialPad
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
-def resample_to_1mm_isotropic(input_path: str, output_path: str):
+TARGET_SHAPE = (128, 128, 128)
+TARGET_SPACING_MM = 1.0
+
+
+def _load(path: Path) -> tuple[np.ndarray, np.ndarray]:
+    """Load a NIfTI file and return float32 data and affine without memory mapping."""
+    img = nib.load(path, mmap=False)
+    data = img.get_fdata(dtype=np.float32)
+    return data, img.affine
+
+
+def _save(data: np.ndarray, affine: np.ndarray, path: Path) -> None:
+    """Save a float32 array as NIfTI after asserting it matches TARGET_SHAPE."""
+    assert data.shape == TARGET_SHAPE, f"Expected shape {TARGET_SHAPE}, got {data.shape}"
+    nib.save(nib.Nifti1Image(data, affine), path)
+
+
+def _resample_to_1mm_isotropic(
+    data: np.ndarray, affine: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    """Resample a volume to 1 mm isotropic voxel spacing.
+
+    Uses MONAI Spacing (bilinear) via MetaTensor so the affine is correctly
+    propagated through the resampling step. The caller does not need to update
+    the affine manually.
     """
-    Resamples a NIfTI file to a fixed 1mm x 1mm x 1mm isotropic voxel size
-    while maintaining the original image's orientation and origin.
+    # Wrap in MetaTensor so Spacing can read and update the affine
+    mt = MetaTensor(
+        torch.from_numpy(data[np.newaxis]),  # channel-first: (1, H, W, D)
+        affine=torch.from_numpy(affine.astype(np.float64)),
+    )
+    transform = Spacing(pixdim=TARGET_SPACING_MM, mode="bilinear")
+    result = transform(mt)
+    resampled = result.numpy()[0].astype(np.float32)  # drop channel dim
+    new_affine = result.affine.numpy()
+    return resampled, new_affine
 
-    Args:
-        input_path (str): Path to the input NIfTI file.
-        output_path (str): Path to save the processed NIfTI file.
+
+def generate_variant_c(input_path: Path, output_path: Path) -> None:
+    """Centre-crop or zero-pad to 128³ at native resolution.
+
+    No resampling is performed; the native voxel spacing is preserved. Volumes
+    larger than 128³ on any axis are cropped symmetrically from the centre.
+    Volumes smaller than 128³ on any axis are symmetrically zero-padded. This
+    variant retains full spatial fidelity for any volume that fits within 128³,
+    at the cost of inconsistent field-of-view across subjects with different
+    original acquisition fields of view.
     """
     try:
-        # 1. Load the NIfTI image
-        img = nib.load(input_path, mmap=False)
-
-        # 2. Calculate the current voxel sizes (zooms)
-        original_zooms = np.array(img.header.get_zooms()[:3])
-        
-        # 3. Define the target voxel size (1mm isotropic)
-        target_zoom = np.array([1.0, 1.0, 1.0])
-
-        # 4. Calculate the new shape of the image after resampling
-        new_shape = tuple(np.ceil(np.array(img.shape) * original_zooms / target_zoom).astype(int))
-
-        # 5. Resample the image to 1mm isotropic voxels
-        # We use resample_img and specify the target shape and a new affine
-        # that reflects the 1mm voxel size.
-        new_affine = nib.affines.rescale_affine(img.affine, img.shape, zooms=target_zoom, new_shape=new_shape)
-        resampled_img = resample_img(img, target_affine=new_affine, target_shape=new_shape, interpolation='continuous')
-
-        # 5. Save the final image
-        nib.save(resampled_img, output_path)
-        logging.info(f"Resampled to 1mm isotropic {os.path.basename(input_path)} and saved to {output_path}")
-
-    except (nib.filebasedimages.ImageFileError, FileNotFoundError) as e:
-        logging.error(f"ERROR loading or finding file {os.path.basename(input_path)}: {e}")
+        data, affine = _load(input_path)
+        transform = ResizeWithPadOrCrop(TARGET_SHAPE)
+        result = np.asarray(transform(data[np.newaxis]), dtype=np.float32)
+        _save(result[0], affine, output_path)
     except Exception as e:
-        logging.error(f"An unexpected error occurred during 1mm resampling of {os.path.basename(input_path)}: {e}")
+        logger.error("Error processing %s for variant C: %s", input_path.name, e)
 
-# DATASET D
-def resize_nifti(input_path: str, output_path: str, target_shape: tuple):
-    """
-    Loads a NIfTI file, resizes it to a fixed size of 128x128x128 using
-    trilinear interpolation, and saves it.
 
-    Args:
-        input_path (str): Path to the input NIfTI file.
-        output_path (str): Path to save the resized NIfTI file.
-        target_shape (tuple or list): The target shape for the output image (e.g., (128, 128, 128)).
+def generate_variant_d(input_path: Path, output_path: Path) -> None:
+    """Anti-aliased trilinear resize to 128³ at native resolution.
+
+    Stretches or shrinks the volume to exactly 128³ voxels without prior
+    resampling. Trilinear interpolation with a Gaussian anti-aliasing pre-filter
+    prevents aliasing artefacts when shrinking — the typical case because clinical
+    head MRI volumes are almost always larger than 128³. Effective voxel spacing
+    changes proportionally to the ratio of original to target shape along each
+    axis; the affine is updated accordingly so header and affine remain consistent.
     """
     try:
-        img = nib.load(input_path, mmap=False) # mmap=False to avoid issues with file handles
-        data = img.get_fdata()
-        affine = img.affine
-
-        # 2. Get current shape
-        current_shape = np.array(data.shape)
- 
-        # 2a. Check if resampling is necessary
-        if np.array_equal(current_shape, target_shape):
-            logging.info(f"Image shape is already {target_shape}. Copying {os.path.basename(input_path)} directly.")
-            nib.save(img, output_path)  # Just save the original image
-            return
-
-        # 3. Calculate the zoom factor needed to reach the target shape
-        # This is a simple, non-isotropic scaling.
-        zoom_factor = np.array(target_shape) / np.array(current_shape, dtype=float)
-
-        # 4. Use nilearn to resample. It correctly handles the affine transformation.
-        # Create a new target affine that reflects the new voxel sizes.
-        new_affine = nib.affines.rescale_affine(affine, current_shape, zoom_factor)
-        resized_img = resample_img(img, target_affine=new_affine, target_shape=target_shape, interpolation='continuous')
-
-        # 7. Save the resampled image
-        resized_img.header.set_zooms(np.abs(np.diagonal(resized_img.affine)[:3]))
-        nib.save(resized_img, output_path)
-        logging.info(f"Resized {os.path.basename(input_path)} and saved to {output_path}")
-
-    except (nib.filebasedimages.ImageFileError, FileNotFoundError) as e:
-        logging.error(f"ERROR loading or finding file {os.path.basename(input_path)}: {e}")
+        data, affine = _load(input_path)
+        old_shape = np.array(data.shape, dtype=float)
+        transform = Resize(TARGET_SHAPE, mode="trilinear", anti_aliasing=True)
+        result = np.asarray(transform(data[np.newaxis]), dtype=np.float32)
+        # Voxel size is scaled by old_shape / new_shape along each axis;
+        # the affine columns (voxel-to-world vectors) are scaled accordingly.
+        scale = old_shape / np.array(TARGET_SHAPE, dtype=float)
+        new_affine = affine.copy()
+        new_affine[:3, :3] = affine[:3, :3] * scale[np.newaxis, :]
+        _save(result[0], new_affine, output_path)
     except Exception as e:
-        logging.error(f"An unexpected error occurred while processing {os.path.basename(input_path)}: {e}")
+        logger.error("Error processing %s for variant D: %s", input_path.name, e)
 
-# DATASET C
-def center_crop_or_pad_nifti(input_path: str, output_path: str, target_shape: tuple, fill_value: float = 0.0):
-    """
-    Crops or pads a NIfTI image to a target shape from the center.
 
-    If the image is larger than the target shape, it's cropped. If it's smaller,
-    it's padded with `fill_value`. The affine matrix is adjusted to reflect the
-    new origin.
+def generate_variant_a(input_path: Path, output_path: Path) -> None:
+    """Resample to 1 mm isotropic voxels, then centre-crop or zero-pad to 128³.
 
-    Args:
-        input_path (str): Path to the input NIfTI file.
-        output_path (str): Path to save the processed NIfTI file.
-        target_shape (tuple): The target shape (e.g., (128, 128, 128)).
-        fill_value (float): The value to use for padding if needed.
+    Step 1 normalises spatial resolution across subjects to a fixed 1 mm isotropic
+    grid via bilinear interpolation, eliminating anisotropy and scale differences.
+    Step 2 crops from the centre if the 1 mm volume exceeds 128³, or symmetrically
+    zero-pads if it is smaller. The result is a 128³ volume at a uniform, known
+    voxel spacing of 1 mm — the most straightforward variant for models that are
+    sensitive to absolute physical scale.
     """
     try:
-        img = nib.load(input_path, mmap=False)
-        data = img.get_fdata()
-        affine = img.affine
-        current_shape = np.array(data.shape)
-        target_shape = np.array(target_shape)
-
-        # Calculate the difference in shape
-        diff = target_shape - current_shape
-
-        # Calculate crop/pad amounts for each dimension
-        crop_before = np.maximum(0, -diff) // 2
-        crop_after = np.maximum(0, -diff) - crop_before
-        pad_before = np.maximum(0, diff) // 2
-        pad_after = np.maximum(0, diff) - pad_before
-
-        # Define slices for cropping from the original data
-        slices = tuple(slice(cb, s - ca) for cb, s, ca in zip(crop_before, current_shape, crop_after))
-        cropped_data = data[slices]
-
-        # Define padding widths
-        pad_widths = tuple((pb, pa) for pb, pa in zip(pad_before, pad_after))
-        padded_data = np.pad(cropped_data, pad_widths, mode='constant', constant_values=fill_value)
-
-        # Adjust the affine matrix for the new origin
-        translation = nib.affines.from_translation(crop_before - pad_before)
-        new_affine = np.dot(affine, translation)
-
-        new_img = nib.Nifti1Image(padded_data, new_affine, img.header)
-        nib.save(new_img, output_path)
-        logging.info(f"Center-cropped/padded {os.path.basename(input_path)} and saved to {output_path}")
-
+        data, affine = _load(input_path)
+        data, affine = _resample_to_1mm_isotropic(data, affine)
+        transform = ResizeWithPadOrCrop(TARGET_SHAPE)
+        result = np.asarray(transform(data[np.newaxis]), dtype=np.float32)
+        _save(result[0], affine, output_path)
     except Exception as e:
-        logging.error(f"An unexpected error occurred during cropping of {os.path.basename(input_path)}: {e}")
+        logger.error("Error processing %s for variant A: %s", input_path.name, e)
 
-# DATASET A
-def resample_and_crop(input_path: str, output_path: str, target_shape: tuple, fill_value: float = 0.0):
+
+def generate_variant_b(input_path: Path, output_path: Path) -> None:
+    """Resample to 1 mm isotropic voxels, then anti-aliased trilinear resize to 128³.
+
+    Step 1 normalises spatial resolution to 1 mm isotropic via bilinear
+    interpolation, removing anisotropy. Step 2 rescales the resampled volume to
+    exactly 128³ using trilinear interpolation with anti-aliasing to suppress
+    artefacts during downsampling. Unlike variant A, every subject fills the full
+    128³ cube with no zero-padded background. The affine from the 1 mm resampling
+    step is retained so the output reports a nominal spacing of 1 mm.
     """
-    A pipeline function that first resamples a NIfTI file to 1mm isotropic voxels,
-    and then center-crops or pads it to the target shape.
-
-    Args:
-        input_path (str): Path to the input NIfTI file.
-        output_path (str): Path to save the final processed NIfTI file.
-        target_shape (tuple): The target shape for the output image (e.g., (128, 128, 128)).
-        fill_value (float): The value to use for padding.
-    """
-    # Create a temporary file path for the intermediate resampled image
-    temp_path = output_path.replace('.nii.gz', '_temp_resampled.nii.gz')
-
     try:
-        # Step 1: Resample to 1mm isotropic
-        resample_to_1mm_isotropic(input_path, temp_path)
-
-        # Step 2: Center crop or pad the resampled image
-        center_crop_or_pad_nifti(temp_path, output_path, target_shape, fill_value)
-    finally:
-        # Clean up the temporary file
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
-
-# DATASET B
-def resample_and_shrink(input_path: str, output_path: str, target_shape: tuple):
-    """
-    A pipeline function that first resamples a NIfTI file to 1mm isotropic voxels,
-    and then resizes it to the target shape using trilinear interpolation.
-
-    Args:
-        input_path (str): Path to the input NIfTI file.
-        output_path (str): Path to save the final processed NIfTI file.
-        target_shape (tuple): The target shape for the output image (e.g., (128, 128, 128)).
-    """
-    # Create a temporary file path for the intermediate resampled image
-    temp_path = output_path.replace('.nii.gz', '_temp_resampled.nii.gz')
-
-    try:
-        # Step 1: Resample to 1mm isotropic
-        resample_to_1mm_isotropic(input_path, temp_path)
-
-        # Step 2: Resize the resampled image to the target shape
-        resize_nifti(temp_path, output_path, target_shape)
-    finally:
-        # Clean up the temporary file
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
-
-# DATASET E
-def resize_isotropic_with_padding(input_path: str, output_path: str, target_size: int = 128, fill_value: float = 0.0):
-    """
-    Resamples a NIfTI file to be isotropic with voxels of the smallest original
-    dimension, then resizes and pads it into a cubic shape (target_size^3)
-    using nilearn for robust affine handling.
-
-    Args:
-        input_path (str): Path to the input NIfTI file.
-        output_path (str): Path to save the processed NIfTI file.
-        target_size (int): The edge length of the final cubic image.
-        fill_value (float): The value to use for padding.
-    """
-    final_shape = (target_size, target_size, target_size)
-    try:
-        # 1. Load the NIfTI image
-        img = nib.load(input_path, mmap=False)
-
-        # 2. Make the image isotropic by resampling to the smallest voxel size
-        original_zooms = np.array(img.header.get_zooms()[:3])
-        target_zoom = min(original_zooms)
-        
-        # Create a new affine for the isotropic image
-        iso_affine = np.diag([target_zoom, target_zoom, target_zoom, 1.0])
-        iso_img = resample_to_img(img, target_affine=iso_affine, interpolation='continuous')
-
-        # 3. Create a target canvas image with the final desired shape and affine
-        # This ensures the final image is centered correctly.
-        target_affine = iso_affine.copy()
-        target_img = nib.Nifti1Image(np.full(final_shape, fill_value), affine=target_affine)
-
-        # 4. Resample the isotropic image to the target canvas.
-        # This will pad/crop the image to the final_shape.
-        resized_img = resample_to_img(iso_img, target_img, interpolation='continuous', fill_value=fill_value)
-
-        nib.save(resized_img, output_path)
-        logging.info(f"Isotropically resized {os.path.basename(input_path)} and saved to {output_path}")
-
-    except (nib.filebasedimages.ImageFileError, FileNotFoundError) as e:
-        logging.error(f"ERROR loading or finding file {os.path.basename(input_path)}: {e}")
+        data, affine = _load(input_path)
+        data, affine = _resample_to_1mm_isotropic(data, affine)
+        transform = Resize(TARGET_SHAPE, mode="trilinear", anti_aliasing=True)
+        result = np.asarray(transform(data[np.newaxis]), dtype=np.float32)
+        # The 1 mm affine is preserved as the nominal spacing for this variant;
+        # the resize is treated as a fixed-grid resampling artefact, not a
+        # physical scale change.
+        _save(result[0], affine, output_path)
     except Exception as e:
-        logging.error(f"An unexpected error occurred while processing {os.path.basename(input_path)}: {e}")
+        logger.error("Error processing %s for variant B: %s", input_path.name, e)
+
+
+def generate_variant_e(input_path: Path, output_path: Path) -> None:
+    """Resample to isotropic at finest pitch → scale largest dim to 128 → zero-pad to 128³.
+
+    Three-step pipeline that preserves aspect ratio while fitting every volume
+    into a 128³ cube:
+
+    Step 1 — Isotropic resampling: resample to isotropic voxels at the smallest
+    original voxel pitch (finest resolution axis), removing anisotropy without
+    sacrificing in-plane resolution.
+
+    Step 2 — Uniform scale to 128: uniformly scale the isotropic volume so that
+    its largest spatial dimension equals exactly 128 voxels, using anti-aliased
+    trilinear interpolation to prevent aliasing during the typical downsampling
+    case. Aspect ratio is preserved throughout.
+
+    Step 3 — Symmetric zero-padding: pad the scaled volume to 128³ with zeros.
+    Padding is always symmetric and never crops, so no brain tissue is removed
+    in this step.
+    """
+    try:
+        data, affine = _load(input_path)
+        original_zooms = np.abs(np.diagonal(affine)[:3])
+        min_zoom = float(np.min(original_zooms))
+
+        # Step 1: Resample to isotropic at the smallest original voxel pitch so
+        # that the finest-resolution axis is not degraded during isotropy correction.
+        mt = MetaTensor(
+            torch.from_numpy(data[np.newaxis]),
+            affine=torch.from_numpy(affine.astype(np.float64)),
+        )
+        transform_spacing = Spacing(pixdim=min_zoom, mode="bilinear")
+        iso_result = transform_spacing(mt)
+        iso_data = iso_result.numpy()[0].astype(np.float32)
+        iso_affine = iso_result.affine.numpy()
+        iso_shape = np.array(iso_data.shape)  # (H, W, D)
+
+        # Step 2: Uniform scale so max(shape) == 128; anti-aliasing prevents
+        # aliasing artefacts when the isotropic volume is larger than 128³.
+        scale = 128.0 / float(np.max(iso_shape))
+        scaled_shape = tuple(max(1, round(float(s) * scale)) for s in iso_shape)
+        transform_resize = Resize(scaled_shape, mode="trilinear", anti_aliasing=True)
+        scaled_data = np.asarray(transform_resize(iso_data[np.newaxis]), dtype=np.float32)
+
+        # Update affine: voxel size scales by iso_shape / scaled_shape.
+        # Because the scale is uniform, each axis gets the same factor (1/scale).
+        scale_per_axis = iso_shape / np.array(scaled_shape, dtype=float)
+        scaled_affine = iso_affine.copy()
+        scaled_affine[:3, :3] = iso_affine[:3, :3] * scale_per_axis[np.newaxis, :]
+
+        # Step 3: Symmetric zero-pad to 128³ — brain fits inside, no cropping.
+        transform_pad = SpatialPad(TARGET_SHAPE, method="symmetric")
+        padded_data = np.asarray(transform_pad(scaled_data), dtype=np.float32)
+
+        _save(padded_data[0], scaled_affine, output_path)
+    except Exception as e:
+        logger.error("Error processing %s for variant E: %s", input_path.name, e)
