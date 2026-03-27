@@ -16,6 +16,7 @@ experiments/
 logs/
 
 # Python defaults
+.ruff_cache/
 __pycache__/
 *.pyc
 venv/

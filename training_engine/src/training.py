@@ -15,6 +15,11 @@ from sklearn.metrics import fbeta_score
 from tqdm import tqdm
 
 
+# ----------------------------------------------------
+# 1. Per-Epoch Training
+# ----------------------------------------------------
+
+
 def train_one_epoch(
     model: torch.nn.Module,
     dataloader: torch.utils.data.DataLoader,
@@ -50,6 +55,11 @@ def train_one_epoch(
     epoch_loss = running_loss / total_samples
     epoch_acc = correct_predictions.double() / total_samples
     return epoch_loss, epoch_acc.item()
+
+
+# ----------------------------------------------------
+# 2. Per-Epoch Validation
+# ----------------------------------------------------
 
 
 def validate_one_epoch(
@@ -114,6 +124,11 @@ def validate_one_epoch(
     if return_details:
         return epoch_loss, epoch_acc, val_f2, detailed_results
     return epoch_loss, epoch_acc, val_f2
+
+
+# ----------------------------------------------------
+# 3. Full Training Loop
+# ----------------------------------------------------
 
 
 def run_training_loop(

@@ -30,7 +30,9 @@ from .plots import (
 from .training import run_training_loop, validate_one_epoch
 
 
-# --- 1. Single Fold Runner ---
+# ----------------------------------------------------
+# 1. Single Fold Runner
+# ----------------------------------------------------
 
 
 def run_one_fold(
@@ -151,7 +153,9 @@ def run_one_fold(
     }
 
 
-# --- 2. Experiment Orchestration Helpers ---
+# ----------------------------------------------------
+# 2. Experiment Orchestration Helpers
+# ----------------------------------------------------
 
 
 def prepare_experiment_setup(config: Dict[str, Any]) -> tuple[str, Any]:
@@ -210,7 +214,9 @@ def summarize_experiment_results(
     print("\n" + "=" * 80)
 
 
-# --- 3. Main Experiment Orchestrator ---
+# ----------------------------------------------------
+# 3. Main Experiment Orchestrator
+# ----------------------------------------------------
 
 
 def run_experiment(config: Dict[str, Any]) -> None:

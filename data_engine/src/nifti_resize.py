@@ -8,8 +8,17 @@ from monai.transforms import Spacing, Resize, ResizeWithPadOrCrop, SpatialPad
 
 logger = logging.getLogger(__name__)
 
+# ----------------------------------------------------
+# 1. Module-Level Constants
+# ----------------------------------------------------
+
 TARGET_SHAPE = (128, 128, 128)
 TARGET_SPACING_MM = 1.0
+
+
+# ----------------------------------------------------
+# 2. Private Helpers
+# ----------------------------------------------------
 
 
 def _load(path: Path) -> tuple[np.ndarray, np.ndarray]:
@@ -44,6 +53,11 @@ def _resample_to_1mm_isotropic(
     resampled = result.numpy()[0].astype(np.float32)  # drop channel dim
     new_affine = result.affine.numpy()
     return resampled, new_affine
+
+
+# ----------------------------------------------------
+# 3. Variant Functions
+# ----------------------------------------------------
 
 
 def generate_variant_c(input_path: Path, output_path: Path) -> None:
