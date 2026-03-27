@@ -2,7 +2,10 @@ import torch
 import torch.nn as nn
 import torchvision.models.video as video_models
 from monai.networks.nets import DenseNet, SwinUNETR
-from monai.apps import MedicalNet
+try:
+    from monai.apps import MedicalNet
+except ImportError:
+    MedicalNet = None  # Not available in MONAI >= 1.4; models using it will raise at call time.
 from typing import Optional
 
 # ----------------------------------------------------
