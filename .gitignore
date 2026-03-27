@@ -4,6 +4,8 @@ data_engine/.venv
 data_engine/output
 
 training_engine/src/__pycache__
+training_engine/tests/__pycache__
+training_engine/.pytest_cache
 training_engine/datasets/
 
 # Canonical experiment outputs (model weights, metrics, predictions)
@@ -14,6 +16,7 @@ experiments/
 logs/
 
 # Python defaults
+.ruff_cache/
 __pycache__/
 *.pyc
 venv/

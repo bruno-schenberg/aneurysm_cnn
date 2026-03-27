@@ -9,7 +9,6 @@ from sklearn.metrics import confusion_matrix
 import csv
 from typing import List, Dict, Any
 import pandas as pd
-import os
 from sklearn.metrics import precision_score, recall_score, fbeta_score
 
 # --- Plotting and Saving Functions ---

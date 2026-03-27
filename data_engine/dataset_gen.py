@@ -1,104 +1,119 @@
+import argparse
+import logging
 import os
 import sys
-import logging
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
-# Ensure that 'data_engine' and its parent are in the Python path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from concurrent.futures import ProcessPoolExecutor, as_completed
 from data_engine.src.nifti_resize import (
-    resize_nifti, 
-    resize_isotropic_with_padding, 
-    center_crop_or_pad_nifti,
-    resample_and_crop,
-    resample_and_shrink
+    generate_variant_a,
+    generate_variant_b,
+    generate_variant_c,
+    generate_variant_d,
+    generate_variant_e,
 )
 
 INPUT_NIFTI_PATH = Path("/mnt/data/cases-3/nifti")
-OUTPUT_A_PATH = Path("/mnt/data/cases-3/dataset_A_resampled_cropped") # A - resample to 1mm + crop
-OUTPUT_B_PATH = Path("/mnt/data/cases-3/dataset_B_resampled_shrunk") # B - resample to 1mm + shrink
-OUTPUT_C_PATH = Path("/mnt/data/cases-3/dataset_C_cropped") # C - crop
-OUTPUT_D_PATH = Path("/mnt/data/cases-3/dataset_D_shrunk") # D - shrink
-OUTPUT_E_PATH = Path("/mnt/data/cases-3/dataset_E_isotropic_padded") # E - resample largest dimension 128px + pad
-TARGET_SHAPE = (128, 128, 128)
-MAX_WORKERS = os.cpu_count()  # Use all available CPU cores
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# One output directory per variant, keyed by variant letter
+OUTPUT_PATHS = {
+    "A": Path("/mnt/data/cases-3/dataset_A_resampled_cropped"),
+    "B": Path("/mnt/data/cases-3/dataset_B_resampled_shrunk"),
+    "C": Path("/mnt/data/cases-3/dataset_C_cropped"),
+    "D": Path("/mnt/data/cases-3/dataset_D_shrunk"),
+    "E": Path("/mnt/data/cases-3/dataset_E_isotropic_padded"),
+}
 
-def process_file(file_path: Path, output_paths: dict):
-    """Processes a single NIfTI file with all 5 dataset generation methods."""
-    try:
-        filename = file_path.name
-        logging.info(f"Processing {filename}...")
+# 3 workers is safe on any machine with ≥ 8 GB RAM; a typical head MRI at
+# 400×400×180 float32 with all five variant arrays in flight weighs ~550 MB
+# per worker, so 3 workers peak around 1.6 GB.
+DEFAULT_WORKERS = 3
 
-        # A - resample to 1mm + crop
-        output_a_file = output_paths['A'] / filename
-        resample_and_crop(str(file_path), str(output_a_file), target_shape=TARGET_SHAPE)
 
-        # B - resample to 1mm + shrink
-        output_b_file = output_paths['B'] / filename
-        resample_and_shrink(str(file_path), str(output_b_file), target_shape=TARGET_SHAPE)
+def _worker_logging_init() -> None:
+    """Configure a StreamHandler in each worker process.
 
-        # C - crop
-        output_c_file = output_paths['C'] / filename
-        center_crop_or_pad_nifti(str(file_path), str(output_c_file), target_shape=TARGET_SHAPE)
-
-        # D - shrink
-        output_d_file = output_paths['D'] / filename
-        resize_nifti(str(file_path), str(output_d_file), target_shape=TARGET_SHAPE)
-
-        # E - resample largest dimension 128px + pad
-        output_e_file = output_paths['E'] / filename
-        resize_isotropic_with_padding(str(file_path), str(output_e_file), target_size=TARGET_SHAPE[0])
-
-        return f"Successfully processed {filename}"
-    except Exception as e:
-        return f"Failed to process {file_path.name}: {e}"
-
-def main():
+    ProcessPoolExecutor workers do not inherit the parent's logging handlers,
+    so without this initialiser their log records would be silently discarded.
     """
-    Main function to find and process all NIfTI files for resizing.
-    """
-    logging.info("Starting resizing process...")
-    logging.info(f"Input directory: {INPUT_NIFTI_PATH}")
-    logging.info(f"Dataset A Output: {OUTPUT_A_PATH}")
-    logging.info(f"Dataset B Output: {OUTPUT_B_PATH}")
-    logging.info(f"Dataset C Output: {OUTPUT_C_PATH}")
-    logging.info(f"Dataset D Output: {OUTPUT_D_PATH}")
-    logging.info(f"Dataset E Output: {OUTPUT_E_PATH}")
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(processName)s - %(levelname)s - %(message)s",
+    )
 
-    # Find all NIfTI files, assuming a structure like '.../nifti/0/*.nii.gz'
-    nifti_files = list(INPUT_NIFTI_PATH.rglob('*/*.nii.gz'))
-    if not nifti_files:
-        logging.warning("No .nii.gz files found in subdirectories. Checking top-level directory.")
-        nifti_files = list(INPUT_NIFTI_PATH.glob('*.nii.gz'))
 
+def process_file(file_path: Path, output_dirs: dict[str, Path]) -> str:
+    """Generate all five dataset variants for a single NIfTI file."""
+    filename = file_path.name
+    logging.info("Processing %s …", filename)
+    generate_variant_a(file_path, output_dirs["A"] / filename)
+    generate_variant_b(file_path, output_dirs["B"] / filename)
+    generate_variant_c(file_path, output_dirs["C"] / filename)
+    generate_variant_d(file_path, output_dirs["D"] / filename)
+    generate_variant_e(file_path, output_dirs["E"] / filename)
+    return f"Done: {filename}"
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Generate five preprocessing variants of every NIfTI file."
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=DEFAULT_WORKERS,
+        metavar="N",
+        help=f"Number of parallel worker processes (default: {DEFAULT_WORKERS})",
+    )
+    args = parser.parse_args()
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+    )
+    logging.info("Input: %s", INPUT_NIFTI_PATH)
+    for key, path in OUTPUT_PATHS.items():
+        logging.info("Variant %s → %s", key, path)
+
+    # Discover NIfTI files; they live in class subdirectories (0/ and 1/)
+    nifti_files = list(INPUT_NIFTI_PATH.rglob("*/*.nii.gz"))
     if not nifti_files:
-        logging.error("No .nii.gz files found to process. Exiting.")
+        logging.warning("No .nii.gz files found in subdirectories; checking top level.")
+        nifti_files = list(INPUT_NIFTI_PATH.glob("*.nii.gz"))
+    if not nifti_files:
+        logging.error("No .nii.gz files found. Exiting.")
         return
 
-    logging.info(f"Found {len(nifti_files)} files to process.")
+    logging.info("Found %d files to process with %d workers.", len(nifti_files), args.workers)
 
+    # Build per-file output directories keyed by variant letter, mirroring the
+    # class subdirectory structure (0/ and 1/) from the input tree.
+    file_output_dirs: list[tuple[Path, dict[str, Path]]] = []
     for file_path in nifti_files:
         class_dir = file_path.parent.name
-        
-        # Create class-specific subdirectories for each dataset
-        output_paths = {
-            'A': OUTPUT_A_PATH / class_dir,
-            'B': OUTPUT_B_PATH / class_dir,
-            'C': OUTPUT_C_PATH / class_dir,
-            'D': OUTPUT_D_PATH / class_dir,
-            'E': OUTPUT_E_PATH / class_dir,
+        dirs = {key: OUTPUT_PATHS[key] / class_dir for key in OUTPUT_PATHS}
+        for d in dirs.values():
+            d.mkdir(parents=True, exist_ok=True)
+        file_output_dirs.append((file_path, dirs))
+
+    with ProcessPoolExecutor(
+        max_workers=args.workers, initializer=_worker_logging_init
+    ) as executor:
+        futures = {
+            executor.submit(process_file, fp, dirs): fp
+            for fp, dirs in file_output_dirs
         }
+        for future in as_completed(futures):
+            file_path = futures[future]
+            try:
+                logging.info(future.result())
+            except Exception as exc:
+                logging.error("Failed %s: %s", file_path.name, exc)
 
-        for path in output_paths.values():
-            path.mkdir(parents=True, exist_ok=True)
+    logging.info("All done.")
 
-        result = process_file(file_path, output_paths)
-        logging.info(result)
-
-    logging.info("Resizing process complete.")
 
 if __name__ == "__main__":
     main()
