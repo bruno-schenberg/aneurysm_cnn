@@ -1,6 +1,13 @@
-import pytest
 import os
-from src.file_utils import generate_new_names, add_data_codes, add_data_paths
+import pytest
+from src.file_utils import (
+    add_data_codes,
+    add_data_paths,
+    count_dcm_files,
+    find_missing_cases,
+    generate_new_names,
+    get_subfolders,
+)
 
 def test_generate_new_names():
     folder_list = ["bp1", "BP2", "bp03", "case100", "other_folder"]
@@ -59,3 +66,77 @@ def test_add_data_paths():
     assert paths["f1"] == "f1"
     assert paths["f2"] == os.path.join("f2", "sub1")
     assert paths["f3"] == "EMPTY"
+
+
+# ---------------------------------------------------------------------------
+# get_subfolders
+# ---------------------------------------------------------------------------
+
+
+def test_get_subfolders_returns_subfolder_names(tmp_path):
+    (tmp_path / "alpha").mkdir()
+    (tmp_path / "beta").mkdir()
+    (tmp_path / "file.txt").write_text("not a dir")
+    result = get_subfolders(str(tmp_path))
+    assert set(result) == {"alpha", "beta"}
+
+
+def test_get_subfolders_missing_directory_returns_empty():
+    result = get_subfolders("/nonexistent/path/that/does/not/exist")
+    assert result == []
+
+
+# ---------------------------------------------------------------------------
+# count_dcm_files
+# ---------------------------------------------------------------------------
+
+
+def test_count_dcm_files_counts_only_dcm_extensions(tmp_path):
+    (tmp_path / "slice001.dcm").write_bytes(b"fake")
+    (tmp_path / "slice002.DCM").write_bytes(b"fake")  # uppercase extension
+    (tmp_path / "readme.txt").write_text("ignored")
+    (tmp_path / "subdir").mkdir()
+    assert count_dcm_files(str(tmp_path)) == 2
+
+
+def test_count_dcm_files_missing_directory_returns_zero():
+    assert count_dcm_files("/nonexistent/path/xyz") == 0
+
+
+# ---------------------------------------------------------------------------
+# find_missing_cases
+# ---------------------------------------------------------------------------
+
+
+def test_find_missing_cases_identifies_gaps_in_sequence():
+    # Provide cases BP001 and BP003, expect BP002 flagged as missing
+    name_mapping = [
+        {"original_name": "bp1", "fixed_name": "BP001"},
+        {"original_name": "bp3", "fixed_name": "BP003"},
+    ]
+    missing = find_missing_cases(name_mapping)
+    missing_names = {m["fixed_name"] for m in missing}
+    assert "BP002" in missing_names
+    assert "BP001" not in missing_names
+    assert "BP003" not in missing_names
+    assert all(m["original_name"] == "missing" for m in missing)
+
+
+def test_find_missing_cases_empty_mapping_returns_all_1_to_999():
+    missing = find_missing_cases([])
+    assert len(missing) == 999
+    fixed_names = {m["fixed_name"] for m in missing}
+    assert "BP001" in fixed_names
+    assert "BP999" in fixed_names
+
+
+# ---------------------------------------------------------------------------
+# add_data_codes — ≥2 subfolders branch
+# ---------------------------------------------------------------------------
+
+
+def test_add_data_codes_duplicate_data_multiple_subfolders():
+    """Two or more non-empty subfolders must produce DUPLICATE_DATA."""
+    mapping = [{"original_name": "f1", "direct_items": 0, "non_empty_subfolders": ["sub1", "sub2"]}]
+    updated = add_data_codes(mapping)
+    assert updated[0]["data_code"] == "DUPLICATE_DATA"

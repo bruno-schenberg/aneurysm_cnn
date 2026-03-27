@@ -6,6 +6,11 @@ from collections import defaultdict
 logger = logging.getLogger("dicom_ingestion")
 
 
+# ----------------------------------------------------
+# 1. Filesystem Utilities
+# ----------------------------------------------------
+
+
 def get_subfolders(path: str) -> list[str]:
     """Returns subfolder names within a directory."""
     try:
@@ -29,6 +34,11 @@ def count_dcm_files(path: str) -> int:
     except (FileNotFoundError, OSError) as e:
         logger.error(f"Error: Could not count items in '{path}': {e}")
         return 0
+
+
+# ----------------------------------------------------
+# 2. Name Standardisation
+# ----------------------------------------------------
 
 
 def generate_new_names(folder_list: list[str]) -> list[dict]:
@@ -101,6 +111,11 @@ def find_missing_cases(name_mapping: list[dict]) -> list[dict]:
     return missing_rows
 
 
+# ----------------------------------------------------
+# 3. Folder Statistics
+# ----------------------------------------------------
+
+
 def get_folder_stats(base_path: str, folder_list: list[str]) -> list[dict]:
     """
     Counts items and subfolders within a list of specified folders.
@@ -117,7 +132,7 @@ def get_folder_stats(base_path: str, folder_list: list[str]) -> list[dict]:
 
     for folder_name in folder_list:
         folder_path = os.path.join(base_path, folder_name)
-        items_in_subfolders, non_empty_subfolders = 0, 0
+        items_in_subfolders = 0
         non_empty_subfolder_names = []
 
         try:
@@ -143,6 +158,11 @@ def get_folder_stats(base_path: str, folder_list: list[str]) -> list[dict]:
         except OSError as e:
             logger.info(f"  - Error scanning folder '{folder_path}': {e}")
     return stats_list
+
+
+# ----------------------------------------------------
+# 4. Data Codes and Paths
+# ----------------------------------------------------
 
 
 def add_data_codes(name_mapping: list[dict]) -> list[dict]:
@@ -221,8 +241,16 @@ def add_data_paths(name_mapping: list[dict]) -> list[dict]:
     return name_mapping
 
 
-def organize_data(case_folders: list[str], RAW_DATA_PATH: str) -> list[dict]:
+# ----------------------------------------------------
+# 5. Pipeline Orchestration
+# ----------------------------------------------------
 
+
+def organize_data(case_folders: list[str], RAW_DATA_PATH: str) -> list[dict]:
+    """
+    Runs the full name-standardisation and folder-analysis pipeline.
+    Returns a list of dicts with fixed names, data codes, and resolved paths.
+    """
     # 1. Generate the mapping from original to new names.
     name_mapping = generate_new_names(case_folders)
 

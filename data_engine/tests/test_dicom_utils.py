@@ -1,7 +1,13 @@
 import os
 import pytest
 import numpy as np
-from src.dicom_utils import get_orientation, load_dicom_metadata, validate_dcms
+from src.dicom_utils import (
+    _evaluate_spacing,
+    _flag_exam_size_outliers,
+    get_orientation,
+    load_dicom_metadata,
+    validate_dcms,
+)
 
 # Path to the sample raw dataset
 SAMPLE_RAW_DIR = "/mnt/data/cases-3/sample-raw"
@@ -50,8 +56,6 @@ def test_validate_dcms_with_sample_data():
     # Since it's actual sample data, we expect it to be processed
     # validation_status might not be 'OK' if data has variable spacing/gaps,
     # but it shouldn't fail with an unhandled exception or 'ALL_DCMS_CORRUPT'.
-    valid_statuses = ("OK", "VARIABLE_SPACING", "GAPPED_SEQUENCE", "DUPLICATE_SLICES", "BELOW_LIMIT", "ABOVE_LIMIT")
-    
     # We use lower checking logic here just to make sure it ran completely
     assert not item["validation_status"].startswith("VALIDATION_ERROR")
     assert item["validation_status"] != "ALL_DCMS_CORRUPT"
@@ -92,3 +96,113 @@ def test_spacing_analysis_logic():
     assert len(unique_spacings) == 2
     assert 1.5 in unique_spacings
     assert 3.0 in unique_spacings
+
+
+# ---------------------------------------------------------------------------
+# _evaluate_spacing — branch coverage via mock datasets
+# ---------------------------------------------------------------------------
+
+
+class _MockDS:
+    """Minimal stand-in for a pydicom Dataset that _evaluate_spacing reads."""
+    def __init__(self, dist: float, instance_number: int = 1):
+        self.dist = dist
+        self.InstanceNumber = instance_number
+
+
+def test_evaluate_spacing_duplicate_slices():
+    """Two slices at the same position must return DUPLICATE_SLICES."""
+    ds_list = [_MockDS(0.0, 1), _MockDS(0.0, 2), _MockDS(1.5, 3)]
+    status, _, dupes, _ = _evaluate_spacing(ds_list)
+    assert status == "DUPLICATE_SLICES"
+    assert dupes > 0
+
+
+def test_evaluate_spacing_ok_uniform_spacing():
+    """Perfectly uniform spacing with consecutive instance numbers must return OK."""
+    ds_list = [_MockDS(d, i + 1) for i, d in enumerate([0.0, 1.5, 3.0, 4.5])]
+    status, _, _, _ = _evaluate_spacing(ds_list)
+    assert status == "OK"
+
+
+def test_evaluate_spacing_gapped_instance_numbers():
+    """Uniform spatial spacing but non-consecutive instance numbers must return GAPPED_SEQUENCE."""
+    # Physical distances are evenly spaced; instance numbers skip from 2 to 4.
+    ds_list = [_MockDS(d, n) for d, n in zip([0.0, 1.5, 3.0, 4.5], [1, 2, 4, 5])]
+    status, _, _, _ = _evaluate_spacing(ds_list)
+    assert status == "GAPPED_SEQUENCE"
+
+
+def test_evaluate_spacing_variable_two_non_doubled_spacings():
+    """Two unrelated spacings (not a 2× ratio) must return VARIABLE_SPACING."""
+    # Deltas: 1.5, 3.3 — ratio is 2.2, not 2.0 within tolerance.
+    ds_list = [_MockDS(d, i + 1) for i, d in enumerate([0.0, 1.5, 4.8])]
+    status, _, _, _ = _evaluate_spacing(ds_list)
+    assert status == "VARIABLE_SPACING"
+
+
+def test_evaluate_spacing_more_than_two_spacings():
+    """More than two distinct spacings must return VARIABLE_SPACING."""
+    # Deltas: 1.0, 1.5, 2.0 — three unique values.
+    ds_list = [_MockDS(d, i + 1) for i, d in enumerate([0.0, 1.0, 2.5, 4.5])]
+    status, _, _, _ = _evaluate_spacing(ds_list)
+    assert status == "VARIABLE_SPACING"
+
+
+# ---------------------------------------------------------------------------
+# validate_dcms — branches that do not require real DICOM files
+# ---------------------------------------------------------------------------
+
+
+def test_validate_dcms_not_applicable_for_special_paths():
+    """Items with EMPTY, MISSING, or DUPLICATE_DATA data_path must be skipped."""
+    for code in ("EMPTY", "MISSING", "DUPLICATE_DATA"):
+        data_mapping = [{"fixed_name": "BP001", "data_path": code}]
+        result = validate_dcms(data_mapping, "/nonexistent")
+        assert result[0]["validation_status"] == "NOT_APPLICABLE", f"Failed for code: {code}"
+
+
+def test_validate_dcms_no_dcm_files(tmp_path):
+    """A directory with no .dcm files must produce NO_DCM_FILES."""
+    case_dir = tmp_path / "BP001_folder"
+    case_dir.mkdir()
+    (case_dir / "info.txt").write_text("not a dicom")
+
+    data_mapping = [{"fixed_name": "BP001", "data_path": "BP001_folder"}]
+    result = validate_dcms(data_mapping, str(tmp_path))
+    assert result[0]["validation_status"] == "NO_DCM_FILES"
+
+
+# ---------------------------------------------------------------------------
+# _flag_exam_size_outliers
+# ---------------------------------------------------------------------------
+
+
+def test_flag_exam_size_outliers_below_and_above_limit():
+    """IQR outliers must be flagged BELOW_LIMIT and ABOVE_LIMIT; inliers stay OK."""
+    data = [
+        {"fixed_name": "BP001", "validation_status": "OK", "exam_size": 100.0},
+        {"fixed_name": "BP002", "validation_status": "OK", "exam_size": 105.0},
+        {"fixed_name": "BP003", "validation_status": "OK", "exam_size": 108.0},
+        {"fixed_name": "BP004", "validation_status": "OK", "exam_size": 110.0},
+        {"fixed_name": "BP005", "validation_status": "OK", "exam_size": 115.0},
+        {"fixed_name": "BP006", "validation_status": "OK", "exam_size": 120.0},
+        {"fixed_name": "BP007", "validation_status": "OK", "exam_size": 10.0},   # far below Q1 − 1.5×IQR
+        {"fixed_name": "BP008", "validation_status": "OK", "exam_size": 500.0},  # far above Q3 + 1.5×IQR
+    ]
+    result = _flag_exam_size_outliers(data)
+    statuses = {d["exam_size"]: d["validation_status"] for d in result}
+    assert statuses[10.0] == "BELOW_LIMIT"
+    assert statuses[500.0] == "ABOVE_LIMIT"
+    assert statuses[100.0] == "OK"
+    assert statuses[115.0] == "OK"
+
+
+def test_flag_exam_size_outliers_no_ok_exams_returns_early():
+    """When no OK exams exist the function must return data unchanged."""
+    data = [
+        {"validation_status": "FAILED",        "exam_size": 100.0},
+        {"validation_status": "MISSING_CLASS", "exam_size": 200.0},
+    ]
+    result = _flag_exam_size_outliers(data)
+    assert all(d["validation_status"] not in ("BELOW_LIMIT", "ABOVE_LIMIT") for d in result)

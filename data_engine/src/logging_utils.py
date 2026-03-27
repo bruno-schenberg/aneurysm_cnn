@@ -1,8 +1,12 @@
 import logging
 import csv
-import os
 import json
 from datetime import datetime
+
+
+# ----------------------------------------------------
+# 1. JSONL Handler
+# ----------------------------------------------------
 
 
 class _JsonlHandler(logging.FileHandler):
@@ -22,6 +26,11 @@ class _JsonlHandler(logging.FileHandler):
             self.flush()
         except Exception:
             self.handleError(record)
+
+
+# ----------------------------------------------------
+# 2. Logger Setup
+# ----------------------------------------------------
 
 
 def setup_logger(log_path: str = "ingestion.log"):
@@ -50,6 +59,12 @@ def setup_logger(log_path: str = "ingestion.log"):
 
     return logger
 
+
+# ----------------------------------------------------
+# 3. Audit Logging
+# ----------------------------------------------------
+
+
 def write_audit_log(results: list, output_path: str = "ingestion_summary.csv"):
     """
     Writes the final audit log (CSV) containing the conversion results.
@@ -67,6 +82,7 @@ def write_audit_log(results: list, output_path: str = "ingestion_summary.csv"):
             writer.writerows(results)
     except Exception as e:
         logging.getLogger("dicom_ingestion").error(f"Failed to write audit log to {output_path}: {e}")
+
 
 def log_jsonl(data: dict, log_path: str = "ingestion_metrics.jsonl"):
     """

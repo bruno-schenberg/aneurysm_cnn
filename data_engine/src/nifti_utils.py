@@ -4,9 +4,15 @@ import numpy as np
 import nibabel as nib
 import gc
 from monai.transforms import LoadImage
-from monai.data import ITKReader, PydicomReader
+from monai.data import ITKReader
 
 logger = logging.getLogger("dicom_ingestion")
+
+
+# ----------------------------------------------------
+# 1. Pre-Conversion Filtering
+# ----------------------------------------------------
+
 
 def filter_for_conversion(exam_data: list[dict]) -> list[dict]:
     """
@@ -21,6 +27,12 @@ def filter_for_conversion(exam_data: list[dict]) -> list[dict]:
 
     logger.info(f"  - Found {len(eligible_exams)} exams eligible for conversion.")
     return eligible_exams
+
+
+# ----------------------------------------------------
+# 2. NIfTI Conversion
+# ----------------------------------------------------
+
 
 def convert_series_to_nifti(dicom_dir: str, output_path: str) -> bool:
     """
@@ -58,6 +70,12 @@ def convert_series_to_nifti(dicom_dir: str, output_path: str) -> bool:
     except Exception as e:
         logger.error(f"  - Error during MONAI conversion for {dicom_dir}: {e}")
         return False
+
+
+# ----------------------------------------------------
+# 3. Conversion Orchestration
+# ----------------------------------------------------
+
 
 def process_and_convert_exams(eligible_exams: list[dict], dicom_base_path: str, nifti_output_dir: str) -> list[dict]:
     """

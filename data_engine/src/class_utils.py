@@ -1,7 +1,14 @@
 import logging
-logger = logging.getLogger("dicom_ingestion")
 import csv
 import re
+
+logger = logging.getLogger("dicom_ingestion")
+
+
+# ----------------------------------------------------
+# 1. Classification Join
+# ----------------------------------------------------
+
 
 def join_class_data(validated_data: list[dict], classes_csv_path: str) -> list[dict]:
     """
@@ -44,6 +51,12 @@ def join_class_data(validated_data: list[dict], classes_csv_path: str) -> list[d
             class_info = class_map.get(base_name, {})
             item.update(class_info)
     return validated_data
+
+
+# ----------------------------------------------------
+# 2. Missing Class Check
+# ----------------------------------------------------
+
 
 def check_missing_class(data: list[dict]) -> list[dict]:
     """

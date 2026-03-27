@@ -1,6 +1,5 @@
 import pytest
 import os
-import shutil
 import tempfile
 import nibabel as nib
 from src.nifti_utils import filter_for_conversion, process_and_convert_exams, convert_series_to_nifti
@@ -74,3 +73,44 @@ def test_process_and_convert_exams_with_sample_data():
         expected_output_path = os.path.join(temp_out_dir, mock_class, f"{mock_exam_name}.nii.gz")
         assert results[0]["output_path"] == expected_output_path
         assert os.path.exists(expected_output_path), "NIfTI file should be created in correct class subfolder"
+
+
+# ---------------------------------------------------------------------------
+# filter_for_conversion — edge cases
+# ---------------------------------------------------------------------------
+
+
+def test_filter_for_conversion_missing_class_key_excluded():
+    """Exams with no 'class' key at all must not be included."""
+    exam_data = [
+        {"fixed_name": "BP001", "validation_status": "OK"},  # no 'class' key
+        {"fixed_name": "BP002", "validation_status": "OK", "class": "1"},
+    ]
+    eligible = filter_for_conversion(exam_data)
+    names = [e["fixed_name"] for e in eligible]
+    assert "BP001" not in names
+    assert "BP002" in names
+
+
+# ---------------------------------------------------------------------------
+# process_and_convert_exams — idempotency
+# ---------------------------------------------------------------------------
+
+
+def test_process_and_convert_exams_idempotency(tmp_path):
+    """An exam whose output file already exists must be skipped, not re-converted."""
+    class_dir = tmp_path / "0"
+    class_dir.mkdir()
+    existing = class_dir / "BP001.nii.gz"
+    existing.write_bytes(b"placeholder")
+
+    exam_data = [{
+        "fixed_name": "BP001",
+        "data_path": "some/dicom/path",
+        "validation_status": "OK",
+        "class": "0",
+    }]
+    results = process_and_convert_exams(exam_data, str(tmp_path), str(tmp_path))
+    assert results[0]["status"] == "skipped"
+    assert results[0]["reason"] == "Already exists"
+    assert results[0]["output_path"] == str(existing)

@@ -8,6 +8,12 @@ import numpy as np
 
 logger = logging.getLogger("dicom_ingestion")
 
+
+# ----------------------------------------------------
+# 1. Orientation Helpers
+# ----------------------------------------------------
+
+
 def get_orientation(iop: list[float] | None) -> str:
     """Determines if the orientation is Axial, Coronal, Sagittal, or Oblique."""
     if iop is None or len(iop) < 6:
@@ -26,6 +32,12 @@ def get_orientation(iop: list[float] | None) -> str:
     else:
         return "OBLIQUE"
 
+
+# ----------------------------------------------------
+# 2. DICOM Loading
+# ----------------------------------------------------
+
+
 def load_dicom_metadata(path: str) -> list:
     """
     Loads all valid DICOM file headers from a given directory path.
@@ -41,6 +53,12 @@ def load_dicom_metadata(path: str) -> list:
             except InvalidDicomError:
                 logger.warning(f"  - Warning: Skipping corrupt/invalid DICOM file: {dcm_path}")
     return metadata_list
+
+
+# ----------------------------------------------------
+# 3. Slice Sorting and Spacing Analysis (Private)
+# ----------------------------------------------------
+
 
 def _sort_slices_by_projection(metadata_list: list, iop: list[float]) -> None:
     """
@@ -99,6 +117,12 @@ def _evaluate_spacing(metadata_list: list) -> tuple:
     else:
         # More than two spacing values
         return 'VARIABLE_SPACING', unique_spacings, 0, deltas
+
+
+# ----------------------------------------------------
+# 4. Main Series Validation
+# ----------------------------------------------------
+
 
 def validate_dcms(data_mapping: list[dict], base_path: str) -> list[dict]:
     """
@@ -167,7 +191,7 @@ def validate_dcms(data_mapping: list[dict], base_path: str) -> list[dict]:
             # 7. Math: Projection-Based Sorting
             _sort_slices_by_projection(main_series_metadata, iop)
 
-            # 8. Math: Spacing Analysis & Quality Control
+            # 8. Spacing Analysis & Quality Control
             status, unique_spacings, duplicates, deltas = _evaluate_spacing(main_series_metadata)
             item['validation_status'] = status
             item['duplicate_slice_count'] = duplicates
@@ -203,6 +227,7 @@ def validate_dcms(data_mapping: list[dict], base_path: str) -> list[dict]:
 
     logger.info("Validation complete.")
     return data_mapping
+
 
 def _flag_exam_size_outliers(data_mapping: list[dict]) -> list[dict]:
     """
@@ -255,6 +280,12 @@ def _flag_exam_size_outliers(data_mapping: list[dict]) -> list[dict]:
             logger.info(f"  - {item['fixed_name']} (Exam Size: {item['exam_size']:.2f})")
 
     return data_mapping
+
+
+# ----------------------------------------------------
+# 5. Mixed Series Analysis
+# ----------------------------------------------------
+
 
 def analyze_mixed_series(folder_path: str) -> list[dict]:
     """
@@ -316,6 +347,7 @@ def analyze_mixed_series(folder_path: str) -> list[dict]:
         series_reports.append(report)
 
     return series_reports
+
 
 def analyze_mixed_folders(data_mapping: list[dict], base_path: str, output_csv_path: str) -> None:
     """
