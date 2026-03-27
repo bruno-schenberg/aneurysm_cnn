@@ -1,7 +1,6 @@
 import numpy as np
 import nibabel as nib
 import pytest
-from pathlib import Path
 
 from src.nifti_resize import (
     TARGET_SHAPE,

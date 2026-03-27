@@ -8,7 +8,6 @@ from pathlib import Path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from data_engine.src.nifti_resize import (
-    TARGET_SHAPE,
     generate_variant_a,
     generate_variant_b,
     generate_variant_c,
