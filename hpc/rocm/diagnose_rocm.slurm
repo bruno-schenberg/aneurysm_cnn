@@ -102,7 +102,7 @@ source /opt/ohpc/pub/apps/miniconda3/etc/profile.d/conda.sh 2>/dev/null \
     || echo "WARNING: could not source conda — skipping Python section"
 
 conda activate aneurysm_cnn_rocm 2>&1 && \
-    python "$HOME/aneurysm_cnn/hpc/singularity/diagnose_rocm.py" 2>&1 \
+    python "$HOME/aneurysm_cnn/hpc/rocm/diagnose_rocm.py" 2>&1 \
     || echo "conda env not available — skipping Python section"
 
 echo ""
