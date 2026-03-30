@@ -1,7 +1,12 @@
-.claude/projects/
+# Dev-only files (kept in vibecode, excluded from main)
+.claude/
+.specify/
+specs/
+CLAUDE.md
+feature_list.md
+
 data_engine/src/__pycache__
 data_engine/.pytest_cache
-data_engine/.venv
 data_engine/output
 
 training_engine/src/__pycache__
