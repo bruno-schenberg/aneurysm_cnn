@@ -5,7 +5,7 @@ Generates a minimal synthetic NIfTI dataset for testing the training pipeline
 on the cluster without the real /mnt/data dataset.
 
 Creates:
-    sample_dataset/
+    /mnt/data/cases-3/sample_dataset/
         0/   — 12 synthetic negative (healthy) volumes
         1/   — 12 synthetic positive (aneurysm) volumes
 
@@ -16,14 +16,14 @@ Usage (run from repo root, with conda data env active):
     python hpc/singularity/create_sample_dataset.py
 
 Then transfer to the cluster:
-    scp -r sample_dataset/ <user>@drummond:~/
+    scp -r /mnt/data/cases-3/sample_dataset/ <user>@drummond:~/
 """
 
 import os
 import numpy as np
 import nibabel as nib
 
-OUTPUT_DIR = "sample_dataset"
+OUTPUT_DIR = "/mnt/data/cases-3/sample_dataset"
 N_PER_CLASS = 12   # enough for 20% test split + 2-fold CV with stratification
 SHAPE = (32, 32, 32)
 RNG = np.random.default_rng(42)
@@ -63,7 +63,7 @@ def main() -> None:
     total = N_PER_CLASS * 2
     print(f"\nDone — {total} volumes in '{OUTPUT_DIR}/' ({N_PER_CLASS} per class)")
     print("\nTransfer to cluster:")
-    print(f"  scp -r {OUTPUT_DIR}/ <user>@drummond:~/")
+    print(f"  scp -r {OUTPUT_DIR} <user>@drummond:~/")
 
 
 if __name__ == "__main__":
