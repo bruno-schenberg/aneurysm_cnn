@@ -26,10 +26,10 @@ From: rocm/dev-ubuntu-22.04:6.4
     python -m pip install --upgrade pip
 
     # ------------------------------------------------------------------ #
-    #  PyTorch + torchvision — ROCm 7.2 wheels                           #
+    #  PyTorch + torchvision — ROCm 6.4 wheels                           #
     # ------------------------------------------------------------------ #
-    pip install torch torchvision \
-        --index-url https://download.pytorch.org/whl/rocm6.2
+    pip install torch==2.9.1 torchvision==0.24.1 \
+        --index-url https://download.pytorch.org/whl/rocm6.4
 
     # ------------------------------------------------------------------ #
     #  Project dependencies                                               #
