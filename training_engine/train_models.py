@@ -9,6 +9,7 @@ Usage (from repository root):
     python training_engine/train_models.py
 """
 
+import argparse
 import json
 import os
 from typing import Any, Dict, List
@@ -54,6 +55,7 @@ DATASET_PATHS: Dict[str, str] = {
     "C": "/mnt/data/cases-3/dataset_C_cropped",            # Native resolution → crop to 128³
     "D": "/mnt/data/cases-3/dataset_D_shrunk",             # Native resolution → shrink to 128³
     "E": "/mnt/data/cases-3/dataset_E_isotropic_padded",   # Largest dim resampled to 128px → pad to 128³
+    "SAMPLE": os.path.expanduser("~/sample_dataset"),      # Synthetic dataset for container/pipeline testing
 }
 
 
@@ -150,8 +152,19 @@ def run_all_experiments(prepared_configs: List[Dict[str, Any]]) -> None:
 # ── Main Execution ─────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    # Load experiment definitions from the JSON file co-located with this script.
-    experiments_file = os.path.join(os.path.dirname(__file__), "experiments.json")
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--experiments",
+        default="experiments.json",
+        help="Path to experiments JSON file (default: experiments.json)",
+    )
+    args = parser.parse_args()
+
+    # Resolve relative paths against the script's directory
+    if not os.path.isabs(args.experiments):
+        experiments_file = os.path.join(os.path.dirname(__file__), args.experiments)
+    else:
+        experiments_file = args.experiments
     try:
         with open(experiments_file) as f:
             experiments_to_run = json.load(f)
