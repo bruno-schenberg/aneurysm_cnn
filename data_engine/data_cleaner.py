@@ -74,7 +74,7 @@ def _build_audit_log(conversion_results: list[dict], final_data: list[dict]) -> 
     return full_audit_results
 
 
-def run_pipeline(raw_dir: str | Path, nifti_dir: str | Path) -> None:
+def run_pipeline(raw_dir: str | Path, nifti_dir: str | Path, max_workers: int | None = None) -> None:
     """
     Executes the full DICOM to NIfTI ingestion and standardization pipeline.
 
@@ -133,7 +133,7 @@ def run_pipeline(raw_dir: str | Path, nifti_dir: str | Path) -> None:
 
         # 7. Convert to NIfTI and track results
         conversion_results = process_and_convert_exams(
-            eligible_for_conversion, raw_dir_str, nifti_dir_str
+            eligible_for_conversion, raw_dir_str, nifti_dir_str, max_workers=max_workers
         )
 
         # 8. Write the audit log — must cover 100% of input cases for traceability.
@@ -169,10 +169,16 @@ if __name__ == "__main__":
         help=f"Path to raw DICOM data directory (default: {DEFAULT_RAW_DATA_PATH})"
     )
     parser.add_argument(
-        "--nifti-dir", 
-        default=str(DEFAULT_OUTPUT_NIFTI_PATH), 
+        "--nifti-dir",
+        default=str(DEFAULT_OUTPUT_NIFTI_PATH),
         help=f"Path to output NIfTI directory (default: {DEFAULT_OUTPUT_NIFTI_PATH})"
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=None,
+        help="Number of parallel worker processes for NIfTI conversion (default: os.cpu_count())"
     )
     args = parser.parse_args()
 
-    run_pipeline(Path(args.raw_dir), Path(args.nifti_dir))
+    run_pipeline(Path(args.raw_dir), Path(args.nifti_dir), max_workers=args.workers)

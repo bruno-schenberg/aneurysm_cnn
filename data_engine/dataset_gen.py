@@ -2,7 +2,7 @@ import argparse
 import logging
 import os
 import sys
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from multiprocessing import Pool
 from pathlib import Path
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -26,18 +26,16 @@ OUTPUT_PATHS = {
     "E": Path("/mnt/data/cases-3/dataset_E_isotropic_padded"),
 }
 
-# 3 workers is safe on any machine with ≥ 8 GB RAM; a typical head MRI at
-# 400×400×180 float32 with all five variant arrays in flight weighs ~550 MB
-# per worker, so 3 workers peak around 1.6 GB.
 DEFAULT_WORKERS = 3
+
+# Workers are recycled after this many files to flush MONAI/torch allocator
+# caches that accumulate across tasks.  multiprocessing.Pool handles recycling
+# without the simultaneous-recycle deadlock present in ProcessPoolExecutor.
+MAX_TASKS_PER_WORKER = 10
 
 
 def _worker_logging_init() -> None:
-    """Configure a StreamHandler in each worker process.
-
-    ProcessPoolExecutor workers do not inherit the parent's logging handlers,
-    so without this initialiser their log records would be silently discarded.
-    """
+    """Configure a StreamHandler in each worker process."""
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(processName)s - %(levelname)s - %(message)s",
@@ -47,12 +45,15 @@ def _worker_logging_init() -> None:
 def process_file(file_path: Path, output_dirs: dict[str, Path]) -> str:
     """Generate all five dataset variants for a single NIfTI file."""
     filename = file_path.name
-    logging.info("Processing %s …", filename)
-    generate_variant_a(file_path, output_dirs["A"] / filename)
-    generate_variant_b(file_path, output_dirs["B"] / filename)
-    generate_variant_c(file_path, output_dirs["C"] / filename)
-    generate_variant_d(file_path, output_dirs["D"] / filename)
-    generate_variant_e(file_path, output_dirs["E"] / filename)
+    for variant, fn, key in [
+        ("A", generate_variant_a, "A"),
+        ("B", generate_variant_b, "B"),
+        ("C", generate_variant_c, "C"),
+        ("D", generate_variant_d, "D"),
+        ("E", generate_variant_e, "E"),
+    ]:
+        logging.info("%s → variant %s", filename, variant)
+        fn(file_path, output_dirs[key] / filename)
     return f"Done: {filename}"
 
 
@@ -98,19 +99,20 @@ def main() -> None:
             d.mkdir(parents=True, exist_ok=True)
         file_output_dirs.append((file_path, dirs))
 
-    with ProcessPoolExecutor(
-        max_workers=args.workers, initializer=_worker_logging_init
-    ) as executor:
-        futures = {
-            executor.submit(process_file, fp, dirs): fp
-            for fp, dirs in file_output_dirs
-        }
-        for future in as_completed(futures):
-            file_path = futures[future]
-            try:
-                logging.info(future.result())
-            except Exception as exc:
-                logging.error("Failed %s: %s", file_path.name, exc)
+    with Pool(
+        processes=args.workers,
+        initializer=_worker_logging_init,
+        maxtasksperchild=MAX_TASKS_PER_WORKER,
+    ) as pool:
+        for fp, dirs in file_output_dirs:
+            pool.apply_async(
+                process_file,
+                args=(fp, dirs),
+                callback=lambda msg: logging.info(msg),
+                error_callback=lambda exc, name=fp.name: logging.error("Failed %s: %s", name, exc),
+            )
+        pool.close()
+        pool.join()
 
     logging.info("All done.")
 

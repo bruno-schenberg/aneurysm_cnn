@@ -7,20 +7,15 @@ try:
     MATPLOTLIB_AVAILABLE = True
 except ImportError:
     MATPLOTLIB_AVAILABLE = False
-from src.nifti_utils import convert_series_to_nifti
 
-SAMPLE_DICOM_DIR = "/home/aneurysm_cnn/data_engine/dataset/sample-raw/BP05- 2838474/Anonymous_Mr_712482402_20170105"
-OUTPUT_NIFTI = "/tmp/sample_output.nii.gz"
+NIFTI_DIR = "/mnt/data/cases-3/nifti"
 
-def main():
-    print("1. Converting DICOM to NIfTI...")
-    success = convert_series_to_nifti(SAMPLE_DICOM_DIR, OUTPUT_NIFTI)
-    if not success:
-        print("Conversion failed!")
-        return
 
-    print(f"\n2. Loading generated NIfTI: {OUTPUT_NIFTI}")
-    img = nib.load(OUTPUT_NIFTI)
+def check_nifti_file(nifti_path: str) -> None:
+    print(f"\n=== Checking: {nifti_path} ===")
+
+    print(f"\n1. Loading NIfTI: {nifti_path}")
+    img = nib.load(nifti_path)
     data = img.get_fdata()
     header = img.header
 
@@ -28,7 +23,7 @@ def main():
     print(f"Shape (Dimensions): {data.shape}")
     print(f"Voxel Spacing (Zooms): {header.get_zooms()}")
     print(f"Data Type: {header.get_data_dtype()}")
-    
+
     print("\n--- Affine Matrix (Orientation & Spacing) ---")
     print(img.affine)
 
@@ -39,33 +34,44 @@ def main():
     print(f"NaN Count: {np.isnan(data).sum()}")
     print(f"Inf Count: {np.isinf(data).sum()}")
 
-    # Compare with a single DICOM file
-    dcm_files = [f for f in os.listdir(SAMPLE_DICOM_DIR) if f.endswith('.dcm')]
-    if dcm_files:
-        dcm_path = os.path.join(SAMPLE_DICOM_DIR, dcm_files[0])
-        ds = pydicom.dcmread(dcm_path)
-        print("\n--- Original DICOM Metadata (Sample) ---")
-        print(f"Pixel Spacing: {getattr(ds, 'PixelSpacing', 'N/A')}")
-        print(f"Slice Thickness: {getattr(ds, 'SliceThickness', 'N/A')}")
-        print(f"Rows x Columns: {getattr(ds, 'Rows', 'N/A')} x {getattr(ds, 'Columns', 'N/A')}")
-
     if MATPLOTLIB_AVAILABLE:
-        print("\n3. Generating a 2D slice plot...")
-        # Get the middle slice along the Z axis (usually the last dimension)
+        print("\n2. Generating a 2D slice plot...")
         z_mid = data.shape[2] // 2
         slice_2d = data[:, :, z_mid]
-        
+
         plt.figure(figsize=(6, 6))
-        # NIfTI data often needs transposing or rotating for matplotlib depending on orientation
         plt.imshow(slice_2d.T, cmap='gray', origin='lower')
-        plt.title(f"Middle Slice (Z={z_mid})")
+        name = os.path.splitext(os.path.splitext(os.path.basename(nifti_path))[0])[0]
+        plt.title(f"{name} — Middle Slice (Z={z_mid})")
         plt.axis('off')
-        
-        plot_path = "/tmp/nifti_slice.png"
+
+        plot_path = f"/tmp/nifti_slice_{name}.png"
         plt.savefig(plot_path)
+        plt.close()
         print(f"Saved middle slice plot to: {plot_path}")
     else:
         print("\nMatplotlib not installed, skipping plot generation.")
+
+
+def main():
+    # Collect one sample from each class subdirectory
+    samples = []
+    for class_label in ("0", "1"):
+        class_dir = os.path.join(NIFTI_DIR, class_label)
+        if not os.path.isdir(class_dir):
+            print(f"Class directory not found: {class_dir}")
+            continue
+        files = sorted(f for f in os.listdir(class_dir) if f.endswith(".nii.gz"))
+        if files:
+            samples.append(os.path.join(class_dir, files[0]))
+
+    if not samples:
+        print(f"No NIfTI files found in {NIFTI_DIR}")
+        return
+
+    for path in samples:
+        check_nifti_file(path)
+
 
 if __name__ == "__main__":
     main()

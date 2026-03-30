@@ -4,7 +4,7 @@ import nibabel as nib
 import torch
 from pathlib import Path
 from monai.data import MetaTensor
-from monai.transforms import Spacing, Resize, ResizeWithPadOrCrop, SpatialPad
+from monai.transforms import Spacing, Resize, ResizeWithPadOrCrop
 
 logger = logging.getLogger(__name__)
 
@@ -37,21 +37,15 @@ def _save(data: np.ndarray, affine: np.ndarray, path: Path) -> None:
 def _resample_to_1mm_isotropic(
     data: np.ndarray, affine: np.ndarray
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Resample a volume to 1 mm isotropic voxel spacing.
-
-    Uses MONAI Spacing (bilinear) via MetaTensor so the affine is correctly
-    propagated through the resampling step. The caller does not need to update
-    the affine manually.
-    """
-    # Wrap in MetaTensor so Spacing can read and update the affine
+    """Resample a volume to 1 mm isotropic voxel spacing via MONAI Spacing (bilinear)."""
     mt = MetaTensor(
         torch.from_numpy(data[np.newaxis]),  # channel-first: (1, H, W, D)
         affine=torch.from_numpy(affine.astype(np.float64)),
     )
-    transform = Spacing(pixdim=TARGET_SPACING_MM, mode="bilinear")
-    result = transform(mt)
-    resampled = result.numpy()[0].astype(np.float32)  # drop channel dim
+    result = Spacing(pixdim=TARGET_SPACING_MM, mode="bilinear")(mt)
+    resampled = result.numpy()[0].astype(np.float32)
     new_affine = result.affine.numpy()
+    del mt, result
     return resampled, new_affine
 
 
@@ -72,8 +66,8 @@ def generate_variant_c(input_path: Path, output_path: Path) -> None:
     """
     try:
         data, affine = _load(input_path)
-        transform = ResizeWithPadOrCrop(TARGET_SHAPE)
-        result = np.asarray(transform(data[np.newaxis]), dtype=np.float32)
+        result = np.asarray(ResizeWithPadOrCrop(TARGET_SHAPE)(data[np.newaxis]), dtype=np.float32)
+        del data
         _save(result[0], affine, output_path)
     except Exception as e:
         logger.error("Error processing %s for variant C: %s", input_path.name, e)
@@ -92,10 +86,11 @@ def generate_variant_d(input_path: Path, output_path: Path) -> None:
     try:
         data, affine = _load(input_path)
         old_shape = np.array(data.shape, dtype=float)
-        transform = Resize(TARGET_SHAPE, mode="trilinear", anti_aliasing=True)
-        result = np.asarray(transform(data[np.newaxis]), dtype=np.float32)
-        # Voxel size is scaled by old_shape / new_shape along each axis;
-        # the affine columns (voxel-to-world vectors) are scaled accordingly.
+        result = np.asarray(
+            Resize(TARGET_SHAPE, mode="trilinear", anti_aliasing=True)(data[np.newaxis]),
+            dtype=np.float32,
+        )
+        del data
         scale = old_shape / np.array(TARGET_SHAPE, dtype=float)
         new_affine = affine.copy()
         new_affine[:3, :3] = affine[:3, :3] * scale[np.newaxis, :]
@@ -117,8 +112,8 @@ def generate_variant_a(input_path: Path, output_path: Path) -> None:
     try:
         data, affine = _load(input_path)
         data, affine = _resample_to_1mm_isotropic(data, affine)
-        transform = ResizeWithPadOrCrop(TARGET_SHAPE)
-        result = np.asarray(transform(data[np.newaxis]), dtype=np.float32)
+        result = np.asarray(ResizeWithPadOrCrop(TARGET_SHAPE)(data[np.newaxis]), dtype=np.float32)
+        del data
         _save(result[0], affine, output_path)
     except Exception as e:
         logger.error("Error processing %s for variant A: %s", input_path.name, e)
@@ -137,8 +132,11 @@ def generate_variant_b(input_path: Path, output_path: Path) -> None:
     try:
         data, affine = _load(input_path)
         data, affine = _resample_to_1mm_isotropic(data, affine)
-        transform = Resize(TARGET_SHAPE, mode="trilinear", anti_aliasing=True)
-        result = np.asarray(transform(data[np.newaxis]), dtype=np.float32)
+        result = np.asarray(
+            Resize(TARGET_SHAPE, mode="trilinear", anti_aliasing=True)(data[np.newaxis]),
+            dtype=np.float32,
+        )
+        del data
         # The 1 mm affine is preserved as the nominal spacing for this variant;
         # the resize is treated as a fixed-grid resampling artefact, not a
         # physical scale change.
@@ -148,57 +146,36 @@ def generate_variant_b(input_path: Path, output_path: Path) -> None:
 
 
 def generate_variant_e(input_path: Path, output_path: Path) -> None:
-    """Resample to isotropic at finest pitch → scale largest dim to 128 → zero-pad to 128³.
+    """Resample isotropically so the largest dimension maps to 128 voxels, then pad to 128³.
 
-    Three-step pipeline that preserves aspect ratio while fitting every volume
-    into a 128³ cube:
-
-    Step 1 — Isotropic resampling: resample to isotropic voxels at the smallest
-    original voxel pitch (finest resolution axis), removing anisotropy without
-    sacrificing in-plane resolution.
-
-    Step 2 — Uniform scale to 128: uniformly scale the isotropic volume so that
-    its largest spatial dimension equals exactly 128 voxels, using anti-aliased
-    trilinear interpolation to prevent aliasing during the typical downsampling
-    case. Aspect ratio is preserved throughout.
-
-    Step 3 — Symmetric zero-padding: pad the scaled volume to 128³ with zeros.
-    Padding is always symmetric and never crops, so no brain tissue is removed
-    in this step.
+    Combines the former two-step pipeline (resample to min_zoom → scale max-dim
+    to 128) into a single MONAI Spacing call, eliminating the large intermediate
+    array that the first step previously produced.  The target spacing is derived
+    as max_physical_extent / 128, which is algebraically equivalent to the
+    original approach while preserving aspect ratio and avoiding any cropping.
     """
     try:
         data, affine = _load(input_path)
         original_zooms = np.abs(np.diagonal(affine)[:3])
-        min_zoom = float(np.min(original_zooms))
+        max_physical_extent = float(np.max(np.array(data.shape, dtype=float) * original_zooms))
+        target_spacing = max_physical_extent / 128.0
 
-        # Step 1: Resample to isotropic at the smallest original voxel pitch so
-        # that the finest-resolution axis is not degraded during isotropy correction.
         mt = MetaTensor(
             torch.from_numpy(data[np.newaxis]),
             affine=torch.from_numpy(affine.astype(np.float64)),
         )
-        transform_spacing = Spacing(pixdim=min_zoom, mode="bilinear")
-        iso_result = transform_spacing(mt)
-        iso_data = iso_result.numpy()[0].astype(np.float32)
-        iso_affine = iso_result.affine.numpy()
-        iso_shape = np.array(iso_data.shape)  # (H, W, D)
+        del data
+        scaled_result = Spacing(pixdim=target_spacing, mode="bilinear")(mt)
+        scaled_data = scaled_result.numpy()[0].astype(np.float32)
+        scaled_affine = scaled_result.affine.numpy()
+        del mt, scaled_result
 
-        # Step 2: Uniform scale so max(shape) == 128; anti-aliasing prevents
-        # aliasing artefacts when the isotropic volume is larger than 128³.
-        scale = 128.0 / float(np.max(iso_shape))
-        scaled_shape = tuple(max(1, round(float(s) * scale)) for s in iso_shape)
-        transform_resize = Resize(scaled_shape, mode="trilinear", anti_aliasing=True)
-        scaled_data = np.asarray(transform_resize(iso_data[np.newaxis]), dtype=np.float32)
-
-        # Update affine: voxel size scales by iso_shape / scaled_shape.
-        # Because the scale is uniform, each axis gets the same factor (1/scale).
-        scale_per_axis = iso_shape / np.array(scaled_shape, dtype=float)
-        scaled_affine = iso_affine.copy()
-        scaled_affine[:3, :3] = iso_affine[:3, :3] * scale_per_axis[np.newaxis, :]
-
-        # Step 3: Symmetric zero-pad to 128³ — brain fits inside, no cropping.
-        transform_pad = SpatialPad(TARGET_SHAPE, method="symmetric")
-        padded_data = np.asarray(transform_pad(scaled_data), dtype=np.float32)
+        # Pad or crop to exactly 128³ — Spacing rounds voxel counts so the
+        # result may be off by ±1 on any axis; ResizeWithPadOrCrop handles both.
+        padded_data = np.asarray(
+            ResizeWithPadOrCrop(TARGET_SHAPE)(scaled_data[np.newaxis]), dtype=np.float32
+        )
+        del scaled_data
 
         _save(padded_data[0], scaled_affine, output_path)
     except Exception as e:

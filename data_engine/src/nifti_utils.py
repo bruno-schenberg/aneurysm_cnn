@@ -3,6 +3,7 @@ import logging
 import numpy as np
 import nibabel as nib
 import gc
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from monai.transforms import LoadImage
 from monai.data import ITKReader
 
@@ -77,61 +78,88 @@ def convert_series_to_nifti(dicom_dir: str, output_path: str) -> bool:
 # ----------------------------------------------------
 
 
-def process_and_convert_exams(eligible_exams: list[dict], dicom_base_path: str, nifti_output_dir: str) -> list[dict]:
+def _convert_exam_worker(exam: dict, dicom_base_path: str, nifti_output_dir: str) -> dict:
     """
-    Orchestrates the conversion of eligible DICOM series to NIfTI format.
-    Returns a list of ConversionResult dictionaries.
+    Worker function for parallel NIfTI conversion of a single exam.
+    Designed to run in a subprocess — returns all results and log messages
+    as data so the main process can log them.
     """
-    results = []
-    logger.info(f"Starting NIfTI conversion for {len(eligible_exams)} exams...")
-    if not os.path.exists(nifti_output_dir):
-        logger.info(f"  - Creating base output directory: {nifti_output_dir}")
-        os.makedirs(nifti_output_dir)
+    fixed_name = exam['fixed_name']
+    exam_class = exam.get('class')
 
-    for exam in eligible_exams:
-        fixed_name = exam['fixed_name']
-        data_path = exam['data_path']
-        exam_class = exam.get('class')
+    result = {
+        "exam_name": fixed_name,
+        "status": "failed",
+        "reason": "",
+        "output_path": "",
+        "log_messages": [],
+    }
 
-        result = {
-            "exam_name": fixed_name,
-            "status": "failed",
-            "reason": "",
-            "output_path": ""
-        }
+    result["log_messages"].append(f"Processing exam: {fixed_name} (Class: {exam_class})")
 
-        logger.info(f"Processing exam: {fixed_name} (Class: {exam_class})")
+    class_output_dir = os.path.join(nifti_output_dir, str(exam_class))
+    os.makedirs(class_output_dir, exist_ok=True)
 
-        # Create the class-specific subdirectory
-        class_output_dir = os.path.join(nifti_output_dir, str(exam_class))
-        os.makedirs(class_output_dir, exist_ok=True)
+    input_dicom_path = os.path.join(dicom_base_path, exam['data_path'])
+    output_nifti_path = os.path.join(class_output_dir, f"{fixed_name}.nii.gz")
 
-        input_dicom_path = os.path.join(dicom_base_path, data_path)
-        output_nifti_path = os.path.join(class_output_dir, f"{fixed_name}.nii.gz")
+    if os.path.exists(output_nifti_path):
+        result["log_messages"].append(f"  - Skipping {fixed_name}, output already exists")
+        result["status"] = "skipped"
+        result["reason"] = "Already exists"
+        result["output_path"] = output_nifti_path
+        return result
 
-        # Idempotency check: skip if output already exists
-        if os.path.exists(output_nifti_path):
-            logger.info(f"  - Skipping {fixed_name}, output already exists: {output_nifti_path}")
-            result["status"] = "skipped"
-            result["reason"] = "Already exists"
+    try:
+        if convert_series_to_nifti(input_dicom_path, output_nifti_path):
+            result["status"] = "success"
             result["output_path"] = output_nifti_path
-            results.append(result)
-            continue
+        else:
+            result["reason"] = "MONAI conversion failed"
+    except OSError as e:
+        result["reason"] = "FAILED_IO"
+        result["log_messages"].append(f"  - IO failure for {fixed_name}: {e}")
+    except Exception as e:
+        result["reason"] = f"Unexpected error: {str(e)}"
 
-        # Step 1: Convert using the new MONAI-based function
-        try:
-            if convert_series_to_nifti(input_dicom_path, output_nifti_path):
-                result["status"] = "success"
-                result["output_path"] = output_nifti_path
-            else:
-                result["reason"] = "MONAI conversion failed"
-        except OSError as e:
-            logger.critical(f"  - IO failure processing {fixed_name}: {e}")
-            result["reason"] = "FAILED_IO"
-        except Exception as e:
-            result["reason"] = f"Unexpected error: {str(e)}"
-        
-        results.append(result)
+    return result
+
+
+def process_and_convert_exams(
+    eligible_exams: list[dict],
+    dicom_base_path: str,
+    nifti_output_dir: str,
+    max_workers: int | None = None,
+) -> list[dict]:
+    """
+    Orchestrates parallel conversion of eligible DICOM series to NIfTI format.
+    Uses a ProcessPoolExecutor so each exam is converted concurrently.
+
+    Args:
+        eligible_exams: Exams that passed validation and have a known class.
+        dicom_base_path: Root directory containing the raw DICOM folders.
+        nifti_output_dir: Root directory for NIfTI output (class subdirs created automatically).
+        max_workers: Number of parallel worker processes. Defaults to os.cpu_count().
+
+    Returns:
+        A list of ConversionResult dicts (one per exam).
+    """
+    logger.info(f"Starting NIfTI conversion for {len(eligible_exams)} exams...")
+    os.makedirs(nifti_output_dir, exist_ok=True)
+
+    results = []
+    futures = {}
+
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        for exam in eligible_exams:
+            future = executor.submit(_convert_exam_worker, exam, dicom_base_path, nifti_output_dir)
+            futures[future] = exam['fixed_name']
+
+        for future in as_completed(futures):
+            result = future.result()
+            for msg in result.pop("log_messages", []):
+                logger.info(msg)
+            results.append(result)
 
     success_count = sum(1 for r in results if r['status'] == 'success')
     logger.info(f"Conversion complete. Successfully processed {success_count} out of {len(eligible_exams)} exams.")
