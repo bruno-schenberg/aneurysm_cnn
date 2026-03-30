@@ -1,3 +1,4 @@
+.claude/projects/
 data_engine/src/__pycache__
 data_engine/.pytest_cache
 data_engine/.venv
