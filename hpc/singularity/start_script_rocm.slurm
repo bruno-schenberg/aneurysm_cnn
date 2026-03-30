@@ -36,9 +36,6 @@ echo -e "## Singularity Image:             $SIF \n"
 ##-------    Start of Work     ------##
 #########################################
 
-## Architecture override for AMD Instinct MI210 (gfx90a).
-## Also set inside the container via %environment, but exporting here
-## ensures it is inherited even if the container env block is skipped.
 ## Load Singularity module (as required by the Drummond cluster)
 module load singularity/3.7.1
 
@@ -63,9 +60,13 @@ if torch.cuda.is_available():
 echo -e "## ...Verification complete. ##\n"
 
 ## 2. Run training
+## Set EXPERIMENTS_FILE to override which experiments.json to use.
+## Default: experiments.json  |  Sample test: experiments_sample.json
+EXPERIMENTS_FILE=${EXPERIMENTS_FILE:-experiments.json}
 singularity exec --rocm \
     --bind $WRKDIR:$WRKDIR \
-    $SIF python -u train_models.py
+    --bind $HOME:$HOME \
+    $SIF python -u train_models.py --experiments $EXPERIMENTS_FILE
 
 ## 3. Copy results back to home directory
 srun cp -r $WRKDIR/training_engine/experiments/. $HOME/aneurysm_cnn/experiments/
