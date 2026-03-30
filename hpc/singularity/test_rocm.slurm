@@ -34,8 +34,9 @@ echo -e "## Singularity Image:             $SIF \n"
 ##-------    Start of Work     ------##
 #########################################
 
-## Load Singularity module (as required by the Drummond cluster)
+## Load required modules
 module load singularity/3.7.1
+module load rocm/6.4.3
 
 export HSA_OVERRIDE_GFX_VERSION=9.0.a
 

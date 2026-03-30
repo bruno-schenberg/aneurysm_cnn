@@ -1,9 +1,9 @@
 Bootstrap: docker
-From: rocm/dev-ubuntu-22.04:7.2
+From: rocm/dev-ubuntu-22.04:6.4
 
 %labels
     Author aneurysm_cnn
-    ROCm   7.2
+    ROCm   6.4
     Python 3.11
 
 %post
@@ -29,7 +29,7 @@ From: rocm/dev-ubuntu-22.04:7.2
     #  PyTorch + torchvision — ROCm 7.2 wheels                           #
     # ------------------------------------------------------------------ #
     pip install torch torchvision \
-        --index-url https://download.pytorch.org/whl/rocm7.2
+        --index-url https://download.pytorch.org/whl/rocm6.2
 
     # ------------------------------------------------------------------ #
     #  Project dependencies                                               #

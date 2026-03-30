@@ -36,8 +36,9 @@ echo -e "## Singularity Image:             $SIF \n"
 ##-------    Start of Work     ------##
 #########################################
 
-## Load Singularity module (as required by the Drummond cluster)
+## Load required modules
 module load singularity/3.7.1
+module load rocm/6.4.3
 
 ## Architecture override for AMD Instinct MI210 (gfx90a).
 ## Also set inside the container via %environment, but exporting here
