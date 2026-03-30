@@ -1,26 +1,79 @@
 [
     {
-        "name": "R3D18_Dataset_A_Weighted_20",
+        "name": "R3D18_Dataset_A_QuickTest",
         "model": "R3D18",
         "balancing": "weighted_cost_function",
-        "data_path_key": "A"
+        "data_path_key": "A",
+        "EPOCHS": 1,
+        "N_SPLITS": 2,
+        "QUICK_TEST": false,
+        "BATCH_SIZE": 1,
+        "VAL_BATCH_SIZE": 1
     },
     {
-        "name": "R3D18_Dataset_B_Weighted_20",
-        "model": "R3D18",
+        "name": "R3D50_Dataset_B_QuickTest",
+        "model": "R3D50",
         "balancing": "weighted_cost_function",
-        "data_path_key": "B"
+        "data_path_key": "B",
+        "EPOCHS": 1,
+        "N_SPLITS": 2,
+        "QUICK_TEST": false,
+        "BATCH_SIZE": 1,
+        "VAL_BATCH_SIZE": 1
     },
     {
-        "name": "R3D18_Dataset_C_Weighted_20",
-        "model": "R3D18",
+        "name": "DenseNet121_Dataset_C_QuickTest",
+        "model": "DenseNet121",
         "balancing": "weighted_cost_function",
-        "data_path_key": "C"
+        "data_path_key": "C",
+        "EPOCHS": 1,
+        "N_SPLITS": 2,
+        "QUICK_TEST": false,
+        "BATCH_SIZE": 1,
+        "VAL_BATCH_SIZE": 1
     },
     {
-        "name": "R3D18_Dataset_D_Weighted_20",
-        "model": "R3D18",
+        "name": "SwinUNETR_Dataset_D_QuickTest",
+        "model": "SwinUNETR",
         "balancing": "weighted_cost_function",
-        "data_path_key": "D"
+        "data_path_key": "D",
+        "EPOCHS": 1,
+        "N_SPLITS": 2,
+        "QUICK_TEST": false,
+        "BATCH_SIZE": 1,
+        "VAL_BATCH_SIZE": 1
+    },
+    {
+        "name": "UNet3D_Dataset_E_QuickTest",
+        "model": "UNet3D",
+        "balancing": "weighted_cost_function",
+        "data_path_key": "E",
+        "EPOCHS": 1,
+        "N_SPLITS": 2,
+        "QUICK_TEST": false,
+        "BATCH_SIZE": 1,
+        "VAL_BATCH_SIZE": 1
+    },
+    {
+        "name": "UNet3DWithBackbone_Dataset_A_QuickTest",
+        "model": "UNet3DWithBackbone",
+        "balancing": "weighted_cost_function",
+        "data_path_key": "A",
+        "EPOCHS": 1,
+        "N_SPLITS": 2,
+        "QUICK_TEST": false,
+        "BATCH_SIZE": 1,
+        "VAL_BATCH_SIZE": 1
+    },
+    {
+        "name": "MIL_R3D18_Dataset_B_QuickTest",
+        "model": "MIL_R3D18",
+        "balancing": "weighted_cost_function",
+        "data_path_key": "B",
+        "EPOCHS": 1,
+        "N_SPLITS": 2,
+        "QUICK_TEST": false,
+        "BATCH_SIZE": 1,
+        "VAL_BATCH_SIZE": 1
     }
 ]

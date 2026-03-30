@@ -15,6 +15,9 @@ from typing import Any, Dict, List
 
 import torch
 
+# Redirect MONAI model cache to a user-writable directory (avoids /root/.cache permission issues)
+os.environ.setdefault("MONAI_HOME", os.path.expanduser("~/.cache/monai"))
+
 from src.orchestrator import run_experiment
 
 
@@ -46,11 +49,11 @@ DEFAULT_CONFIG: Dict[str, Any] = {
 # Maps data_path_key values from experiments.json to filesystem paths.
 # Paths are relative to the training_engine/ working directory.
 DATASET_PATHS: Dict[str, str] = {
-    "A": "datasets/resample_crop",      # 1mm isotropic resample → crop to 128³
-    "B": "datasets/resample_shrink",    # 1mm isotropic resample → shrink to 128³
-    "C": "datasets/no_resample_crop",   # Native resolution → crop to 128³
-    "D": "datasets/no_resample_shrink", # Native resolution → shrink to 128³
-    "E": "datasets/isotropic_padded",   # Largest dim resampled to 128px → pad to 128³
+    "A": "/mnt/data/cases-3/dataset_A_resampled_cropped",  # 1mm isotropic resample → crop to 128³
+    "B": "/mnt/data/cases-3/dataset_B_resampled_shrunk",   # 1mm isotropic resample → shrink to 128³
+    "C": "/mnt/data/cases-3/dataset_C_cropped",            # Native resolution → crop to 128³
+    "D": "/mnt/data/cases-3/dataset_D_shrunk",             # Native resolution → shrink to 128³
+    "E": "/mnt/data/cases-3/dataset_E_isotropic_padded",   # Largest dim resampled to 128px → pad to 128³
 }
 
 
@@ -135,6 +138,9 @@ def run_all_experiments(prepared_configs: List[Dict[str, Any]]) -> None:
             print(f"\nFATAL ERROR: Data path missing for experiment '{exp_config['name']}'. {e}")
         except Exception as e:
             print(f"\nFATAL ERROR running experiment '{exp_config['name']}': {e}")
+        finally:
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
 
     print("\n\n" + "*" * 80)
     print("EXPERIMENTS FINISHED")

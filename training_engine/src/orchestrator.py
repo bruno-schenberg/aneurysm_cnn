@@ -52,7 +52,7 @@ def run_one_fold(
     Returns a FoldResult dict with per-sample predictions, classification metrics,
     eval accuracy, and eval loss.
     """
-    print(f"\n--- Starting Fold {fold + 1}/{config['N_SPLITS']} ---")
+    print(f"\n--- Starting Fold {fold}/{config['N_SPLITS']} ---")
 
     fold_output_dir = os.path.join(experiment_output_dir, f"fold_{fold}")
     os.makedirs(fold_output_dir, exist_ok=True)
@@ -250,7 +250,7 @@ def run_experiment(config: Dict[str, Any]) -> None:
             aneurysm_positive_weight = get_class_weights(train_files)
             if aneurysm_positive_weight is not None:
                 print(
-                    f"Using class weights for fold {fold_idx}: "
+                    f"Using class weights for fold {fold_idx + 1}: "
                     f"{aneurysm_positive_weight.tolist()}"
                 )
 
@@ -261,7 +261,7 @@ def run_experiment(config: Dict[str, Any]) -> None:
         model.to(config["DEVICE"])
 
         fold_results = run_one_fold(
-            fold=fold_idx,
+            fold=fold_idx + 1,
             train_loader=train_loader,
             val_loader=val_loader,
             test_loader=test_loader,
@@ -271,7 +271,11 @@ def run_experiment(config: Dict[str, Any]) -> None:
             experiment_output_dir=experiment_output_dir,
         )
 
-        fold_model_name = f"{config['name']}_fold{fold_idx}"
+        del model
+        if config["DEVICE"] == "cuda":
+            torch.cuda.empty_cache()
+
+        fold_model_name = f"{config['name']}_fold{fold_idx + 1}"
         all_fold_predictions[fold_model_name] = fold_results
 
         if config["QUICK_TEST"]:
