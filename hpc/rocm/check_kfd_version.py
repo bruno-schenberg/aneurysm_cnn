@@ -10,7 +10,7 @@ import os
 import struct
 import subprocess
 
-ROCM_PATH = "/opt/ohpc/pub/apps/rocm-6.4.3"
+ROCM_PATH = "/opt/ohpc/pub/apps/rocm/rocm-6.4.3"
 AMDKFD_IOC_GET_VERSION = 0xC0084B01
 
 print("=== KFD version check ===")
@@ -62,7 +62,13 @@ if hsa_lib and os.path.exists(hsa_lib):
     print("Scanning for version strings ...")
     result = subprocess.run(["strings", hsa_lib], capture_output=True, text=True)
     for line in result.stdout.splitlines():
-        if "KFD_IOCTL" in line or "kfd_ioctl" in line or "major_version" in line:
-            print(f"  {line.strip()}")
+        l = line.strip()
+        if "KFD_IOCTL" in l or "kfd_ioctl" in l or "major_version" in l or "minor_version" in l:
+            print(f"  {l}")
+    # Also look for version number patterns like "1.17" or "1.18"
+    import re
+    for line in result.stdout.splitlines():
+        if re.fullmatch(r"1\.\d{1,2}", line.strip()):
+            print(f"  version string: {line.strip()}")
 else:
     print("Could not locate libhsa-runtime64 — is rocm/6.4.3 module loaded?")
