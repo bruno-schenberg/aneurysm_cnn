@@ -78,7 +78,7 @@ rocm-smi 2>&1
 echo ""
 echo "--- rocminfo with module rocm/6.4.3 ---"
 echo "ROCM_PATH=$ROCM_PATH"
-export HSA_OVERRIDE_GFX_VERSION=9.0.a
+export HSA_OVERRIDE_GFX_VERSION=9.0.10
 rocminfo 2>&1
 
 # ----------------------------------------------------------------

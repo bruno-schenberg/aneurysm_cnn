@@ -49,7 +49,7 @@ From: rocm/dev-ubuntu-22.04:6.4
 %environment
     # Required for AMD Instinct MI210 (gfx90a) — tells ROCm to treat the
     # GPU as gfx90a even when the runtime reports a different string.
-    export HSA_OVERRIDE_GFX_VERSION=9.0.a
+    export HSA_OVERRIDE_GFX_VERSION=9.0.10
 
     # Ensure the container's Python is used
     export PATH=/usr/bin:$PATH
