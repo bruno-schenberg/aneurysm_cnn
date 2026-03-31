@@ -1,79 +1,47 @@
 [
     {
-        "name": "R3D18_Dataset_A_QuickTest",
+        "name": "R3D18_A_baseline",
         "model": "R3D18",
         "balancing": "weighted_cost_function",
         "data_path_key": "A",
-        "EPOCHS": 1,
-        "N_SPLITS": 2,
-        "QUICK_TEST": false,
-        "BATCH_SIZE": 1,
-        "VAL_BATCH_SIZE": 1
+        "EPOCHS": 40,
+        "BATCH_SIZE": 5,
+        "QUICK_TEST": false
     },
     {
-        "name": "R3D50_Dataset_B_QuickTest",
-        "model": "R3D50",
+        "name": "R3D18_B_baseline",
+        "model": "R3D18",
         "balancing": "weighted_cost_function",
         "data_path_key": "B",
-        "EPOCHS": 1,
-        "N_SPLITS": 2,
-        "QUICK_TEST": false,
-        "BATCH_SIZE": 1,
-        "VAL_BATCH_SIZE": 1
+        "EPOCHS": 40,
+        "BATCH_SIZE": 5,
+        "QUICK_TEST": false
     },
     {
-        "name": "DenseNet121_Dataset_C_QuickTest",
-        "model": "DenseNet121",
+        "name": "R3D18_C_baseline",
+        "model": "R3D18",
         "balancing": "weighted_cost_function",
         "data_path_key": "C",
-        "EPOCHS": 1,
-        "N_SPLITS": 2,
-        "QUICK_TEST": false,
-        "BATCH_SIZE": 1,
-        "VAL_BATCH_SIZE": 1
+        "EPOCHS": 40,
+        "BATCH_SIZE": 5,
+        "QUICK_TEST": false
     },
     {
-        "name": "SwinUNETR_Dataset_D_QuickTest",
-        "model": "SwinUNETR",
+        "name": "R3D18_D_baseline",
+        "model": "R3D18",
         "balancing": "weighted_cost_function",
         "data_path_key": "D",
-        "EPOCHS": 1,
-        "N_SPLITS": 2,
-        "QUICK_TEST": false,
-        "BATCH_SIZE": 1,
-        "VAL_BATCH_SIZE": 1
+        "EPOCHS": 40,
+        "BATCH_SIZE": 5,
+        "QUICK_TEST": false
     },
     {
-        "name": "UNet3D_Dataset_E_QuickTest",
-        "model": "UNet3D",
+        "name": "R3D18_E_baseline",
+        "model": "R3D18",
         "balancing": "weighted_cost_function",
         "data_path_key": "E",
-        "EPOCHS": 1,
-        "N_SPLITS": 2,
-        "QUICK_TEST": false,
-        "BATCH_SIZE": 1,
-        "VAL_BATCH_SIZE": 1
-    },
-    {
-        "name": "UNet3DWithBackbone_Dataset_A_QuickTest",
-        "model": "UNet3DWithBackbone",
-        "balancing": "weighted_cost_function",
-        "data_path_key": "A",
-        "EPOCHS": 1,
-        "N_SPLITS": 2,
-        "QUICK_TEST": false,
-        "BATCH_SIZE": 1,
-        "VAL_BATCH_SIZE": 1
-    },
-    {
-        "name": "MIL_R3D18_Dataset_B_QuickTest",
-        "model": "MIL_R3D18",
-        "balancing": "weighted_cost_function",
-        "data_path_key": "B",
-        "EPOCHS": 1,
-        "N_SPLITS": 2,
-        "QUICK_TEST": false,
-        "BATCH_SIZE": 1,
-        "VAL_BATCH_SIZE": 1
+        "EPOCHS": 40,
+        "BATCH_SIZE": 5,
+        "QUICK_TEST": false
     }
 ]
