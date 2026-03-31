@@ -35,12 +35,12 @@ echo -e "## Scratch Directory:             $WRKDIR \n"
 #########################################
 
 ## 1. Environment Setup
-## We will load the system's rocm module.
 module purge
-module load rocm/6.0.1
+module load rocm/6.4.3
+export LD_LIBRARY_PATH=/opt/ohpc/pub/apps/rocm/rocm-6.4.3/lib:$LD_LIBRARY_PATH
 
 ## 2. Architecture Override
-## This is required for PyTorch to work correctly with the Instinct MI210 (gfx90a) GPU.
+## Required for PyTorch to recognise the Instinct MI210 (gfx90a). Format must be decimal.
 export HSA_OVERRIDE_GFX_VERSION=9.0.10
 
 ## 3. Activate Conda Environment
@@ -63,9 +63,12 @@ if torch.cuda.is_available():
 echo -e "## ...Verification Complete. ##\n"
 
 ## 5. Execute Training Script.
-## Run the python script directly. The environment is now clean and fully
-## controlled by Conda, which should resolve the detection issue.
-python -u train_models.py
+## Override experiments file via EXPERIMENTS_FILE env var (optional).
+EXPERIMENTS_ARG=""
+if [ -n "$EXPERIMENTS_FILE" ]; then
+    EXPERIMENTS_ARG="--experiments $EXPERIMENTS_FILE"
+fi
+python -u train_models.py $EXPERIMENTS_ARG
 
 ## 6. Copy the output experiments.
 srun cp -r $WRKDIR/training_engine/experiments/. $HOME/aneurysm_cnn/experiments/
