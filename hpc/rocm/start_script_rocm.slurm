@@ -46,6 +46,9 @@ export HSA_OVERRIDE_GFX_VERSION=9.0.10
 ## 3. Dataset root (home directory on cluster)
 export DATA_ROOT=$HOME/data/cases-3
 
+## 4. Backup dir — results are copied here after each experiment completes
+export EXPERIMENT_BACKUP_DIR=$HOME/aneurysm_cnn/experiments
+
 ## 3. Activate Conda Environment
 source $HOME/miniconda3/bin/activate
 conda activate aneurysm_cnn_rocm
