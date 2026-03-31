@@ -49,13 +49,14 @@ DEFAULT_CONFIG: Dict[str, Any] = {
 
 # Maps data_path_key values from experiments.json to filesystem paths.
 # Paths are relative to the training_engine/ working directory.
+_DATA_ROOT = os.environ.get("DATA_ROOT", "/mnt/data/cases-3")
 DATASET_PATHS: Dict[str, str] = {
-    "A": "/mnt/data/cases-3/dataset_A_resampled_cropped",  # 1mm isotropic resample → crop to 128³
-    "B": "/mnt/data/cases-3/dataset_B_resampled_shrunk",   # 1mm isotropic resample → shrink to 128³
-    "C": "/mnt/data/cases-3/dataset_C_cropped",            # Native resolution → crop to 128³
-    "D": "/mnt/data/cases-3/dataset_D_shrunk",             # Native resolution → shrink to 128³
-    "E": "/mnt/data/cases-3/dataset_E_isotropic_padded",   # Largest dim resampled to 128px → pad to 128³
-    "SAMPLE": os.path.expanduser("~/sample_dataset"),      # Synthetic dataset for container/pipeline testing
+    "A": f"{_DATA_ROOT}/dataset_A_resampled_cropped",  # 1mm isotropic resample → crop to 128³
+    "B": f"{_DATA_ROOT}/dataset_B_resampled_shrunk",   # 1mm isotropic resample → shrink to 128³
+    "C": f"{_DATA_ROOT}/dataset_C_cropped",            # Native resolution → crop to 128³
+    "D": f"{_DATA_ROOT}/dataset_D_shrunk",             # Native resolution → shrink to 128³
+    "E": f"{_DATA_ROOT}/dataset_E_isotropic_padded",   # Largest dim resampled to 128px → pad to 128³
+    "SAMPLE": os.path.expanduser("~/sample_dataset"),  # Synthetic dataset for container/pipeline testing
 }
 
 
