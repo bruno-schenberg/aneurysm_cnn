@@ -38,7 +38,7 @@ echo -e "## Singularity Image:             $SIF \n"
 module load singularity/3.7.1
 module load rocm/6.4.3
 
-export HSA_OVERRIDE_GFX_VERSION=9.0.a
+export HSA_OVERRIDE_GFX_VERSION=9.0.10
 
 ## 1. rocm-smi from the host (outside container, for hardware diagnostics)
 echo -e "\n## Running rocm-smi (host) for diagnostics... ##"

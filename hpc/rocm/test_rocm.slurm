@@ -41,7 +41,7 @@ module load rocm/6.0.1
 
 ## 2. Architecture Override
 ## This is required for PyTorch to work correctly with the Instinct MI210 (gfx90a) GPU.
-export HSA_OVERRIDE_GFX_VERSION=9.0.a
+export HSA_OVERRIDE_GFX_VERSION=9.0.10
 
 ## 3. Activate Conda Environment
 source $HOME/miniconda3/bin/activate

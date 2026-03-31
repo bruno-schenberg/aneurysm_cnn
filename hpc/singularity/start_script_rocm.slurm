@@ -43,7 +43,7 @@ module load rocm/6.4.3
 ## Architecture override for AMD Instinct MI210 (gfx90a).
 ## Also set inside the container via %environment, but exporting here
 ## ensures it is inherited even if the container env block is skipped.
-export HSA_OVERRIDE_GFX_VERSION=9.0.a
+export HSA_OVERRIDE_GFX_VERSION=9.0.10
 
 ## 1. Verify GPU visibility
 echo -e "\n## Verifying GPU & PyTorch inside container... ##"
