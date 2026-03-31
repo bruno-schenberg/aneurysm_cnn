@@ -6,6 +6,7 @@
         "data_path_key": "A",
         "EPOCHS": 40,
         "BATCH_SIZE": 5,
+        "USE_KFOLD": false,
         "QUICK_TEST": false
     },
     {
@@ -15,6 +16,7 @@
         "data_path_key": "B",
         "EPOCHS": 40,
         "BATCH_SIZE": 5,
+        "USE_KFOLD": false,
         "QUICK_TEST": false
     },
     {
@@ -24,6 +26,7 @@
         "data_path_key": "C",
         "EPOCHS": 40,
         "BATCH_SIZE": 5,
+        "USE_KFOLD": false,
         "QUICK_TEST": false
     },
     {
@@ -33,6 +36,7 @@
         "data_path_key": "D",
         "EPOCHS": 40,
         "BATCH_SIZE": 5,
+        "USE_KFOLD": false,
         "QUICK_TEST": false
     },
     {
@@ -42,6 +46,7 @@
         "data_path_key": "E",
         "EPOCHS": 40,
         "BATCH_SIZE": 5,
+        "USE_KFOLD": false,
         "QUICK_TEST": false
     }
 ]
