@@ -8,6 +8,7 @@ evaluating the best F2 checkpoint, and aggregating results across folds.
 
 import json
 import os
+import shutil
 from typing import Any, Dict, Optional
 
 import torch
@@ -292,3 +293,9 @@ def run_experiment(config: Dict[str, Any]) -> None:
         experiment_output_dir=experiment_output_dir,
         all_fold_predictions=all_fold_predictions,
     )
+
+    backup_dir = os.environ.get("EXPERIMENT_BACKUP_DIR")
+    if backup_dir:
+        dest = os.path.join(backup_dir, config["name"])
+        shutil.copytree(experiment_output_dir, dest, dirs_exist_ok=True)
+        print(f"[INFO] Results backed up to: {dest}")
