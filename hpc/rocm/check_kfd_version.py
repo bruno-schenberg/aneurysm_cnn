@@ -11,7 +11,6 @@ import struct
 import subprocess
 
 ROCM_PATH = "/opt/ohpc/pub/apps/rocm-6.4.3"
-HSA_LIB = f"{ROCM_PATH}/lib/libhsa-runtime64.so.1"
 AMDKFD_IOC_GET_VERSION = 0xC0084B01
 
 print("=== KFD version check ===")
@@ -47,15 +46,23 @@ if headers:
 else:
     print("No kfd_ioctl.h found under ROCm path.")
 
-# 3. Search for version strings in the HSA runtime binary
-print(f"\nSearching HSA runtime binary for version strings ...")
-if os.path.exists(HSA_LIB):
-    result = subprocess.run(
-        ["strings", HSA_LIB],
-        capture_output=True, text=True
-    )
+# 3. Find the actual HSA library path via ldd, then scan it
+print("\nLocating libhsa-runtime64 via ldd ...")
+rocminfo_path = subprocess.run(["which", "rocminfo"], capture_output=True, text=True).stdout.strip()
+hsa_lib = None
+if rocminfo_path:
+    ldd = subprocess.run(["ldd", rocminfo_path], capture_output=True, text=True)
+    for line in ldd.stdout.splitlines():
+        if "libhsa-runtime64" in line and "=>" in line:
+            hsa_lib = line.split("=>")[1].split("(")[0].strip()
+            print(f"Found: {hsa_lib}")
+            break
+
+if hsa_lib and os.path.exists(hsa_lib):
+    print("Scanning for version strings ...")
+    result = subprocess.run(["strings", hsa_lib], capture_output=True, text=True)
     for line in result.stdout.splitlines():
         if "KFD_IOCTL" in line or "kfd_ioctl" in line or "major_version" in line:
             print(f"  {line.strip()}")
 else:
-    print(f"Library not found: {HSA_LIB}")
+    print("Could not locate libhsa-runtime64 — is rocm/6.4.3 module loaded?")
