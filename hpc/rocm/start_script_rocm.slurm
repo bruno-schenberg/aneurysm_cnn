@@ -43,6 +43,9 @@ export LD_LIBRARY_PATH=/opt/ohpc/pub/apps/rocm/rocm-6.4.3/lib:$LD_LIBRARY_PATH
 ## Required for PyTorch to recognise the Instinct MI210 (gfx90a). Format must be decimal.
 export HSA_OVERRIDE_GFX_VERSION=9.0.10
 
+## 3. Dataset root (home directory on cluster)
+export DATA_ROOT=$HOME/data/cases-3
+
 ## 3. Activate Conda Environment
 source $HOME/miniconda3/bin/activate
 conda activate aneurysm_cnn_rocm
