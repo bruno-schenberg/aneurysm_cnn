@@ -149,11 +149,16 @@ def split_data(
     n_splits: int,
     test_size: float,
     seed: int = 42,
+    use_kfold: bool = True,
+    val_split_ratio: float = 0.30,
 ) -> Generator[Tuple[int, List[Dict], List[Dict], List[Dict]], None, None]:
     """
     Partitions all_data into a stratified hold-out test set and a development
-    set, then yields (fold_idx, train_files, val_files, test_files) for each
-    stratified k-fold split of the development set.
+    set, then yields (fold_idx, train_files, val_files, test_files).
+
+    When use_kfold=True: yields one tuple per stratified k-fold split.
+    When use_kfold=False: yields a single tuple using a stratified
+    train/val split with val_split_ratio as the validation fraction.
 
     This function is intentionally free of MONAI and PyTorch to keep it
     unit-testable with synthetic in-memory data on any machine.
@@ -170,6 +175,17 @@ def split_data(
     dev_data = [all_data[i] for i in stratified_dev_indices]
     test_files = [all_data[i] for i in test_indices]
     dev_labels = [d["label"] for d in dev_data]
+
+    if not use_kfold:
+        train_idx, val_idx = train_test_split(
+            range(len(dev_data)),
+            test_size=val_split_ratio,
+            shuffle=True,
+            stratify=dev_labels,
+            random_state=seed,
+        )
+        yield 0, [dev_data[i] for i in train_idx], [dev_data[i] for i in val_idx], test_files
+        return
 
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=seed)
     for fold_idx, (train_idx, val_idx) in enumerate(skf.split(dev_data, dev_labels)):

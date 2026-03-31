@@ -52,7 +52,8 @@ def run_one_fold(
     Returns a FoldResult dict with per-sample predictions, classification metrics,
     eval accuracy, and eval loss.
     """
-    print(f"\n--- Starting Fold {fold}/{config['N_SPLITS']} ---")
+    total_folds = config["N_SPLITS"] if config.get("USE_KFOLD", True) else 1
+    print(f"\n--- Starting Fold {fold}/{total_folds} ---")
 
     fold_output_dir = os.path.join(experiment_output_dir, f"fold_{fold}")
     os.makedirs(fold_output_dir, exist_ok=True)
@@ -174,9 +175,11 @@ def prepare_experiment_setup(config: Dict[str, Any]) -> tuple[str, Any]:
         f"  - Model: {config['model']}, Epochs: {config['EPOCHS']}, "
         f"BS: {config['BATCH_SIZE']}, LR: {config['LEARNING_RATE']}"
     )
+    use_kfold = config.get("USE_KFOLD", True)
+    folds_display = config["N_SPLITS"] if use_kfold else "1 (single 70/30 split)"
     print(
         f"  - Balancing: {config['balancing'] or 'None'}, "
-        f"Folds: {config['N_SPLITS']}"
+        f"Folds: {folds_display}"
     )
     print(f"  - Results will be saved to: {experiment_output_dir}")
     print("=" * 80)
@@ -193,6 +196,8 @@ def prepare_experiment_setup(config: Dict[str, Any]) -> tuple[str, Any]:
         n_splits=config["N_SPLITS"],
         test_size=config["TEST_SPLIT_RATIO"],
         seed=config["RANDOM_SEED"],
+        use_kfold=config.get("USE_KFOLD", True),
+        val_split_ratio=config.get("VAL_SPLIT_RATIO", 0.30),
     )
 
     return experiment_output_dir, fold_splits
