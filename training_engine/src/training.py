@@ -140,10 +140,13 @@ def run_training_loop(
     device: str,
     num_epochs: int,
     class_weights: Optional[torch.Tensor] = None,
+    patience: int = 0,
 ) -> Tuple[List[Dict[str, Any]], float, Optional[Dict[str, Any]]]:
     """
     Runs the full training and validation loop for the specified number of epochs.
     Checkpoints the model state at the epoch with the highest validation F2-score.
+
+    When patience > 0, stops early if val F2 does not improve for that many epochs.
 
     Returns:
         metrics_history: List of per-epoch dicts (epoch, train_loss, train_acc,
@@ -166,9 +169,13 @@ def run_training_loop(
     metrics_history: List[Dict[str, Any]] = []
     best_val_f2 = 0.0
     best_model_checkpoint: Optional[Dict[str, Any]] = None
+    epochs_without_improvement = 0
     start_time = time.time()
 
-    print("\nStarting training...")
+    if patience > 0:
+        print(f"\nStarting training (early stopping patience={patience})...")
+    else:
+        print("\nStarting training...")
     for epoch in range(num_epochs):
         print(f"\n--- Epoch {epoch + 1}/{num_epochs} ---")
 
@@ -194,9 +201,29 @@ def run_training_loop(
                 "best_epoch": epoch + 1,
                 "best_val_f2": val_f2,
             }
+            epochs_without_improvement = 0
             print(
                 f"  -> New best model: epoch {epoch + 1}, val F2 = {best_val_f2:.4f}"
             )
+        else:
+            epochs_without_improvement += 1
+            if patience > 0:
+                print(
+                    f"  -> No improvement ({epochs_without_improvement}/{patience})"
+                )
+                if epochs_without_improvement >= patience:
+                    print(
+                        f"  -> Early stopping triggered at epoch {epoch + 1}."
+                    )
+                    metrics_history.append({
+                        "epoch": epoch + 1,
+                        "train_loss": train_loss,
+                        "train_acc": train_acc,
+                        "val_loss": val_loss,
+                        "val_acc": val_acc,
+                        "val_f2": val_f2,
+                    })
+                    break
 
         metrics_history.append({
             "epoch": epoch + 1,

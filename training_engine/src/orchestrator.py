@@ -74,6 +74,7 @@ def run_one_fold(
         device=config["DEVICE"],
         num_epochs=config["EPOCHS"],
         class_weights=weights_tensor,
+        patience=config.get("EARLY_STOPPING_PATIENCE", 0),
     )
     print(f"Fold {fold} training duration: {total_time:.2f} minutes.")
 
