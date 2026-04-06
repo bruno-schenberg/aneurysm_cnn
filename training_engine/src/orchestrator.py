@@ -62,7 +62,11 @@ def run_one_fold(
 
     # [Step 1] Initialise optimiser and loss criterion
     criterion_cls = nn.CrossEntropyLoss
-    optimizer = optim.Adam(model.parameters(), lr=config["LEARNING_RATE"])
+    optimizer = optim.AdamW(
+        model.parameters(),
+        lr=config["LEARNING_RATE"],
+        weight_decay=config.get("WEIGHT_DECAY", 1e-4),
+    )
 
     # [Step 2] Run the training loop; checkpoints at the highest val F2 epoch
     metrics_history, total_time, best_model_checkpoint = run_training_loop(
