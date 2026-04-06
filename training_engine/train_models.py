@@ -42,6 +42,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "USE_KFOLD": True,          # True = stratified k-fold CV; False = single 70/30 train/val split
     "VAL_SPLIT_RATIO": 0.30,    # Fraction of dev set used for validation when USE_KFOLD=False
     "EARLY_STOPPING_PATIENCE": 0,  # Epochs without val F2 improvement before stopping; 0 = disabled
+    "WEIGHT_DECAY": 1e-4,          # AdamW weight decay (L2 regularisation strength)
     "QUICK_TEST": True,         # True = run only fold 0 (fast debug / CI mode); False = full k-fold
     "HOLD_OUT_TEST_SET": True,  # True = reserve TEST_SPLIT_RATIO of data for final evaluation, never seen during training
     "TEST_SPLIT_RATIO": 0.20,   # Fraction of total dataset held out for final evaluation (applies when HOLD_OUT_TEST_SET=True)
