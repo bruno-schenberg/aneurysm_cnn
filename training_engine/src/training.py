@@ -38,7 +38,10 @@ def train_one_epoch(
         inputs, labels = batch["image"].to(device), batch["label"].to(device)
 
         optimizer.zero_grad()
-        outputs = model(inputs)
+        if "tabular" in batch:
+            outputs = model(inputs, batch["tabular"].to(device))
+        else:
+            outputs = model(inputs)
         loss = criterion(outputs, labels)
         loss.backward()
         optimizer.step()
@@ -92,7 +95,10 @@ def validate_one_epoch(
         for batch in progress_bar:
             inputs, labels = batch["image"].to(device), batch["label"].to(device)
 
-            outputs = model(inputs)
+            if "tabular" in batch:
+                outputs = model(inputs, batch["tabular"].to(device))
+            else:
+                outputs = model(inputs)
             loss = criterion(outputs, labels)
 
             running_loss += loss.item() * inputs.size(0)

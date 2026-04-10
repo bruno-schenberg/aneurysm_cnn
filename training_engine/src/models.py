@@ -567,9 +567,121 @@ class MILClassifier(nn.Module):
         return self.classifier(m)
 
 
-# ── 7. Model Factory ───────────────────────────────────────────────────────────
+# ── 7. Multimodal Late-Fusion Wrapper ─────────────────────────────────────────
 
-def get_model(model_name: str, num_classes: int) -> torch.nn.Module:
+def _strip_classifier(model: nn.Module, model_name: str) -> int:
+    """
+    Replaces the final classification linear layer of ``model`` with an Identity
+    module so that the model's forward pass returns feature vectors instead of
+    class logits. Returns the feature dimensionality (the replaced layer's
+    ``in_features``).
+
+    Used internally to prepare an image-only model for late fusion with tabular
+    features via ``MultiModalWrapper``.
+
+    Args:
+        model: An already-constructed image model whose final linear layer will
+            be replaced.
+        model_name: Architecture name (case-insensitive), used to locate the
+            correct attribute path for each architecture.
+
+    Returns:
+        Integer feature dimensionality of the stripped classification layer.
+
+    Raises:
+        ValueError: If ``model_name`` is not a recognised architecture.
+    """
+    name = model_name.lower()
+    if name in ("r3d18", "r3d50"):
+        dim = model.fc.in_features
+        model.fc = nn.Identity()
+        return dim
+    elif name == "densenet121":
+        # MONAI DenseNet: class_layers is Sequential(relu, pool, flatten, out).
+        # Replacing 'out' leaves relu+pool+flatten intact so the output is
+        # the flattened pooled feature vector, not logits.
+        dim = model.class_layers.out.in_features
+        model.class_layers.out = nn.Identity()
+        return dim
+    elif name in ("swinunetr", "unet3d", "unet3dwithbackbone", "mil_r3d18"):
+        dim = model.classifier.in_features
+        model.classifier = nn.Identity()
+        return dim
+    else:
+        raise ValueError(
+            f"_strip_classifier is not implemented for model '{model_name}'. "
+            f"Valid names: {SUPPORTED_MODELS}"
+        )
+
+
+class MultiModalWrapper(nn.Module):
+    """
+    Late-fusion multimodal wrapper that combines image features from any CNN
+    backbone with tabular patient metadata (age, gender) for joint classification.
+
+    Architecture:
+      - Image branch: the provided ``image_model`` with its classifier stripped,
+        producing a feature vector of shape ``(B, image_feature_dim)``.
+      - Tabular branch: a small MLP that embeds ``[age_normalised, gender]``
+        into a 16-dimensional vector.
+      - Fusion head: concatenates both branches and passes through a dropout MLP
+        to produce class logits.
+
+    The tabular branch is intentionally shallow (two linear layers) to avoid
+    overfitting on only two input features.
+
+    Input:
+        image: ``(B, 1, D, H, W)`` volumetric scan tensor.
+        tabular: ``(B, tabular_dim)`` float tensor — by default ``[age/100, gender]``.
+
+    Output:
+        ``(B, num_classes)`` class logits.
+
+    Args:
+        image_model: A CNN backbone whose final classifier has already been
+            stripped by ``_strip_classifier``.
+        image_feature_dim: Dimensionality of the feature vector produced by
+            ``image_model`` after stripping.
+        tabular_dim: Number of tabular input features (default 2: age + gender).
+        num_classes: Number of output classes.
+    """
+
+    def __init__(
+        self,
+        image_model: nn.Module,
+        image_feature_dim: int,
+        tabular_dim: int = 2,
+        num_classes: int = 2,
+    ):
+        super().__init__()
+        self.image_model = image_model
+        self.tabular_branch = nn.Sequential(
+            nn.Linear(tabular_dim, 16),
+            nn.ReLU(),
+            nn.Linear(16, 16),
+        )
+        self.fusion_head = nn.Sequential(
+            nn.Linear(image_feature_dim + 16, 128),
+            nn.ReLU(),
+            nn.Dropout(0.5),
+            nn.Linear(128, num_classes),
+        )
+
+    def forward(self, image: torch.Tensor, tabular: torch.Tensor) -> torch.Tensor:
+        img_feat = self.image_model(image)       # (B, image_feature_dim)
+        tab_feat = self.tabular_branch(tabular)  # (B, 16)
+        fused = torch.cat([img_feat, tab_feat], dim=1)
+        return self.fusion_head(fused)
+
+
+# ── 8. Model Factory ───────────────────────────────────────────────────────────
+
+def get_model(
+    model_name: str,
+    num_classes: int,
+    use_tabular: bool = False,
+    tabular_dim: int = 2,
+) -> torch.nn.Module:
     """
     Construct and return a model by name.
 
@@ -578,10 +690,17 @@ def get_model(model_name: str, num_classes: int) -> torch.nn.Module:
     ``(B, 1, 128, 128, 128)`` input tensor and produces ``(B, num_classes)``
     logits on CPU.
 
+    When ``use_tabular=True``, the model's classification head is stripped and
+    it is wrapped in a ``MultiModalWrapper`` that accepts an additional
+    ``tabular`` tensor of shape ``(B, tabular_dim)`` alongside the image.
+    The wrapper's ``forward`` signature becomes ``forward(image, tabular)``.
+
     Args:
         model_name: Architecture name. Must be one of ``SUPPORTED_MODELS``
             (case-insensitive). Examples: ``"R3D18"``, ``"r3d18"``, ``"r3d50"``.
         num_classes: Number of output classes (typically 2: healthy / aneurysm).
+        use_tabular: If True, wrap the model for late fusion with tabular features.
+        tabular_dim: Number of tabular input features (default 2: age + gender).
 
     Returns:
         A ``torch.nn.Module`` ready for training or evaluation.
@@ -593,29 +712,36 @@ def get_model(model_name: str, num_classes: int) -> torch.nn.Module:
 
     if name == "r3d18":
         print("  -> Using torchvision R3D-18 (Kinetics-400 pretrained).")
-        return get_r3d18_pytorch_model(num_classes)
+        model = get_r3d18_pytorch_model(num_classes)
     elif name == "r3d50":
         print("  -> Using MONAI ResNet-50 (MedicalNet pretrained).")
-        return get_r3d50_model(num_classes)
+        model = get_r3d50_model(num_classes)
     elif name == "densenet121":
         print("  -> Using MONAI DenseNet-121 (from scratch).")
-        return get_densenet121_monai_model(num_classes)
+        model = get_densenet121_monai_model(num_classes)
     elif name == "swinunetr":
         print("  -> Using MONAI SwinUNETR classifier.")
-        return get_swinunetr_model(num_classes)
+        model = get_swinunetr_model(num_classes)
     elif name == "unet3d":
         print("  -> Using custom UNet3D classifier (from scratch).")
-        return UNet3DClassifier(in_channels=1, num_classes=num_classes, base_c=32)
+        model = UNet3DClassifier(in_channels=1, num_classes=num_classes, base_c=32)
     elif name == "unet3dwithbackbone":
         print("  -> Using custom UNet3D with MONAI ResNet-18 backbone (MedicalNet).")
-        return get_unet3d_with_backbone_model(num_classes)
+        model = get_unet3d_with_backbone_model(num_classes)
     elif name == "mil_r3d18":
         print("  -> Using MIL classifier with MONAI ResNet-18 instance extractor.")
         instance_extractor = get_r3d18_monai_model(num_classes)
         # ResNet-18 produces 512-dimensional features before the classification head.
-        return MILClassifier(instance_extractor, num_classes, feature_dim=512)  # type: ignore
+        model = MILClassifier(instance_extractor, num_classes, feature_dim=512)  # type: ignore
     else:
         raise ValueError(
             f"Unknown model name: '{model_name}'. "
             f"Valid names (case-insensitive): {SUPPORTED_MODELS}"
         )
+
+    if use_tabular:
+        print(f"  -> Wrapping with MultiModalWrapper (tabular_dim={tabular_dim}).")
+        feature_dim = _strip_classifier(model, name)
+        model = MultiModalWrapper(model, feature_dim, tabular_dim, num_classes)
+
+    return model

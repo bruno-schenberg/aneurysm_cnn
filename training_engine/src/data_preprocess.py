@@ -7,6 +7,7 @@ and DataLoader assembly. This module is the boundary between raw data on disk an
 the PyTorch training loop.
 """
 
+import csv
 import os
 import random
 from typing import Dict, Generator, List, Optional, Tuple
@@ -58,11 +59,31 @@ def seed_worker(worker_id: int) -> None:
 # ----------------------------------------------------
 
 
-def get_data_list(root_dir: str) -> List[Dict]:
+def get_data_list(root_dir: str, tabular_csv: Optional[str] = None) -> List[Dict]:
     """
     Discovers NIfTI files in class subdirectories (0/ and 1/) and returns
     a list of DataRecord dicts with image path, label, and filename.
+
+    When tabular_csv is provided, each record also gets a 'tabular' key containing
+    a float32 numpy array of [age/100, gender] for that case. The CSV must have
+    columns: case_id, age, gender — where case_id matches the NIfTI filename
+    without its extension (e.g. 'BP001' for 'BP001.nii.gz').
+
+    Raises:
+        KeyError: If a NIfTI file has no corresponding row in the tabular CSV.
     """
+    tabular_data: Dict[str, np.ndarray] = {}
+    if tabular_csv is not None:
+        with open(tabular_csv, newline="") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                # Age normalised to [0, 1] by dividing by 100 (known patient age range).
+                # Gender encoded as 0.0 / 1.0.
+                tabular_data[row["case_id"]] = np.array(
+                    [float(row["age"]) / 100.0, float(row["gender"])],
+                    dtype=np.float32,
+                )
+
     data = []
     for label in [0, 1]:
         class_folder = os.path.join(root_dir, str(label))
@@ -70,11 +91,20 @@ def get_data_list(root_dir: str) -> List[Dict]:
             continue
         for f in os.listdir(class_folder):
             if f.endswith((".nii", ".nii.gz")):
-                data.append({
+                record: Dict = {
                     "image": os.path.join(class_folder, f),
                     "label": label,
                     "path": f,
-                })
+                }
+                if tabular_csv is not None:
+                    case_id = f.replace(".nii.gz", "").replace(".nii", "")
+                    if case_id not in tabular_data:
+                        raise KeyError(
+                            f"Case '{case_id}' (file '{f}') not found in tabular CSV "
+                            f"'{tabular_csv}'. Every NIfTI file must have a matching row."
+                        )
+                    record["tabular"] = tabular_data[case_id]
+                data.append(record)
     return data
 
 
@@ -119,10 +149,12 @@ def get_class_weights(data: List[Dict]) -> Optional[torch.Tensor]:
 def get_transforms(
     spatial_size: Tuple[int, int, int] = (128, 128, 128),
     augment: bool = False,
+    use_tabular: bool = False,
 ) -> Compose:
     """
     Builds the dictionary-based MONAI transform pipeline.
     Augmentations (random flip, rotate, Gaussian noise) are applied only when augment=True.
+    When use_tabular=True, the 'tabular' key is also converted to a tensor by EnsureTyped.
     """
     keys = ["image"]
     transforms = [
@@ -141,7 +173,8 @@ def get_transforms(
             RandZoomd(keys=keys, min_zoom=0.9, max_zoom=1.1, prob=0.3, keep_size=True),
             RandGaussianNoised(keys=keys, prob=0.2, mean=0.0, std=0.01),
         ])
-    transforms.append(EnsureTyped(keys=keys))
+    ensure_keys = ["image", "tabular"] if use_tabular else ["image"]
+    transforms.append(EnsureTyped(keys=ensure_keys))
     return Compose(transforms)
 
 
@@ -213,16 +246,20 @@ def build_dataloaders(
     val_batch_size: int,
     seed: int = 42,
     oversample: bool = False,
+    use_tabular: bool = False,
 ) -> Tuple[DataLoader, DataLoader, DataLoader]:
     """
     Wraps train, val, and test file lists in MONAI Datasets and PyTorch DataLoaders.
     Applies training augmentations to the training set only.
     Oversampling (WeightedRandomSampler) is applied to the training loader when requested.
 
+    When use_tabular=True, the 'tabular' key in each batch dict is converted to a tensor
+    (requires that records already contain the 'tabular' field from get_data_list).
+
     Both worker_init_fn and generator are set on every DataLoader for full reproducibility.
     """
-    train_transform = get_transforms(augment=True)
-    eval_transform = get_transforms(augment=False)
+    train_transform = get_transforms(augment=True, use_tabular=use_tabular)
+    eval_transform = get_transforms(augment=False, use_tabular=use_tabular)
 
     sampler = None
     if oversample:

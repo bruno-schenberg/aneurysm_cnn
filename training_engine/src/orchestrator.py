@@ -196,7 +196,8 @@ def prepare_experiment_setup(config: Dict[str, Any]) -> tuple[str, Any]:
     set_seed(config["RANDOM_SEED"])
     os.makedirs(experiment_output_dir, exist_ok=True)
 
-    all_data = get_data_list(data_dir)
+    tabular_csv = config.get("TABULAR_CSV")
+    all_data = get_data_list(data_dir, tabular_csv=tabular_csv)
     fold_splits = split_data(
         all_data=all_data,
         n_splits=config["N_SPLITS"],
@@ -241,6 +242,7 @@ def run_experiment(config: Dict[str, Any]) -> None:
     balancing = config["balancing"]
     oversample = balancing == "oversampling"
     use_class_weights = balancing == "weighted_cost_function"
+    use_tabular = config.get("USE_TABULAR", False)
 
     all_fold_predictions: Dict[str, Any] = {}
 
@@ -253,6 +255,7 @@ def run_experiment(config: Dict[str, Any]) -> None:
             val_batch_size=config["VAL_BATCH_SIZE"],
             seed=config["RANDOM_SEED"],
             oversample=oversample,
+            use_tabular=use_tabular,
         )
 
         # Compute class weights from the training fold only to prevent label leakage
@@ -267,7 +270,9 @@ def run_experiment(config: Dict[str, Any]) -> None:
 
         print(f"\n[Fold {fold_idx + 1}] Setting up model: {config['model']}")
         model = get_model(
-            model_name=config["model"], num_classes=len(config["CLASSES"])
+            model_name=config["model"],
+            num_classes=len(config["CLASSES"]),
+            use_tabular=use_tabular,
         )
         model.to(config["DEVICE"])
 

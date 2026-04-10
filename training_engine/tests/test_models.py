@@ -136,3 +136,59 @@ def test_every_supported_model_name_resolves():
     for name in SUPPORTED_MODELS:
         model = get_model(name, num_classes=NUM_CLASSES)
         assert model is not None, f"get_model('{name}') returned None"
+
+
+# ---------------------------------------------------------------------------
+# Multimodal (tabular) late-fusion wrapper
+# ---------------------------------------------------------------------------
+
+TABULAR_SHAPE = (1, 2)  # batch_size=1, [age/100, gender]
+
+
+def make_tabular() -> torch.Tensor:
+    """Synthetic tabular input: age=0.45 (45 years), gender=1."""
+    return torch.tensor([[0.45, 1.0]])
+
+
+@pytest.mark.parametrize("model_name", ["R3D18", "R3D50", "DenseNet121", "UNet3D"])
+def test_tabular_models_forward_pass(model_name: str):
+    """
+    With use_tabular=True, the wrapped model must accept (image, tabular) and
+    produce the correct output shape on CPU.
+    """
+    model = get_model(model_name, num_classes=NUM_CLASSES, use_tabular=True)
+    model.eval()
+
+    x = make_input()
+    tabular = make_tabular()
+    with torch.no_grad():
+        output = model(x, tabular)
+
+    assert output.shape == EXPECTED_OUTPUT_SHAPE, (
+        f"{model_name} (tabular): expected {EXPECTED_OUTPUT_SHAPE}, got {output.shape}"
+    )
+
+
+def test_tabular_wrapper_is_multimodal_wrapper():
+    """get_model with use_tabular=True must return a MultiModalWrapper instance."""
+    from src.models import MultiModalWrapper
+    model = get_model("R3D18", num_classes=NUM_CLASSES, use_tabular=True)
+    assert isinstance(model, MultiModalWrapper)
+
+
+def test_image_only_model_is_not_wrapped():
+    """get_model with use_tabular=False (default) must NOT return a MultiModalWrapper."""
+    from src.models import MultiModalWrapper
+    model = get_model("R3D18", num_classes=NUM_CLASSES)
+    assert not isinstance(model, MultiModalWrapper)
+
+
+def test_tabular_custom_dim():
+    """MultiModalWrapper must handle a custom tabular_dim (e.g. 5 features)."""
+    model = get_model("R3D18", num_classes=NUM_CLASSES, use_tabular=True, tabular_dim=5)
+    model.eval()
+    x = make_input()
+    tabular = torch.zeros(1, 5)
+    with torch.no_grad():
+        output = model(x, tabular)
+    assert output.shape == EXPECTED_OUTPUT_SHAPE
