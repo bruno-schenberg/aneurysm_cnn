@@ -171,11 +171,13 @@ def _resample_to_1mm_isotropic(
 
 
 def _variant_c_from_data(data: np.ndarray, affine: np.ndarray, output_path: Path) -> None:
+    """Variant C: native spacing, centre-crop or zero-pad to 128³. No interpolation."""
     result = np.asarray(ResizeWithPadOrCrop(TARGET_SHAPE)(data[np.newaxis]), dtype=np.float32)
     _save(result[0], affine, output_path)
 
 
 def _variant_d_from_data(data: np.ndarray, affine: np.ndarray, output_path: Path) -> None:
+    """Variant D: native spacing, trilinear resize to 128³. Affine scaled to match new voxel size."""
     old_shape = np.array(data.shape, dtype=float)
     result = np.asarray(
         Resize(TARGET_SHAPE, mode="trilinear")(data[np.newaxis]),
@@ -188,6 +190,7 @@ def _variant_d_from_data(data: np.ndarray, affine: np.ndarray, output_path: Path
 
 
 def _variant_a_from_data(data: np.ndarray, affine: np.ndarray, output_path: Path) -> None:
+    """Variant A: resample to 1 mm isotropic, then centre-crop or zero-pad to 128³."""
     resampled_data, resampled_affine = _resample_to_1mm_isotropic(data, affine)
     result = np.asarray(
         ResizeWithPadOrCrop(TARGET_SHAPE)(resampled_data[np.newaxis]), dtype=np.float32
@@ -197,6 +200,7 @@ def _variant_a_from_data(data: np.ndarray, affine: np.ndarray, output_path: Path
 
 
 def _variant_b_from_data(data: np.ndarray, affine: np.ndarray, output_path: Path) -> None:
+    """Variant B: single-pass isotropic resample (largest dim → 128 voxels), then zero-pad to 128³."""
     original_zooms = np.sqrt(np.sum(affine[:3, :3] ** 2, axis=0))
     max_physical_extent = float(np.max(np.array(data.shape, dtype=float) * original_zooms))
     target_spacing = max_physical_extent / 128.0

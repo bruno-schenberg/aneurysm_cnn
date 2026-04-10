@@ -147,6 +147,14 @@ def run_one_fold(
     passed (not the full dict) so the saved ``.pth`` file contains only the
     weights and can be loaded directly with ``model.load_state_dict``.
 
+    **Tabular (multimodal) support:** When ``config["USE_TABULAR"]`` is
+    ``True``, the DataLoaders produced by ``prepare_experiment_setup`` include
+    a ``"tabular"`` key in each batch. The model passed in will already be a
+    ``MultiModalWrapper`` (constructed by ``get_model`` in ``run_experiment``).
+    The training and validation functions detect the ``"tabular"`` key at
+    runtime and adjust the forward call automatically — no changes are needed
+    here to support the multimodal path.
+
     Args:
         fold: 1-based fold index, used in print messages and file names.
         train_loader: DataLoader for the training portion of this fold.
@@ -154,6 +162,7 @@ def run_one_fold(
         test_loader: DataLoader for the hold-out test set (identical across
             all folds — it is not a per-fold split).
         model: Freshly initialised model, already moved to the correct device.
+            Will be a ``MultiModalWrapper`` when ``USE_TABULAR=True``.
         config: Fully-formed experiment config dict.
         weights_tensor: Per-class loss weights tensor for weighted
             ``CrossEntropyLoss``, or ``None`` if balancing is not

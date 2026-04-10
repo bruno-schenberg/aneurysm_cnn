@@ -78,10 +78,20 @@ def train_one_epoch(
     before the forward pass is the conventional PyTorch pattern and avoids
     accidentally carrying stale gradients into the first batch.
 
+    **Tabular (multimodal) support:** If the batch contains a ``"tabular"``
+    key (present when ``USE_TABULAR=True`` is set in the experiment config),
+    the forward call becomes ``model(inputs, batch["tabular"])``. Otherwise
+    it is the standard ``model(inputs)``. The training loop does not need to
+    know which mode is active — it detects it from the batch contents, so
+    the same function handles both image-only and multimodal experiments.
+
     Args:
-        model: The network to train. Must already be on ``device``.
+        model: The network to train. Must already be on ``device``. When
+            ``USE_TABULAR=True``, this will be a ``MultiModalWrapper`` whose
+            forward signature is ``forward(image, tabular)``.
         dataloader: Training DataLoader yielding batches of
-            ``{"image": tensor, "label": tensor, "path": str}``.
+            ``{"image": tensor, "label": tensor, "path": str}`` and
+            optionally ``"tabular": tensor`` when multimodal fusion is active.
         criterion: Instantiated loss function (e.g. ``CrossEntropyLoss``
             with class weights already applied).
         optimizer: Optimiser holding references to the model parameters.
@@ -167,9 +177,18 @@ def validate_one_epoch(
     flag is ``False`` by default so the per-epoch validation loop during
     training does not accumulate this overhead unnecessarily.
 
+    **Tabular (multimodal) support:** Mirrors the behaviour in
+    ``train_one_epoch`` — if the batch contains a ``"tabular"`` key, the
+    forward call is ``model(inputs, batch["tabular"])``; otherwise it is
+    ``model(inputs)``. The same DataLoader that was used for training will
+    include the tabular key for evaluation if ``USE_TABULAR=True``.
+
     Args:
-        model: The network to evaluate. Must already be on ``device``.
-        dataloader: Validation or test DataLoader.
+        model: The network to evaluate. Must already be on ``device``. When
+            ``USE_TABULAR=True``, this will be a ``MultiModalWrapper``.
+        dataloader: Validation or test DataLoader yielding batches of
+            ``{"image": tensor, "label": tensor, "path": str}`` and
+            optionally ``"tabular": tensor`` when multimodal fusion is active.
         criterion: Instantiated loss function (same criterion used in training,
             so val loss is directly comparable to train loss).
         device: Target device string.
