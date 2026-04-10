@@ -47,7 +47,6 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "VAL_SPLIT_RATIO": 0.30,    # Fraction of dev set used for validation when USE_KFOLD=False
     "EARLY_STOPPING_PATIENCE": 0,  # Epochs without val F2 improvement before stopping; 0 = disabled
     "WEIGHT_DECAY": 1e-4,          # AdamW weight decay (L2 regularisation strength)
-    "QUICK_TEST": True,         # True = run only fold 0 (fast debug / CI mode); False = full k-fold
     "HOLD_OUT_TEST_SET": True,  # True = reserve TEST_SPLIT_RATIO of data for final evaluation, never seen during training
     "TEST_SPLIT_RATIO": 0.20,   # Fraction of total dataset held out for final evaluation (applies when HOLD_OUT_TEST_SET=True)
     "VAL_BATCH_SIZE": 4,        # Validation and evaluation batch size
@@ -60,10 +59,9 @@ DEFAULT_CONFIG: Dict[str, Any] = {
 _DATA_ROOT = os.environ.get("DATA_ROOT", "/mnt/data/cases-3")
 DATASET_PATHS: Dict[str, str] = {
     "A": f"{_DATA_ROOT}/dataset_A_resampled_cropped",  # 1mm isotropic resample → crop to 128³
-    "B": f"{_DATA_ROOT}/dataset_B_resampled_shrunk",   # 1mm isotropic resample → shrink to 128³
+    "B": f"{_DATA_ROOT}/dataset_B_resampled_shrunk",   # single-step isotropic resample → pad to 128³
     "C": f"{_DATA_ROOT}/dataset_C_cropped",            # Native resolution → crop to 128³
     "D": f"{_DATA_ROOT}/dataset_D_shrunk",             # Native resolution → shrink to 128³
-    "E": f"{_DATA_ROOT}/dataset_E_isotropic_padded",   # Largest dim resampled to 128px → pad to 128³
     "SAMPLE": os.path.expanduser("~/sample_dataset"),  # Synthetic dataset for container/pipeline testing
 }
 

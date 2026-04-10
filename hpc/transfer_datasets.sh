@@ -21,7 +21,6 @@ DATASETS=(
     "dataset_B_resampled_shrunk"
     "dataset_C_cropped"
     "dataset_D_shrunk"
-    "dataset_E_isotropic_padded"
 )
 
 echo "=== Creating remote directory ==="
