@@ -1,0 +1,16 @@
+name: aneurysm_cnn_data_hpc
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - numpy=1.26.4
+  - nibabel=5.4.0
+  - monai=1.5.2
+  - setuptools=69.5.1  # monai uses pkg_resources; setuptools 70+ removed it
+  - pip
+  - pip:
+    # PyTorch CPU build — dataset generation does not require a GPU.
+    # On the HPC cluster the training engine uses the separate
+    # aneurysm_cnn_rocm environment for GPU workloads.
+    - torch==2.1.0
