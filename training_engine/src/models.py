@@ -537,7 +537,7 @@ class UNETRClassifier(nn.Module):
             hidden_size=hidden_size,
             mlp_dim=mlp_dim,
             num_heads=num_heads,
-            pos_embed="conv",
+            proj_type="conv",
             norm_name="instance",
             res_block=True,
         )

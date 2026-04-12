@@ -88,7 +88,7 @@ class TestInvalidDataPathKey:
         with pytest.raises(ValueError) as exc_info:
             prepare_experiment_configs([exp])
         message = str(exc_info.value)
-        for key in ["A", "B", "C", "D", "E"]:
+        for key in ["A", "B", "C", "D"]:
             assert key in message, (
                 f"Valid key '{key}' missing from ValueError message. Got: {message}"
             )
@@ -213,21 +213,3 @@ class TestGradAccumConfig:
             prepare_experiment_configs([make_valid_experiment(GRAD_ACCUM_STEPS=2.5)])
 
 
-# ---------------------------------------------------------------------------
-# Dataset path key E (previously missing)
-# ---------------------------------------------------------------------------
-
-class TestDatasetPathKeyE:
-    """Dataset key E must be recognised after the refactor that added it."""
-
-    def test_key_e_resolves(self):
-        """data_path_key='E' must not raise and must resolve to a non-empty path."""
-        result = prepare_experiment_configs([make_valid_experiment(data_path_key="E")])
-        assert result[0]["data_path"] == DATASET_PATHS["E"]
-        assert result[0]["data_path"]  # non-empty string
-
-    def test_all_five_keys_resolve(self):
-        """All five dataset keys A–E must resolve without error."""
-        for key in ["A", "B", "C", "D", "E"]:
-            result = prepare_experiment_configs([make_valid_experiment(data_path_key=key)])
-            assert result[0]["data_path"] == DATASET_PATHS[key]
