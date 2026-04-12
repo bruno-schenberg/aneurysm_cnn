@@ -19,6 +19,7 @@ import torch
 # Redirect MONAI model cache to a user-writable directory (avoids /root/.cache permission issues)
 os.environ.setdefault("MONAI_HOME", os.path.expanduser("~/.cache/monai"))
 
+from src.data_preprocess import VALID_RESOLUTIONS
 from src.orchestrator import run_experiment
 
 
@@ -52,17 +53,48 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "VAL_BATCH_SIZE": 4,        # Validation and evaluation batch size
     "CLASSES": ["0", "1"],      # Class label strings: '0' = healthy, '1' = aneurysm
     "OUTPUT_DIR": "./experiments",  # Root directory where per-experiment output subdirectories are created
+    # --- Input resolution ---
+    "INPUT_RESOLUTION": "128x128x128",  # Target spatial size for each volume after the Resized transform;
+                                         # parsed by parse_input_resolution into a (H, W, D) tuple for the pipeline.
+                                         # Valid values: '128x128x128', '256x256x128', '256x256x256'.
+    # --- Gradient accumulation ---
+    "GRAD_ACCUM_STEPS": 1,  # Number of mini-batches to accumulate gradients before calling optimizer.step().
+                             # 1 = standard per-batch update (default). N > 1 simulates a batch size of
+                             # N × BATCH_SIZE without the corresponding memory cost.
 }
 
 # Maps data_path_key values from experiments.json to filesystem paths.
 # Paths are relative to the training_engine/ working directory.
 _DATA_ROOT = os.environ.get("DATA_ROOT", "/mnt/data/cases-3")
 DATASET_PATHS: Dict[str, str] = {
-    "A": f"{_DATA_ROOT}/dataset_A_resampled_cropped",  # 1mm isotropic resample → crop to 128³
-    "B": f"{_DATA_ROOT}/dataset_B_resampled_shrunk",   # single-step isotropic resample → pad to 128³
-    "C": f"{_DATA_ROOT}/dataset_C_cropped",            # Native resolution → crop to 128³
-    "D": f"{_DATA_ROOT}/dataset_D_shrunk",             # Native resolution → shrink to 128³
-    "SAMPLE": os.path.expanduser("~/sample_dataset"),  # Synthetic dataset for container/pipeline testing
+    # 128×128×128 variants
+    "A": f"{_DATA_ROOT}/dataset_A_resampled_cropped",      # 1mm isotropic resample → crop to 128³
+    "B": f"{_DATA_ROOT}/dataset_B_resampled_shrunk",       # single-step isotropic resample → pad to 128³
+    "C": f"{_DATA_ROOT}/dataset_C_cropped",                # Native resolution → crop to 128³
+    "D": f"{_DATA_ROOT}/dataset_D_shrunk",                 # Native resolution → shrink to 128³
+    # 256×256×128 variants
+    "A256": f"{_DATA_ROOT}/dataset_A256_resampled_cropped",  # 0.9375mm isotropic resample → crop to 256×256×128
+    "B256": f"{_DATA_ROOT}/dataset_B256_resampled_shrunk",   # single-step resample → pad to 256×256×128
+    "C256": f"{_DATA_ROOT}/dataset_C256_cropped",            # Native resolution → crop to 256×256×128
+    "D256": f"{_DATA_ROOT}/dataset_D256_shrunk",             # Native resolution → shrink to 256×256×128
+    # Sample / testing
+    "SAMPLE": os.path.expanduser("~/sample_dataset"),       # Synthetic dataset for container/pipeline testing
+    "SAMPLE_D": "/mnt/data/nifti-sample-dataset-D",         # 12-case variant-D sample for local integration testing
+}
+
+# Maps each dataset key to the INPUT_RESOLUTION it was generated at.
+# Used to enforce that experiments cannot mix a dataset with a mismatched resolution.
+DATASET_RESOLUTIONS: Dict[str, str] = {
+    "A": "128x128x128",
+    "B": "128x128x128",
+    "C": "128x128x128",
+    "D": "128x128x128",
+    "A256": "256x256x128",
+    "B256": "256x256x128",
+    "C256": "256x256x128",
+    "D256": "256x256x128",
+    "SAMPLE": "128x128x128",
+    "SAMPLE_D": "128x128x128",
 }
 
 
@@ -123,6 +155,31 @@ def prepare_experiment_configs(raw_experiments: List[Dict]) -> List[Dict[str, An
                     f"'TABULAR_CSV' must be set when 'USE_TABULAR' is True "
                     f"(experiment '{exp_name}')."
                 )
+
+        # Validate INPUT_RESOLUTION
+        input_res = config.get("INPUT_RESOLUTION", "128x128x128")
+        if input_res not in VALID_RESOLUTIONS:
+            raise ValueError(
+                f"'INPUT_RESOLUTION' '{input_res}' is not valid in experiment '{exp_name}'. "
+                f"Valid options: {list(VALID_RESOLUTIONS.keys())}"
+            )
+
+        # Enforce that INPUT_RESOLUTION matches the resolution the dataset was generated at
+        required_res = DATASET_RESOLUTIONS.get(data_key)
+        if required_res is not None and input_res != required_res:
+            raise ValueError(
+                f"Dataset '{data_key}' was generated at {required_res} but "
+                f"INPUT_RESOLUTION is '{input_res}' in experiment '{exp_name}'. "
+                f"Use INPUT_RESOLUTION: \"{required_res}\" or switch to a matching dataset."
+            )
+
+        # Validate GRAD_ACCUM_STEPS
+        grad_accum = config.get("GRAD_ACCUM_STEPS", 1)
+        if not isinstance(grad_accum, int) or isinstance(grad_accum, bool) or grad_accum < 1:
+            raise ValueError(
+                f"'GRAD_ACCUM_STEPS' must be an integer >= 1 in experiment '{exp_name}'. "
+                f"Got: {grad_accum!r}"
+            )
 
         prepared_configs.append(config)
 
