@@ -87,6 +87,57 @@ from monai.utils import set_determinism
 from sklearn.model_selection import StratifiedKFold, train_test_split
 
 
+# Single source of truth for all valid INPUT_RESOLUTION strings.
+# Maps the human-readable "HxWxD" config key to the (H, W, D) tuple that
+# MONAI's Resized transform expects. Adding a new resolution requires only
+# a new entry here — no other module needs to be modified.
+VALID_RESOLUTIONS: Dict[str, Tuple[int, int, int]] = {
+    "128x128x128": (128, 128, 128),
+    "256x256x128": (256, 256, 128),
+    "256x256x256": (256, 256, 256),
+}
+
+
+def parse_input_resolution(resolution: str) -> Tuple[int, int, int]:
+    """
+    Parse an ``INPUT_RESOLUTION`` config string into a spatial-size tuple.
+
+    **Why string → tuple at the config boundary?**
+    JSON has no tuple type, so ``INPUT_RESOLUTION`` is stored as a
+    human-readable string (e.g. ``"256x256x128"``) in ``experiments.json``.
+    Converting to a typed tuple at the config-validation boundary means the
+    rest of the pipeline — transforms, DataLoaders, orchestrator — always
+    receives a ``Tuple[int, int, int]`` and never has to handle string parsing.
+    This mirrors how ``data_path_key`` is resolved to a filesystem path in
+    ``train_models.py`` before reaching the pipeline.
+
+    **Why ``VALID_RESOLUTIONS`` is a dict?**
+    The dict serves two purposes: it is the exhaustive whitelist of permitted
+    values (an unlisted string is immediately rejected) and it performs the
+    parsing in a single lookup without any string-splitting arithmetic.
+    Centralising this in one dict means adding a new resolution requires
+    only a new entry here — validation and parsing stay in sync automatically.
+
+    Args:
+        resolution: A resolution string that must be a key in
+            ``VALID_RESOLUTIONS`` (e.g. ``"128x128x128"``).
+
+    Returns:
+        A ``(H, W, D)`` integer tuple suitable for passing to MONAI's
+        ``Resized`` transform as ``spatial_size``.
+
+    Raises:
+        ValueError: If ``resolution`` is not a key in ``VALID_RESOLUTIONS``,
+            with a message that names the invalid value and lists valid options.
+    """
+    if resolution not in VALID_RESOLUTIONS:
+        raise ValueError(
+            f"Invalid INPUT_RESOLUTION '{resolution}'. "
+            f"Valid options: {list(VALID_RESOLUTIONS.keys())}"
+        )
+    return VALID_RESOLUTIONS[resolution]
+
+
 # ----------------------------------------------------
 # 1. Global Reproducibility
 # ----------------------------------------------------
@@ -544,6 +595,7 @@ def build_dataloaders(
     seed: int = 42,
     oversample: bool = False,
     use_tabular: bool = False,
+    spatial_size: Tuple[int, int, int] = (128, 128, 128),
 ) -> Tuple[DataLoader, DataLoader, DataLoader]:
     """
     Wraps train, val, and test record lists in MONAI Datasets and PyTorch
@@ -602,12 +654,16 @@ def build_dataloaders(
         use_tabular: If ``True``, the ``"tabular"`` key in each batch dict is
             converted to a tensor (requires records to already contain the
             ``"tabular"`` field from ``get_data_list``).
+        spatial_size: Target ``(H, W, D)`` shape for the ``Resized`` transform.
+            Defaults to ``(128, 128, 128)`` to preserve exact backwards
+            compatibility with all existing experiments. Pass a different tuple
+            to override the output resolution for all three DataLoaders.
 
     Returns:
         Tuple of ``(train_loader, val_loader, test_loader)``.
     """
-    train_transform = get_transforms(augment=True, use_tabular=use_tabular)
-    eval_transform = get_transforms(augment=False, use_tabular=use_tabular)
+    train_transform = get_transforms(spatial_size=spatial_size, augment=True, use_tabular=use_tabular)
+    eval_transform = get_transforms(spatial_size=spatial_size, augment=False, use_tabular=use_tabular)
 
     sampler = None
     if oversample:

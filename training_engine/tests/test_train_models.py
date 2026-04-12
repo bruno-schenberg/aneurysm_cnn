@@ -143,6 +143,77 @@ class TestValidConfigMerging:
 
 
 # ---------------------------------------------------------------------------
+# INPUT_RESOLUTION config validation
+# ---------------------------------------------------------------------------
+
+class TestInputResolutionConfig:
+    """prepare_experiment_configs must validate and default INPUT_RESOLUTION."""
+
+    def test_absent_input_resolution_defaults_to_128(self):
+        """When INPUT_RESOLUTION is absent, merged config must default to '128x128x128'."""
+        result = prepare_experiment_configs([make_valid_experiment()])
+        assert result[0]["INPUT_RESOLUTION"] == "128x128x128"
+
+    def test_128x128x128_is_valid(self):
+        """'128x128x128' must be accepted without error."""
+        result = prepare_experiment_configs([make_valid_experiment(INPUT_RESOLUTION="128x128x128")])
+        assert result[0]["INPUT_RESOLUTION"] == "128x128x128"
+
+    def test_256x256x128_is_valid(self):
+        """'256x256x128' must be accepted without error."""
+        result = prepare_experiment_configs([make_valid_experiment(INPUT_RESOLUTION="256x256x128")])
+        assert result[0]["INPUT_RESOLUTION"] == "256x256x128"
+
+    def test_256x256x256_is_valid(self):
+        """'256x256x256' must be accepted without error."""
+        result = prepare_experiment_configs([make_valid_experiment(INPUT_RESOLUTION="256x256x256")])
+        assert result[0]["INPUT_RESOLUTION"] == "256x256x256"
+
+    def test_invalid_resolution_raises_value_error(self):
+        """An unrecognised INPUT_RESOLUTION must raise ValueError before any data loads."""
+        with pytest.raises(ValueError):
+            prepare_experiment_configs([make_valid_experiment(INPUT_RESOLUTION="512x512x512")])
+
+    def test_error_message_names_invalid_resolution(self):
+        """The ValueError message must include the invalid resolution string."""
+        with pytest.raises(ValueError, match="bad_res"):
+            prepare_experiment_configs([make_valid_experiment(INPUT_RESOLUTION="bad_res")])
+
+
+# ---------------------------------------------------------------------------
+# GRAD_ACCUM_STEPS config validation
+# ---------------------------------------------------------------------------
+
+class TestGradAccumConfig:
+    """prepare_experiment_configs must validate GRAD_ACCUM_STEPS."""
+
+    def test_absent_grad_accum_steps_defaults_to_1(self):
+        """When GRAD_ACCUM_STEPS is absent, merged config must default to 1."""
+        result = prepare_experiment_configs([make_valid_experiment()])
+        assert result[0]["GRAD_ACCUM_STEPS"] == 1
+
+    def test_valid_grad_accum_steps_4(self):
+        """GRAD_ACCUM_STEPS=4 must be accepted without error."""
+        result = prepare_experiment_configs([make_valid_experiment(GRAD_ACCUM_STEPS=4)])
+        assert result[0]["GRAD_ACCUM_STEPS"] == 4
+
+    def test_zero_raises_value_error(self):
+        """GRAD_ACCUM_STEPS=0 must raise ValueError."""
+        with pytest.raises(ValueError):
+            prepare_experiment_configs([make_valid_experiment(GRAD_ACCUM_STEPS=0)])
+
+    def test_negative_raises_value_error(self):
+        """GRAD_ACCUM_STEPS=-1 must raise ValueError."""
+        with pytest.raises(ValueError):
+            prepare_experiment_configs([make_valid_experiment(GRAD_ACCUM_STEPS=-1)])
+
+    def test_float_raises_value_error(self):
+        """GRAD_ACCUM_STEPS=2.5 (a float) must raise ValueError."""
+        with pytest.raises(ValueError):
+            prepare_experiment_configs([make_valid_experiment(GRAD_ACCUM_STEPS=2.5)])
+
+
+# ---------------------------------------------------------------------------
 # Dataset path key E (previously missing)
 # ---------------------------------------------------------------------------
 

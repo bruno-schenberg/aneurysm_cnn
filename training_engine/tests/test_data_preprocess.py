@@ -1,9 +1,13 @@
 """
-Tests for data_preprocess.py — splitting, class weighting, and transforms.
+Tests for data_preprocess.py — splitting, class weighting, transforms, and
+real-data integration.
 
-All tests run without GPU, filesystem access to real NIfTI data, or a mounted
-dataset directory. The NIfTI transform test writes a single synthetic file to
-pytest's tmp_path fixture.
+Unit tests (splitting, weighting, config) run entirely in-memory with synthetic
+data — no GPU, no real NIfTI files, no mounted dataset required.
+
+Integration tests (TestTransforms, TestRealDataPipeline) load real NIfTI files
+from the 12-case sample dataset defined in conftest.py.  They are skipped
+automatically when the dataset is not mounted.
 """
 
 import pytest
@@ -11,7 +15,7 @@ import numpy as np
 import nibabel as nib
 import torch
 
-from src.data_preprocess import get_class_weights, get_transforms, split_data
+from src.data_preprocess import build_dataloaders, get_class_weights, get_data_list, get_transforms, split_data, parse_input_resolution
 
 
 # ---------------------------------------------------------------------------
@@ -30,6 +34,105 @@ def make_synthetic_data(n_negative: int, n_positive: int) -> list:
     for i in range(n_positive):
         data.append({"image": f"/fake/1/pos_{i}.nii.gz", "label": 1, "path": f"pos_{i}.nii.gz"})
     return data
+
+
+# ---------------------------------------------------------------------------
+# parse_input_resolution
+# ---------------------------------------------------------------------------
+
+
+class TestParseInputResolution:
+    """parse_input_resolution must map valid strings to tuples and reject bad input."""
+
+    def test_128x128x128_returns_correct_tuple(self):
+        """'128x128x128' must return (128, 128, 128)."""
+        assert parse_input_resolution("128x128x128") == (128, 128, 128)
+
+    def test_256x256x128_returns_correct_tuple(self):
+        """'256x256x128' must return (256, 256, 128)."""
+        assert parse_input_resolution("256x256x128") == (256, 256, 128)
+
+    def test_256x256x256_returns_correct_tuple(self):
+        """'256x256x256' must return (256, 256, 256)."""
+        assert parse_input_resolution("256x256x256") == (256, 256, 256)
+
+    def test_unrecognised_string_raises_value_error(self):
+        """An unrecognised resolution string must raise ValueError."""
+        with pytest.raises(ValueError):
+            parse_input_resolution("512x512x512")
+
+    def test_error_message_is_informative(self):
+        """The ValueError message must include the invalid string and valid options."""
+        with pytest.raises(ValueError, match="bad_value"):
+            parse_input_resolution("bad_value")
+
+
+# ---------------------------------------------------------------------------
+# build_dataloaders spatial_size propagation
+# ---------------------------------------------------------------------------
+
+
+class TestBuildDataloadersResolution:
+    """build_dataloaders must accept spatial_size and produce batches of that shape."""
+
+    def _make_nifti(self, path, shape=(16, 16, 16)):
+        vol = np.random.rand(*shape).astype(np.float32)
+        nib.save(nib.Nifti1Image(vol, np.eye(4)), path)
+
+    def _make_dataset(self, tmp_path, n_neg=4, n_pos=4):
+        root = tmp_path / "ds"
+        for label in [0, 1]:
+            d = root / str(label)
+            d.mkdir(parents=True)
+            count = n_neg if label == 0 else n_pos
+            for i in range(count):
+                self._make_nifti(str(d / f"case_{i}.nii.gz"))
+        return str(root)
+
+    def test_spatial_size_64_produces_correct_batch_shape(self, tmp_path):
+        """build_dataloaders with spatial_size=(64,64,64) must yield (B,1,64,64,64) batches."""
+        from src.data_preprocess import get_data_list, split_data
+
+        root = self._make_dataset(tmp_path)
+        data = get_data_list(root)
+        splits = list(split_data(data, n_splits=2, test_size=0.2, seed=42, use_kfold=False, val_split_ratio=0.25))
+        _, train_files, val_files, test_files = splits[0]
+
+        train_loader, _, _ = build_dataloaders(
+            train_files=train_files,
+            val_files=val_files,
+            test_files=test_files,
+            batch_size=2,
+            val_batch_size=2,
+            seed=42,
+            spatial_size=(64, 64, 64),
+        )
+
+        batch = next(iter(train_loader))
+        assert batch["image"].shape[1:] == torch.Size([1, 64, 64, 64]), (
+            f"Unexpected shape: {batch['image'].shape}"
+        )
+
+    def test_default_spatial_size_is_128(self, tmp_path):
+        """build_dataloaders without spatial_size must default to (128,128,128)."""
+        from src.data_preprocess import get_data_list, split_data
+
+        root = self._make_dataset(tmp_path)
+        data = get_data_list(root)
+        splits = list(split_data(data, n_splits=2, test_size=0.2, seed=42, use_kfold=False, val_split_ratio=0.25))
+        _, train_files, val_files, test_files = splits[0]
+
+        train_loader, _, _ = build_dataloaders(
+            train_files=train_files,
+            val_files=val_files,
+            test_files=test_files,
+            batch_size=2,
+            val_batch_size=2,
+            seed=42,
+        )
+
+        batch = next(iter(train_loader))
+        assert batch["image"].shape[1:] == torch.Size([1, 128, 128, 128])
 
 
 # ---------------------------------------------------------------------------
@@ -182,64 +285,40 @@ class TestClassWeighting:
 
 
 # ---------------------------------------------------------------------------
-# Transforms
+# Transforms  (use real NIfTI files from the sample dataset)
 # ---------------------------------------------------------------------------
 
 
 class TestTransforms:
 
-    def test_output_shape_is_1_128_128_128(self, tmp_path):
-        """Eval transform resizes any NIfTI to (1, 128, 128, 128)."""
-        synthetic_volume = np.random.rand(32, 32, 32).astype(np.float32)
-        nifti_img = nib.Nifti1Image(synthetic_volume, affine=np.eye(4))
-        nifti_path = str(tmp_path / "synthetic.nii.gz")
-        nib.save(nifti_img, nifti_path)
-
+    def test_output_shape_is_1_128_128_128(self, sample_nifti_neg):
+        """Eval transform produces shape (1, 128, 128, 128) from a real NIfTI file."""
         transform = get_transforms(spatial_size=(128, 128, 128), augment=False)
-        result = transform({"image": nifti_path})
-
+        result = transform({"image": str(sample_nifti_neg)})
         assert result["image"].shape == torch.Size([1, 128, 128, 128])
 
-    def test_output_values_in_zero_one_range(self, tmp_path):
-        """ScaleIntensity normalises output values to [0, 1]."""
-        synthetic_volume = (np.random.rand(32, 32, 32) * 1000).astype(np.float32)
-        nifti_img = nib.Nifti1Image(synthetic_volume, affine=np.eye(4))
-        nifti_path = str(tmp_path / "synthetic_high_intensity.nii.gz")
-        nib.save(nifti_img, nifti_path)
-
+    def test_output_values_in_zero_one_range(self, sample_nifti_neg):
+        """ScaleIntensity normalises real voxel intensities to [0, 1]."""
         transform = get_transforms(spatial_size=(128, 128, 128), augment=False)
-        result = transform({"image": nifti_path})
+        result = transform({"image": str(sample_nifti_neg)})
         tensor = result["image"]
-
         assert tensor.min().item() >= 0.0 - 1e-6
         assert tensor.max().item() <= 1.0 + 1e-6
 
-    def test_tabular_key_becomes_tensor_when_use_tabular(self, tmp_path):
-        """With use_tabular=True, the 'tabular' key in the sample is converted to a tensor."""
-        synthetic_volume = np.random.rand(32, 32, 32).astype(np.float32)
-        nifti_img = nib.Nifti1Image(synthetic_volume, affine=np.eye(4))
-        nifti_path = str(tmp_path / "synthetic.nii.gz")
-        nib.save(nifti_img, nifti_path)
-
+    def test_tabular_key_becomes_tensor_when_use_tabular(self, sample_nifti_neg):
+        """With use_tabular=True, the 'tabular' key is converted to a tensor."""
         transform = get_transforms(spatial_size=(128, 128, 128), augment=False, use_tabular=True)
         tabular_array = np.array([0.45, 1.0], dtype=np.float32)  # age=45/100, gender=1
-        result = transform({"image": nifti_path, "tabular": tabular_array})
-
+        result = transform({"image": str(sample_nifti_neg), "tabular": tabular_array})
         assert "tabular" in result
         assert isinstance(result["tabular"], torch.Tensor)
         assert result["tabular"].shape == torch.Size([2])
 
-    def test_tabular_values_preserved_after_transform(self, tmp_path):
+    def test_tabular_values_preserved_after_transform(self, sample_nifti_neg):
         """Transform must not alter the numeric values in the 'tabular' field."""
-        synthetic_volume = np.random.rand(32, 32, 32).astype(np.float32)
-        nifti_img = nib.Nifti1Image(synthetic_volume, affine=np.eye(4))
-        nifti_path = str(tmp_path / "synthetic.nii.gz")
-        nib.save(nifti_img, nifti_path)
-
         transform = get_transforms(spatial_size=(128, 128, 128), augment=False, use_tabular=True)
         tabular_array = np.array([0.62, 0.0], dtype=np.float32)
-        result = transform({"image": nifti_path, "tabular": tabular_array})
-
+        result = transform({"image": str(sample_nifti_neg), "tabular": tabular_array})
         assert abs(result["tabular"][0].item() - 0.62) < 1e-5
         assert abs(result["tabular"][1].item() - 0.0) < 1e-5
 
@@ -325,3 +404,104 @@ class TestTabularDataLoading:
         csv_path = self._write_csv(tmp_path, [("case_A", 30, 1)])
         with pytest.raises(KeyError, match="case_MISSING"):
             get_data_list(root, tabular_csv=csv_path)
+
+
+# ---------------------------------------------------------------------------
+# Real-data integration  (requires sample dataset — skipped if not mounted)
+# ---------------------------------------------------------------------------
+
+
+class TestRealDataPipeline:
+    """
+    End-to-end integration tests using real 128×128×128 NIfTI files from the
+    12-case variant-D sample dataset.
+
+    These tests exercise the full data-loading chain:
+        get_data_list → split_data → build_dataloaders → DataLoader iteration
+
+    They are skipped automatically when the dataset is not mounted (the
+    ``sample_dataset_path`` fixture calls ``pytest.skip`` in that case).
+    """
+
+    def test_get_data_list_finds_all_12_cases(self, sample_dataset_path):
+        """get_data_list discovers all 12 NIfTI files and assigns correct labels."""
+        data = get_data_list(str(sample_dataset_path))
+        assert len(data) == 12
+
+    def test_get_data_list_label_counts(self, sample_dataset_path):
+        """6 negatives and 6 positives are present in the sample dataset."""
+        data = get_data_list(str(sample_dataset_path))
+        negatives = sum(1 for d in data if d["label"] == 0)
+        positives = sum(1 for d in data if d["label"] == 1)
+        assert negatives == 6
+        assert positives == 6
+
+    def test_get_data_list_records_have_required_keys(self, sample_dataset_path):
+        """Every record must contain 'image', 'label', and 'path' keys."""
+        data = get_data_list(str(sample_dataset_path))
+        for record in data:
+            assert "image" in record
+            assert "label" in record
+            assert "path" in record
+
+    def test_split_data_produces_disjoint_sets(self, sample_dataset_path):
+        """Train, val, and test sets must be mutually disjoint on the real dataset."""
+        data = get_data_list(str(sample_dataset_path))
+        for _, train_files, val_files, test_files in split_data(
+            data, n_splits=2, test_size=0.2, seed=42
+        ):
+            train_paths = {d["path"] for d in train_files}
+            val_paths = {d["path"] for d in val_files}
+            test_paths = {d["path"] for d in test_files}
+            assert train_paths.isdisjoint(val_paths), "Train/val overlap on real dataset."
+            assert train_paths.isdisjoint(test_paths), "Train/test overlap on real dataset."
+            assert val_paths.isdisjoint(test_paths), "Val/test overlap on real dataset."
+
+    def test_build_dataloaders_batch_image_shape(self, sample_dataset_path):
+        """
+        build_dataloaders must produce batches with image shape (B, 1, 128, 128, 128).
+
+        Uses a single non-kfold split so the test runs quickly without iterating
+        all folds.  batch_size=2 to verify the batch dimension is assembled correctly.
+        """
+        data = get_data_list(str(sample_dataset_path))
+        splits = list(split_data(
+            data, n_splits=2, test_size=0.2, seed=42, use_kfold=False, val_split_ratio=0.25
+        ))
+        _, train_files, val_files, test_files = splits[0]
+
+        train_loader, val_loader, _ = build_dataloaders(
+            train_files=train_files,
+            val_files=val_files,
+            test_files=test_files,
+            batch_size=2,
+            val_batch_size=2,
+            seed=42,
+        )
+
+        batch = next(iter(train_loader))
+        assert batch["image"].shape[1:] == torch.Size([1, 128, 128, 128]), (
+            f"Unexpected image shape: {batch['image'].shape}"
+        )
+
+    def test_build_dataloaders_batch_labels_are_integer(self, sample_dataset_path):
+        """Labels in each batch must be integer tensors (0 or 1)."""
+        data = get_data_list(str(sample_dataset_path))
+        splits = list(split_data(
+            data, n_splits=2, test_size=0.2, seed=42, use_kfold=False, val_split_ratio=0.25
+        ))
+        _, train_files, val_files, test_files = splits[0]
+
+        train_loader, _, _ = build_dataloaders(
+            train_files=train_files,
+            val_files=val_files,
+            test_files=test_files,
+            batch_size=2,
+            val_batch_size=2,
+            seed=42,
+        )
+
+        batch = next(iter(train_loader))
+        labels = batch["label"]
+        assert labels.dtype in (torch.int32, torch.int64, torch.long)
+        assert all(l.item() in (0, 1) for l in labels)
