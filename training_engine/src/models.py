@@ -556,19 +556,27 @@ class UNETRClassifier(nn.Module):
         return self.classifier(pooled)
 
 
-def get_unetr_model(num_classes: int) -> torch.nn.Module:
+def get_unetr_model(
+    num_classes: int,
+    img_size: tuple = (128, 128, 128),
+) -> torch.nn.Module:
     """
-    Constructs a ``UNETRClassifier`` with ViT-Base hyperparameters for 128³ input.
+    Constructs a ``UNETRClassifier`` with ViT-Base hyperparameters.
 
     See ``UNETRClassifier`` for full architecture details and the scientific
     rationale for including a pure ViT alongside the hierarchical SwinUNETR.
 
     Args:
         num_classes: Number of output classes (typically 2: healthy / aneurysm).
+        img_size: Spatial size of the input volumes. Must match the actual
+            input shape because the ViT positional embeddings are constructed
+            for exactly this number of patches (``img_size / patch_size`` per
+            axis). Defaults to ``(128, 128, 128)``; pass ``(256, 256, 128)``
+            when using the 256×256×128 dataset variants.
     """
     return UNETRClassifier(
         num_classes=num_classes,
-        img_size=(128, 128, 128),
+        img_size=img_size,
         hidden_size=768,
         mlp_dim=3072,
         num_heads=12,
@@ -1044,6 +1052,7 @@ def get_model(
     num_classes: int,
     use_tabular: bool = False,
     tabular_dim: int = 2,
+    spatial_size: tuple = (128, 128, 128),
 ) -> torch.nn.Module:
     """
     Construct and return a model by name.
@@ -1058,7 +1067,7 @@ def get_model(
     and ``"R3d18"`` all produce the same model.
 
     Every returned model:
-      - Accepts input of shape ``(B, 1, 128, 128, 128)``
+      - Accepts input of shape ``(B, 1, *spatial_size)``
       - Returns raw logits of shape ``(B, num_classes)``
       - Is on CPU; the caller is responsible for ``.to(device)``
 
@@ -1073,6 +1082,9 @@ def get_model(
         num_classes: Number of output classes (typically 2: healthy / aneurysm).
         use_tabular: If True, wrap the model for late fusion with tabular features.
         tabular_dim: Number of tabular input features (default 2: age + gender).
+        spatial_size: Input spatial dimensions as ``(H, W, D)``. Forwarded to
+            UNETR to set positional embedding size; CNN-based models ignore it
+            because they use adaptive average pooling.
 
     Returns:
         A ``torch.nn.Module`` ready for ``.to(device)`` and training.
@@ -1094,7 +1106,7 @@ def get_model(
         model = get_r3d50_model(num_classes)
     elif name == "unetr":
         print("  -> Using MONAI UNETR (pure ViT encoder, from scratch).")
-        return get_unetr_model(num_classes)
+        return get_unetr_model(num_classes, img_size=spatial_size)
     elif name == "densenet121":
         print("  -> Using MONAI DenseNet-121 (from scratch).")
         model = get_densenet121_monai_model(num_classes)

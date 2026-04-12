@@ -488,6 +488,7 @@ def run_experiment(config: Dict[str, Any]) -> None:
             model_name=config["model"],
             num_classes=len(config["CLASSES"]),
             use_tabular=use_tabular,
+            spatial_size=spatial_size,
         )
         model.to(config["DEVICE"])
 

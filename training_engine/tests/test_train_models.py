@@ -9,7 +9,7 @@ returns correctly merged configs for valid inputs.
 
 import pytest
 
-from train_models import DATASET_PATHS, DEFAULT_CONFIG, prepare_experiment_configs
+from train_models import DATASET_PATHS, DATASET_RESOLUTIONS, DEFAULT_CONFIG, prepare_experiment_configs
 
 
 # ---------------------------------------------------------------------------
@@ -88,7 +88,7 @@ class TestInvalidDataPathKey:
         with pytest.raises(ValueError) as exc_info:
             prepare_experiment_configs([exp])
         message = str(exc_info.value)
-        for key in ["A", "B", "C", "D"]:
+        for key in ["A", "B", "C", "D", "A256", "B256", "C256", "D256"]:
             assert key in message, (
                 f"Valid key '{key}' missing from ValueError message. Got: {message}"
             )
@@ -160,14 +160,16 @@ class TestInputResolutionConfig:
         assert result[0]["INPUT_RESOLUTION"] == "128x128x128"
 
     def test_256x256x128_is_valid(self):
-        """'256x256x128' must be accepted without error."""
-        result = prepare_experiment_configs([make_valid_experiment(INPUT_RESOLUTION="256x256x128")])
+        """'256x256x128' must be accepted when paired with a 256-dataset key."""
+        result = prepare_experiment_configs([make_valid_experiment(
+            data_path_key="A256", INPUT_RESOLUTION="256x256x128"
+        )])
         assert result[0]["INPUT_RESOLUTION"] == "256x256x128"
 
-    def test_256x256x256_is_valid(self):
-        """'256x256x256' must be accepted without error."""
-        result = prepare_experiment_configs([make_valid_experiment(INPUT_RESOLUTION="256x256x256")])
-        assert result[0]["INPUT_RESOLUTION"] == "256x256x256"
+    def test_256x256x256_is_a_recognised_resolution_string(self):
+        """'256x256x256' is a valid resolution string in VALID_RESOLUTIONS (no dataset key yet)."""
+        from src.data_preprocess import VALID_RESOLUTIONS
+        assert "256x256x256" in VALID_RESOLUTIONS
 
     def test_invalid_resolution_raises_value_error(self):
         """An unrecognised INPUT_RESOLUTION must raise ValueError before any data loads."""
@@ -178,6 +180,44 @@ class TestInputResolutionConfig:
         """The ValueError message must include the invalid resolution string."""
         with pytest.raises(ValueError, match="bad_res"):
             prepare_experiment_configs([make_valid_experiment(INPUT_RESOLUTION="bad_res")])
+
+    def test_256_resolution_with_128_dataset_raises(self):
+        """Using INPUT_RESOLUTION='256x256x128' with a 128³ dataset must raise ValueError."""
+        with pytest.raises(ValueError, match="256x256x128"):
+            prepare_experiment_configs([make_valid_experiment(
+                data_path_key="A", INPUT_RESOLUTION="256x256x128"
+            )])
+
+    def test_128_resolution_with_256_dataset_raises(self):
+        """Using INPUT_RESOLUTION='128x128x128' with a 256×256×128 dataset must raise ValueError."""
+        with pytest.raises(ValueError, match="128x128x128"):
+            prepare_experiment_configs([make_valid_experiment(
+                data_path_key="A256", INPUT_RESOLUTION="128x128x128"
+            )])
+
+    def test_256_resolution_with_256_dataset_passes(self):
+        """Using INPUT_RESOLUTION='256x256x128' with a 256×256×128 dataset must not raise."""
+        result = prepare_experiment_configs([make_valid_experiment(
+            data_path_key="A256", INPUT_RESOLUTION="256x256x128"
+        )])
+        assert result[0]["INPUT_RESOLUTION"] == "256x256x128"
+        assert result[0]["data_path"] == DATASET_PATHS["A256"]
+
+    def test_all_256_keys_require_256_resolution(self):
+        """All 256 dataset keys must require INPUT_RESOLUTION='256x256x128'."""
+        for key in ["A256", "B256", "C256", "D256"]:
+            assert DATASET_RESOLUTIONS[key] == "256x256x128"
+            result = prepare_experiment_configs([make_valid_experiment(
+                data_path_key=key, INPUT_RESOLUTION="256x256x128"
+            )])
+            assert result[0]["data_path"] == DATASET_PATHS[key]
+
+    def test_all_128_keys_require_128_resolution(self):
+        """All 128³ dataset keys must require INPUT_RESOLUTION='128x128x128'."""
+        for key in ["A", "B", "C", "D"]:
+            assert DATASET_RESOLUTIONS[key] == "128x128x128"
+            result = prepare_experiment_configs([make_valid_experiment(data_path_key=key)])
+            assert result[0]["INPUT_RESOLUTION"] == "128x128x128"
 
 
 # ---------------------------------------------------------------------------
