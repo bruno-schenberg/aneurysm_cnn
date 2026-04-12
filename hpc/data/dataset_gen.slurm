@@ -14,10 +14,13 @@ echo -e "## Job started at $(date +'%d-%m-%Y as %T') #####################\n"
 ## ---------------------------------------------------------------------------
 ## Configurable parameters (override with env vars at submission time)
 ##
-##   TARGET_SHAPE=256x256x128 VARIANTS="A B C D" sbatch hpc/data/dataset_gen.slurm
+##   INPUT_DIR=$HOME/data/nifti OUTPUT_DIR=$HOME/data/cases-3 \
+##     TARGET_SHAPE=256x256x128 VARIANTS="A B C D" \
+##     sbatch hpc/data/dataset_gen.slurm
 ##
 ## ---------------------------------------------------------------------------
-INPUT_DIR=${INPUT_DIR:-$HOME/data/cases-3/nifti}
+INPUT_DIR=${INPUT_DIR:-$HOME/data/nifti}
+OUTPUT_DIR=${OUTPUT_DIR:-$HOME/data/cases-3}
 TARGET_SHAPE=${TARGET_SHAPE:-256x256x128}
 VARIANTS=${VARIANTS:-B}
 N_WORKERS=${N_WORKERS:-4}
@@ -29,6 +32,7 @@ echo -e "## Job ID:          $SLURM_JOB_ID"
 echo -e "## Execution node:  $(hostname -s)"
 echo -e "## Submit dir:      $SLURM_SUBMIT_DIR"
 echo -e "## Input dir:       $INPUT_DIR"
+echo -e "## Output dir:      $OUTPUT_DIR"
 echo -e "## Target shape:    $TARGET_SHAPE"
 echo -e "## Variants:        $VARIANTS"
 echo -e "## Workers:         $N_WORKERS \n"
@@ -51,10 +55,11 @@ echo ""
 cd $HOME/aneurysm_cnn
 
 python -u data_engine/dataset_gen.py \
-    --input-dir   "$INPUT_DIR"    \
-    --target-shape "$TARGET_SHAPE" \
-    --variants    $VARIANTS       \
-    --workers     "$N_WORKERS"
+    --input-dir    "$INPUT_DIR"     \
+    --output-dir   "$OUTPUT_DIR"    \
+    --target-shape "$TARGET_SHAPE"  \
+    --variants     $VARIANTS        \
+    --workers      "$N_WORKERS"
 
 STATUS=$?
 
