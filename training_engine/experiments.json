@@ -9,8 +9,7 @@
         "LEARNING_RATE": 0.0001,
         "USE_KFOLD": false,
         "VAL_SPLIT_RATIO": 0.20,
-        "EARLY_STOPPING_PATIENCE": 10,
-        "QUICK_TEST": false
+        "EARLY_STOPPING_PATIENCE": 10
     },
     {
         "name": "R3D18_B_lr5e5",
@@ -22,8 +21,7 @@
         "LEARNING_RATE": 0.00005,
         "USE_KFOLD": false,
         "VAL_SPLIT_RATIO": 0.20,
-        "EARLY_STOPPING_PATIENCE": 10,
-        "QUICK_TEST": false
+        "EARLY_STOPPING_PATIENCE": 10
     },
     {
         "name": "R3D18_D_lr1e4",
@@ -35,8 +33,7 @@
         "LEARNING_RATE": 0.0001,
         "USE_KFOLD": false,
         "VAL_SPLIT_RATIO": 0.20,
-        "EARLY_STOPPING_PATIENCE": 10,
-        "QUICK_TEST": false
+        "EARLY_STOPPING_PATIENCE": 10
     },
     {
         "name": "R3D18_D_lr5e5",
@@ -48,8 +45,7 @@
         "LEARNING_RATE": 0.00005,
         "USE_KFOLD": false,
         "VAL_SPLIT_RATIO": 0.20,
-        "EARLY_STOPPING_PATIENCE": 10,
-        "QUICK_TEST": false
+        "EARLY_STOPPING_PATIENCE": 10
     },
     {
         "name": "R3D50_B_lr1e4",
@@ -61,8 +57,7 @@
         "LEARNING_RATE": 0.0001,
         "USE_KFOLD": false,
         "VAL_SPLIT_RATIO": 0.20,
-        "EARLY_STOPPING_PATIENCE": 10,
-        "QUICK_TEST": false
+        "EARLY_STOPPING_PATIENCE": 10
     },
     {
         "name": "R3D50_B_lr5e5",
@@ -74,8 +69,7 @@
         "LEARNING_RATE": 0.00005,
         "USE_KFOLD": false,
         "VAL_SPLIT_RATIO": 0.20,
-        "EARLY_STOPPING_PATIENCE": 10,
-        "QUICK_TEST": false
+        "EARLY_STOPPING_PATIENCE": 10
     },
     {
         "name": "R3D50_D_lr1e4",
@@ -87,8 +81,7 @@
         "LEARNING_RATE": 0.0001,
         "USE_KFOLD": false,
         "VAL_SPLIT_RATIO": 0.20,
-        "EARLY_STOPPING_PATIENCE": 10,
-        "QUICK_TEST": false
+        "EARLY_STOPPING_PATIENCE": 10
     },
     {
         "name": "R3D50_D_lr5e5",
@@ -100,7 +93,6 @@
         "LEARNING_RATE": 0.00005,
         "USE_KFOLD": false,
         "VAL_SPLIT_RATIO": 0.20,
-        "EARLY_STOPPING_PATIENCE": 10,
-        "QUICK_TEST": false
+        "EARLY_STOPPING_PATIENCE": 10
     }
 ]

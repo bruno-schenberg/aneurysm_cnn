@@ -32,6 +32,10 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "data_path_key": None,  # Dataset variant key: 'A', 'B', 'C', 'D', or 'E' (see DATASET_PATHS)
     "data_path": None,      # Derived automatically from data_path_key — do not set in JSON
 
+    # --- Tabular metadata (age/gender) fusion — optional late-fusion feature ---
+    "USE_TABULAR": False,   # True = fuse age/gender with CNN features (late fusion); False = image-only
+    "TABULAR_CSV": None,    # Path to CSV with columns: case_id, age, gender (required when USE_TABULAR=True)
+
     # --- Training parameters — override any of these in experiments.json as needed ---
     "DEVICE": "cuda" if torch.cuda.is_available() else "cpu",  # Auto-detected; override with 'cpu' to force CPU
     "RANDOM_SEED": 42,          # Fixed seed for dataset splits, weight init, and shuffle — ensures reproducibility
@@ -43,7 +47,6 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "VAL_SPLIT_RATIO": 0.30,    # Fraction of dev set used for validation when USE_KFOLD=False
     "EARLY_STOPPING_PATIENCE": 0,  # Epochs without val F2 improvement before stopping; 0 = disabled
     "WEIGHT_DECAY": 1e-4,          # AdamW weight decay (L2 regularisation strength)
-    "QUICK_TEST": True,         # True = run only fold 0 (fast debug / CI mode); False = full k-fold
     "HOLD_OUT_TEST_SET": True,  # True = reserve TEST_SPLIT_RATIO of data for final evaluation, never seen during training
     "TEST_SPLIT_RATIO": 0.20,   # Fraction of total dataset held out for final evaluation (applies when HOLD_OUT_TEST_SET=True)
     "VAL_BATCH_SIZE": 4,        # Validation and evaluation batch size
@@ -56,10 +59,9 @@ DEFAULT_CONFIG: Dict[str, Any] = {
 _DATA_ROOT = os.environ.get("DATA_ROOT", "/mnt/data/cases-3")
 DATASET_PATHS: Dict[str, str] = {
     "A": f"{_DATA_ROOT}/dataset_A_resampled_cropped",  # 1mm isotropic resample → crop to 128³
-    "B": f"{_DATA_ROOT}/dataset_B_resampled_shrunk",   # 1mm isotropic resample → shrink to 128³
+    "B": f"{_DATA_ROOT}/dataset_B_resampled_shrunk",   # single-step isotropic resample → pad to 128³
     "C": f"{_DATA_ROOT}/dataset_C_cropped",            # Native resolution → crop to 128³
     "D": f"{_DATA_ROOT}/dataset_D_shrunk",             # Native resolution → shrink to 128³
-    "E": f"{_DATA_ROOT}/dataset_E_isotropic_padded",   # Largest dim resampled to 128px → pad to 128³
     "SAMPLE": os.path.expanduser("~/sample_dataset"),  # Synthetic dataset for container/pipeline testing
 }
 
@@ -113,6 +115,14 @@ def prepare_experiment_configs(raw_experiments: List[Dict]) -> List[Dict[str, An
                 f"Valid keys: {list(DATASET_PATHS.keys())}"
             )
         config["data_path"] = DATASET_PATHS[data_key]
+
+        # Validate tabular config
+        if config.get("USE_TABULAR"):
+            if not config.get("TABULAR_CSV"):
+                raise ValueError(
+                    f"'TABULAR_CSV' must be set when 'USE_TABULAR' is True "
+                    f"(experiment '{exp_name}')."
+                )
 
         prepared_configs.append(config)
 

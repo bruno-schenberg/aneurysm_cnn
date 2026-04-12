@@ -183,3 +183,63 @@ class TestF2Checkpointing:
                 device="cpu",
                 num_epochs=1,
             )
+
+
+# ---------------------------------------------------------------------------
+# Tabular (multimodal) training loop
+# ---------------------------------------------------------------------------
+
+
+class TestTabularTrainingLoop:
+    """Training and validation loops must handle batches that include a 'tabular' key."""
+
+    def make_tabular_model(self):
+        """Minimal model that accepts (image, tabular) and returns 2-class logits."""
+        class TinyMultiModal(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.fc = torch.nn.Linear(4 + 2, 2)
+
+            def forward(self, image, tabular):
+                x = torch.cat([image, tabular], dim=1)
+                return self.fc(x)
+
+        return TinyMultiModal()
+
+    def make_tabular_loader(self):
+        """Single-batch loader that includes a 'tabular' key alongside image and label."""
+        return [{
+            "image": torch.zeros(2, 4),
+            "label": torch.tensor([0, 1]),
+            "tabular": torch.zeros(2, 2),
+        }]
+
+    def test_train_one_epoch_passes_tabular_to_model(self):
+        """train_one_epoch must call model(image, tabular) when 'tabular' is in batch."""
+        from src.training import train_one_epoch
+        model = self.make_tabular_model()
+        optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+        criterion = torch.nn.CrossEntropyLoss()
+        # Should not raise; a wrong call signature would cause a TypeError
+        loss, acc = train_one_epoch(model, self.make_tabular_loader(), criterion, optimizer, "cpu")
+        assert isinstance(loss, float)
+        assert isinstance(acc, float)
+
+    def test_validate_one_epoch_passes_tabular_to_model(self):
+        """validate_one_epoch must call model(image, tabular) when 'tabular' is in batch."""
+        from src.training import validate_one_epoch
+        model = self.make_tabular_model()
+        criterion = torch.nn.CrossEntropyLoss()
+        loss, acc, f2 = validate_one_epoch(model, self.make_tabular_loader(), criterion, "cpu")
+        assert isinstance(loss, float)
+        assert isinstance(acc, float)
+        assert isinstance(f2, float)
+
+    def test_image_only_loader_still_works(self):
+        """Batches without 'tabular' key must still call model(image) correctly."""
+        from src.training import train_one_epoch
+        model = make_tiny_model()
+        optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+        criterion = torch.nn.CrossEntropyLoss()
+        loss, acc = train_one_epoch(model, make_mock_loader(), criterion, optimizer, "cpu")
+        assert isinstance(loss, float)

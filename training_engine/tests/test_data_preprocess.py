@@ -6,6 +6,7 @@ dataset directory. The NIfTI transform test writes a single synthetic file to
 pytest's tmp_path fixture.
 """
 
+import pytest
 import numpy as np
 import nibabel as nib
 import torch
@@ -212,3 +213,115 @@ class TestTransforms:
 
         assert tensor.min().item() >= 0.0 - 1e-6
         assert tensor.max().item() <= 1.0 + 1e-6
+
+    def test_tabular_key_becomes_tensor_when_use_tabular(self, tmp_path):
+        """With use_tabular=True, the 'tabular' key in the sample is converted to a tensor."""
+        synthetic_volume = np.random.rand(32, 32, 32).astype(np.float32)
+        nifti_img = nib.Nifti1Image(synthetic_volume, affine=np.eye(4))
+        nifti_path = str(tmp_path / "synthetic.nii.gz")
+        nib.save(nifti_img, nifti_path)
+
+        transform = get_transforms(spatial_size=(128, 128, 128), augment=False, use_tabular=True)
+        tabular_array = np.array([0.45, 1.0], dtype=np.float32)  # age=45/100, gender=1
+        result = transform({"image": nifti_path, "tabular": tabular_array})
+
+        assert "tabular" in result
+        assert isinstance(result["tabular"], torch.Tensor)
+        assert result["tabular"].shape == torch.Size([2])
+
+    def test_tabular_values_preserved_after_transform(self, tmp_path):
+        """Transform must not alter the numeric values in the 'tabular' field."""
+        synthetic_volume = np.random.rand(32, 32, 32).astype(np.float32)
+        nifti_img = nib.Nifti1Image(synthetic_volume, affine=np.eye(4))
+        nifti_path = str(tmp_path / "synthetic.nii.gz")
+        nib.save(nifti_img, nifti_path)
+
+        transform = get_transforms(spatial_size=(128, 128, 128), augment=False, use_tabular=True)
+        tabular_array = np.array([0.62, 0.0], dtype=np.float32)
+        result = transform({"image": nifti_path, "tabular": tabular_array})
+
+        assert abs(result["tabular"][0].item() - 0.62) < 1e-5
+        assert abs(result["tabular"][1].item() - 0.0) < 1e-5
+
+
+# ---------------------------------------------------------------------------
+# Tabular data loading
+# ---------------------------------------------------------------------------
+
+
+class TestTabularDataLoading:
+
+    def _write_nifti(self, path):
+        vol = np.random.rand(8, 8, 8).astype(np.float32)
+        nib.save(nib.Nifti1Image(vol, np.eye(4)), path)
+
+    def _make_dataset_dir(self, tmp_path, case_ids_by_label):
+        """Creates class subdirs with dummy NIfTI files. Returns root dir."""
+        root = tmp_path / "dataset"
+        for label, case_ids in case_ids_by_label.items():
+            class_dir = root / str(label)
+            class_dir.mkdir(parents=True)
+            for cid in case_ids:
+                self._write_nifti(str(class_dir / f"{cid}.nii.gz"))
+        return str(root)
+
+    def _write_csv(self, tmp_path, rows):
+        """Writes a tabular CSV and returns its path."""
+        csv_path = str(tmp_path / "metadata.csv")
+        with open(csv_path, "w") as f:
+            f.write("case_id,age,gender\n")
+            for case_id, age, gender in rows:
+                f.write(f"{case_id},{age},{gender}\n")
+        return csv_path
+
+    def test_get_data_list_without_csv_has_no_tabular_key(self, tmp_path):
+        """Without a CSV, records must not contain a 'tabular' key."""
+        from src.data_preprocess import get_data_list
+        root = self._make_dataset_dir(tmp_path, {0: ["case_A"], 1: ["case_B"]})
+        data = get_data_list(root)
+        for record in data:
+            assert "tabular" not in record
+
+    def test_get_data_list_with_csv_adds_tabular_key(self, tmp_path):
+        """With a CSV, every record must have a 'tabular' key."""
+        from src.data_preprocess import get_data_list
+        root = self._make_dataset_dir(tmp_path, {0: ["case_A"], 1: ["case_B"]})
+        csv_path = self._write_csv(tmp_path, [("case_A", 45, 0), ("case_B", 62, 1)])
+        data = get_data_list(root, tabular_csv=csv_path)
+        for record in data:
+            assert "tabular" in record
+
+    def test_tabular_array_shape_is_2(self, tmp_path):
+        """Each 'tabular' array must have exactly 2 elements: [age/100, gender]."""
+        from src.data_preprocess import get_data_list
+        root = self._make_dataset_dir(tmp_path, {0: ["case_A"], 1: ["case_B"]})
+        csv_path = self._write_csv(tmp_path, [("case_A", 45, 0), ("case_B", 62, 1)])
+        data = get_data_list(root, tabular_csv=csv_path)
+        for record in data:
+            assert record["tabular"].shape == (2,)
+
+    def test_age_is_normalised_by_100(self, tmp_path):
+        """Age in the tabular array must be age/100, not raw years."""
+        from src.data_preprocess import get_data_list
+        root = self._make_dataset_dir(tmp_path, {0: ["case_A"]})
+        csv_path = self._write_csv(tmp_path, [("case_A", 50, 0)])
+        data = get_data_list(root, tabular_csv=csv_path)
+        age_normalised = data[0]["tabular"][0]
+        assert abs(age_normalised - 0.5) < 1e-5
+
+    def test_gender_stored_as_float(self, tmp_path):
+        """Gender must be stored as a float (0.0 or 1.0)."""
+        from src.data_preprocess import get_data_list
+        root = self._make_dataset_dir(tmp_path, {0: ["case_A"], 1: ["case_B"]})
+        csv_path = self._write_csv(tmp_path, [("case_A", 30, 0), ("case_B", 40, 1)])
+        data = get_data_list(root, tabular_csv=csv_path)
+        for record in data:
+            assert record["tabular"].dtype == np.float32
+
+    def test_missing_case_in_csv_raises_key_error(self, tmp_path):
+        """A NIfTI file with no matching CSV row must raise KeyError with the case id."""
+        from src.data_preprocess import get_data_list
+        root = self._make_dataset_dir(tmp_path, {0: ["case_A", "case_MISSING"]})
+        csv_path = self._write_csv(tmp_path, [("case_A", 30, 1)])
+        with pytest.raises(KeyError, match="case_MISSING"):
+            get_data_list(root, tabular_csv=csv_path)

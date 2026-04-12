@@ -1,14 +1,46 @@
 """
-Plotting, metric calculation, and artifact-saving utilities for the training engine.
+plots.py
 
-Functions are grouped into three sections:
-- **Plotting**: visual outputs (confusion matrices, ROC curves).
-- **Metric Calculation**: pure numeric functions testable without GPU or real data.
-- **Artifact Saving**: functions that write files to disk (CSVs, model weights).
+Plotting, metric calculation, and artifact-saving utilities for the training
+engine. Called by the orchestrator at the end of each fold to produce a
+complete record of training behaviour and evaluation results.
 
-The ``save_fold_artifacts`` and ``plot_roc_curve`` functions require a live model
-and DataLoader; they are integration-level and are not covered by unit tests.
-All other functions are unit-testable with synthetic data and temporary paths.
+## Three function groups
+
+Functions are organised by what they depend on:
+
+  **Plotting** — visual outputs saved as PNG files. ``plot_confusion_matrix``
+  takes a pre-computed NumPy array and has no external dependencies.
+  ``plot_roc_curve`` is integration-level: it requires a live model and a
+  DataLoader because it re-runs inference to collect class probabilities.
+
+  **Metric Calculation** — pure numeric functions that operate on lists of
+  prediction dicts. No GPU, no DataLoader, and no real NIfTI files are needed.
+  These are the primary candidates for unit testing with synthetic data.
+
+  **Artifact Saving** — functions that write files to disk (CSV, PNG, .pth).
+  ``save_fold_artifacts`` is the top-level entry point that calls all other
+  functions for a completed fold. It is integration-level because it calls
+  ``plot_roc_curve``.
+
+## Why separate pre-computed artifacts from inference-dependent artifacts?
+
+Most artifacts — confusion matrices, prediction CSVs, metrics CSVs — are
+derived from ``detailed_results`` and ``metrics_history``, which are already
+in memory after training. Generating them requires no further GPU work. The
+ROC curve is the exception: it needs continuous probability scores (not just
+argmax predictions), so it must re-run a forward pass over the evaluation
+loader. Keeping this separation explicit makes it easy to regenerate the
+cheaper artifacts offline without a GPU.
+
+## Why two model files per fold?
+
+Each fold saves a ``_model_last.pth`` (weights at the final epoch) and a
+``_model_best.pth`` (weights at the epoch with the highest validation F2).
+In most runs the best epoch occurs well before the final epoch, especially
+with early stopping. Saving both allows post-hoc comparison and ensures the
+best-F2 model is always available for further evaluation even if the training
+loop ran many epochs past its peak.
 """
 
 import csv
@@ -33,6 +65,7 @@ from sklearn.metrics import (
 
 # ── Plotting ──────────────────────────────────────────────────────────────────
 
+
 def plot_confusion_matrix(
     cm: np.ndarray,
     classes: List[str],
@@ -41,16 +74,43 @@ def plot_confusion_matrix(
     title: str = "Confusion Matrix",
 ) -> None:
     """
-    Plot a confusion matrix and save it as a PNG file.
+    Render a confusion matrix and save it as a PNG file.
+
+    A confusion matrix shows the joint distribution of true and predicted
+    labels. For binary classification the layout is:
+
+        ┌──────────────────────┬──────────────────────┐
+        │  True Neg (TN)       │  False Pos (FP)      │
+        ├──────────────────────┼──────────────────────┤
+        │  False Neg (FN)      │  True Pos (TP)       │
+        └──────────────────────┴──────────────────────┘
+
+    Row index = true class, column index = predicted class — the scikit-learn
+    convention used by ``confusion_matrix``.
+
+    **Row normalisation:** when ``normalize=True``, each row is divided by its
+    sum, so cell (i, j) becomes the fraction of true-class-i samples predicted
+    as class j. The diagonal then shows per-class recall: the fraction of each
+    class that was correctly identified. This is useful for comparing class-
+    level performance independent of class size.
+
+    **Text contrast:** cell annotations are drawn in white when the cell value
+    exceeds half the maximum value, and black otherwise. This prevents light
+    text on a light background or dark text on a dark background, keeping
+    the numbers readable across the full colour range.
+
+    **Figure cleanup:** ``plt.close()`` is called after saving to release the
+    figure's memory. Without this, matplotlib accumulates open figures across
+    folds, which can exhaust memory on long runs.
 
     Args:
-        cm: Confusion matrix array of shape (n_classes, n_classes), as returned
-            by ``sklearn.metrics.confusion_matrix``.
-        classes: List of class label strings used for axis tick labels
+        cm: Confusion matrix array of shape ``(n_classes, n_classes)``,
+            as returned by ``sklearn.metrics.confusion_matrix``.
+        classes: Class label strings used for axis tick labels
             (e.g. ``['0', '1']`` for healthy / aneurysm).
-        filename: Absolute or relative path where the PNG will be saved.
-        normalize: If ``True``, each row is divided by its sum so cell values
-            represent per-class recall rates (row-normalised). If ``False``,
+        filename: Path where the PNG will be saved.
+        normalize: If ``True``, row-normalise so each cell shows the fraction
+            of true-class samples predicted in that column. If ``False``,
             raw counts are shown.
         title: Title string displayed above the matrix.
     """
@@ -92,23 +152,45 @@ def plot_roc_curve(
     filename: str,
 ) -> None:
     """
-    Compute and plot a Receiver Operating Characteristic (ROC) curve.
+    Re-run inference to collect class probabilities, then plot and save a ROC curve.
 
-    **Integration-level**: requires a live model, a DataLoader, and a device.
-    Not covered by unit tests — use ``calculate_classification_metrics`` for
-    offline metric evaluation.
+    **What the ROC curve shows:** the Receiver Operating Characteristic curve
+    plots the True Positive Rate (recall / sensitivity) against the False
+    Positive Rate (1 - specificity) as the classification threshold is swept
+    from 1 to 0. A random classifier follows the diagonal; a perfect classifier
+    reaches the top-left corner. The Area Under the Curve (AUC) summarises
+    this into a single number in [0, 1]. AUC = 0.5 is chance; AUC = 1.0 is
+    perfect separation. Unlike F2, AUC is threshold-independent, making it
+    a useful complement for comparing models.
 
-    The function iterates over the DataLoader, collects model probabilities for
-    the positive class (class index 1), and plots FPR vs TPR with AUC annotation.
-    If only one class is present in the evaluation labels, no file is written and
-    a warning is printed instead.
+    **Why re-run inference?** The training loop checkpoints argmax predictions
+    (hard labels), not probability scores. The ROC curve requires continuous
+    probability scores for the positive class to sweep the threshold. A second
+    forward pass over the evaluation loader is therefore needed.
+
+    **Probability extraction:** the model outputs raw logits of shape
+    ``(batch, num_classes)``. For the standard two-class case
+    (``outputs.shape[1] == 2``), ``softmax`` converts logits to probabilities
+    and column index 1 gives the positive-class probability. If the model
+    outputs a single scalar (e.g. a sigmoid head), it is squeezed directly.
+
+    **Single-class guard:** ``roc_curve`` raises a ``ValueError`` if only one
+    class is present in the labels (the curve is undefined). This can happen
+    with very small or heavily imbalanced evaluation splits. The function
+    checks for this before calling ``roc_curve`` and prints a warning instead
+    of crashing.
+
+    **Integration-level:** requires a live model, a DataLoader, and a device.
+    Not covered by unit tests.
 
     Args:
-        model: Trained model in eval mode, or to be set to eval mode here.
-        dataloader: DataLoader yielding dicts with keys ``"image"`` and ``"label"``.
+        model: Trained model. This function sets it to ``eval()`` mode
+            internally.
+        dataloader: DataLoader over the evaluation split, yielding dicts with
+            keys ``"image"`` and ``"label"``.
         device: PyTorch device string (``"cuda"`` or ``"cpu"``).
-        classes: Class label strings (used for the plot title only).
-        filename: Absolute or relative path where the PNG will be saved.
+        classes: Class label strings — used in the plot title only.
+        filename: Path where the PNG will be saved.
     """
     model.eval()
     all_labels: List[int] = []
@@ -155,31 +237,57 @@ def plot_roc_curve(
 
 # ── Metric Calculation ────────────────────────────────────────────────────────
 
+
 def calculate_classification_metrics(
     detailed_results: List[Dict[str, Any]],
 ) -> Dict[str, float]:
     """
-    Calculate Precision, Recall, and F2-Score from a list of prediction records.
+    Compute Precision, Recall, and F2-Score from a list of prediction records.
 
-    F2-Score (β=2) weights recall twice as heavily as precision, reflecting the
-    clinical priority of minimising missed aneurysms (false negatives) over
-    minimising false positives.
+    All three metrics are computed with respect to the positive class
+    (``pos_label=1``, i.e. aneurysm present). This is appropriate for binary
+    detection: we want to know how well the model finds aneurysms, not how well
+    it identifies healthy cases.
+
+    **Why F2, not F1?**
+    F-beta score is the harmonic mean of precision and recall, with recall
+    weighted β² times more heavily than precision. With β=2, recall contributes
+    four times as much as precision. In a clinical screening context, a false
+    negative (missed aneurysm) carries far higher cost than a false positive
+    (unnecessary follow-up scan), so the metric should penalise low recall
+    more heavily than low precision. F2 encodes this asymmetry.
+
+    **Precision, recall, and their trade-off:**
+    Precision = TP / (TP + FP): of all predicted positives, what fraction
+    are truly positive? Recall = TP / (TP + FN): of all true positives,
+    what fraction did the model find? Raising the classification threshold
+    increases precision but reduces recall; lowering it does the opposite.
+    F2 rewards finding more true positives even at the cost of more false alarms.
+
+    **``zero_division=0``:** if the model predicts no positive cases,
+    precision is undefined (0/0). ``zero_division=0`` returns 0.0 in that case
+    rather than raising a warning, which is the correct behaviour for early
+    training epochs where the model may collapse to always predicting negative.
+
+    **Error handling:** the function wraps computation in a try/except and
+    returns NaN for all metrics on unexpected errors. This prevents a single
+    bad fold from aborting the entire experiment summary.
 
     Unit-testable: no GPU, no DataLoader, and no real files required. Construct
     ``detailed_results`` directly with synthetic dicts for testing.
 
     Args:
-        detailed_results: List of prediction dicts. Each dict must contain:
+        detailed_results: List of prediction dicts, each containing:
             - ``'true_label'`` (int): Ground-truth class (0 or 1).
             - ``'pred_label'`` (int): Model prediction (0 or 1).
 
     Returns:
-        Dict with keys ``'Precision'``, ``'Recall'``, and ``'F2-Score'``, each
+        Dict with keys ``'Precision'``, ``'Recall'``, ``'F2-Score'``, each
         a float in [0, 1].
 
         Special cases:
         - Empty list → all values are ``float('nan')``.
-        - Only one class in true labels → all values are ``0.0``.
+        - Only one class present in true labels → all values are ``0.0``.
         - Any unexpected exception → all values are ``float('nan')``.
     """
     if not detailed_results:
@@ -206,22 +314,41 @@ def calculate_classification_metrics(
 
 
 def evaluate_models(
-    all_fold_predictions: Dict[str, List[Dict[str, Any]]], output_csv_path: str
+    all_fold_predictions: Dict[str, Dict[str, Any]], output_csv_path: str
 ) -> None:
     """
-    Aggregate per-fold metrics across all folds and save a summary CSV.
+    Aggregate per-fold evaluation metrics and save a summary CSV.
 
-    Iterates over ``all_fold_predictions``, calculates Precision, Recall, and
-    F2-Score for each fold, appends aggregate Average and Std. Dev. rows, and
-    saves the result to ``output_csv_path``.
+    This function is called once at the end of a full experiment (after all
+    folds have completed) by ``summarize_experiment_results`` in the
+    orchestrator. It collects the pre-computed metrics from each fold result
+    dict, prints a summary table, and writes it to a CSV that includes an
+    Average row and a Std. Dev. row at the bottom.
+
+    **Why include Std. Dev.?**
+    In k-fold cross-validation, the mean metric across folds is the primary
+    summary statistic, but the standard deviation is equally important: a model
+    with F2 = 0.75 ± 0.02 is far more reliable than one with F2 = 0.75 ± 0.20.
+    High variance across folds indicates that performance is sensitive to which
+    cases end up in training vs validation — a sign of instability that the
+    mean alone would hide. When ``USE_KFOLD=False`` (single split), both rows
+    will show the metrics of the single fold, and Std. Dev. will be NaN,
+    which is expected.
+
+    **Pre-computed metrics:** this function reads ``fold_data["metrics"]``
+    directly rather than re-computing metrics from raw predictions. The
+    ``"metrics"`` dict was populated by ``calculate_classification_metrics``
+    in the orchestrator after each fold's test evaluation. This avoids
+    re-running the metric computation at summary time.
 
     Args:
-        all_fold_predictions: Dict mapping fold/model name strings to fold result
-            dicts. Each fold result dict is expected to contain:
-            - ``'metrics'`` (dict): Pre-computed ``{'Precision', 'Recall', 'F2-Score'}``.
-            - ``'eval_acc'`` (float): Evaluation accuracy for the fold.
-            - ``'eval_loss'`` (float): Evaluation loss for the fold.
-        output_csv_path: Path where the summary CSV file will be written.
+        all_fold_predictions: Dict mapping fold/model name strings (e.g.
+            ``"R3D18_B_lr1e4_fold1"``) to fold result dicts. Each value must
+            contain:
+            - ``'metrics'`` (dict): ``{'Precision', 'Recall', 'F2-Score'}``.
+            - ``'eval_acc'`` (float): Test accuracy for the fold.
+            - ``'eval_loss'`` (float): Test loss for the fold.
+        output_csv_path: Path where the summary CSV will be written.
     """
     print(f"\nEvaluating predictions for {len(all_fold_predictions)} folds...")
     results = []
@@ -277,22 +404,33 @@ def evaluate_models(
 
 # ── Artifact Saving ───────────────────────────────────────────────────────────
 
+
 def save_predictions_from_detailed_results(
     detailed_results: List[Dict[str, Any]], filename: str
 ) -> None:
     """
-    Write per-sample predictions to a CSV file.
+    Write per-sample predictions to a CSV file for post-hoc analysis.
 
-    Unit-testable: pass any list of synthetic prediction dicts and a temporary
-    path — no model, DataLoader, or GPU is required.
+    The output CSV has one row per evaluated sample and three columns:
+    ``file_name``, ``true_label``, and ``prediction``. This file is the
+    primary audit trail for understanding which specific cases the model got
+    right or wrong. It can be loaded offline to recompute any metric,
+    investigate systematic errors (e.g. all false negatives from the same
+    scanner), or feed into error analysis tools.
+
+    Uses Python's ``csv.DictWriter`` rather than pandas to avoid the overhead
+    of constructing a full DataFrame for a simple sequential write.
+
+    Unit-testable: pass any list of synthetic prediction dicts and a
+    temporary path — no model, DataLoader, or GPU required.
 
     Args:
-        detailed_results: List of prediction dicts. Each dict must contain:
+        detailed_results: List of prediction dicts, each containing:
             - ``'filename'`` (str): Base filename of the NIfTI scan.
             - ``'true_label'`` (int): Ground-truth class label.
             - ``'pred_label'`` (int): Model-predicted class label.
-        filename: Absolute or relative path where the CSV will be written.
-            The CSV has columns ``file_name``, ``true_label``, ``prediction``.
+        filename: Path where the CSV will be written.
+            The CSV columns are ``file_name``, ``true_label``, ``prediction``.
     """
     rows = [
         {
@@ -318,21 +456,34 @@ def save_metrics_to_csv(
     detailed_results: List[Dict[str, Any]],
 ) -> None:
     """
-    Save the per-epoch training/validation history plus final evaluation metrics to CSV.
+    Save the per-epoch training history and the final evaluation metrics to a
+    single CSV file.
 
-    Produces a single CSV containing one row per training epoch (from
-    ``metrics_history``) followed by a ``final_eval`` row with Precision, Recall,
-    and F2-Score computed from ``detailed_results``.
+    The output has one row per training epoch (from ``metrics_history``) plus
+    a ``final_eval`` row at the end. The epoch rows contain training and
+    validation metrics logged during training (train loss, train acc, val loss,
+    val acc, val F2). The ``final_eval`` row contains Precision, Recall, and
+    F2-Score computed on the test set after the best-model checkpoint was
+    restored.
 
-    Unit-testable: construct ``metrics_history`` and ``detailed_results`` directly
-    with synthetic dicts and pass a temporary path — no GPU or real data required.
+    **Why combine training history and final eval in one file?**
+    Keeping them together makes it easy to plot the full training curve and
+    then compare it against final test performance in a single load. The
+    ``epoch`` column uses the string ``"final_eval"`` for the last row so it
+    is immediately distinguishable from integer epoch indices when the CSV is
+    opened in a spreadsheet.
+
+    Unit-testable: construct ``metrics_history`` and ``detailed_results``
+    with synthetic dicts and pass a temporary path — no GPU or real data
+    required.
 
     Args:
-        metrics_history: List of per-epoch metric dicts (e.g. train loss, val loss,
-            val accuracy). Each dict should contain at least an ``'epoch'`` key.
-        filename: Absolute or relative path where the CSV will be written.
-        detailed_results: List of prediction dicts used to compute the final
-            evaluation metrics (see ``calculate_classification_metrics``).
+        metrics_history: List of per-epoch metric dicts as returned by
+            ``run_training_loop``. Each dict should contain at least
+            ``'epoch'``, ``'train_loss'``, ``'val_loss'``, ``'val_f2'``.
+        filename: Path where the CSV will be written.
+        detailed_results: Per-sample prediction dicts used to compute the
+            ``final_eval`` row via ``calculate_classification_metrics``.
     """
     if not metrics_history:
         print("Warning: metrics_history is empty. Cannot save metrics CSV.")
@@ -362,33 +513,60 @@ def save_fold_artifacts(
     """
     Generate and save all evaluation artifacts for a single completed fold.
 
-    Artifacts written to ``fold_output_dir``:
-    - ``{name}_fold{n}_cm_raw.png`` — raw count confusion matrix.
-    - ``{name}_fold{n}_cm_normalized.png`` — row-normalised confusion matrix.
-    - ``{name}_fold{n}_roc_curve.png`` — ROC curve with AUC (requires DataLoader).
-    - ``{name}_fold{n}_predictions.csv`` — per-sample predictions.
-    - ``{name}_fold{n}_metrics.csv`` — per-epoch history + ``final_eval`` row.
-    - ``{name}_fold{n}_model_last.pth`` — ``state_dict`` after the final epoch.
-    - ``{name}_fold{n}_model_best.pth`` — ``state_dict`` at the best F2-Score epoch
-      (skipped if ``best_model_state`` is ``None``).
+    This is the top-level entry point called by the orchestrator after each
+    fold's training and test evaluation are complete. It delegates to the other
+    functions in this module and produces the full set of outputs needed to
+    review and compare experiment results.
 
-    **Integration-level**: ``plot_roc_curve`` requires a live model and DataLoader.
-    All other artifacts are generated from pre-computed ``detailed_results`` and
-    ``metrics_history`` without re-running inference.
+    **Artifacts written to ``fold_output_dir``:**
+
+      - ``{name}_fold{n}_cm_raw.png`` — confusion matrix with raw counts.
+      - ``{name}_fold{n}_cm_normalized.png`` — row-normalised confusion matrix
+        (diagonal = per-class recall).
+      - ``{name}_fold{n}_roc_curve.png`` — ROC curve with AUC annotation.
+        Requires re-running inference over ``eval_loader``.
+      - ``{name}_fold{n}_predictions.csv`` — per-sample true/predicted labels,
+        one row per evaluated case.
+      - ``{name}_fold{n}_metrics.csv`` — per-epoch training history plus a
+        ``final_eval`` row with test-set Precision, Recall, F2.
+      - ``{name}_fold{n}_model_last.pth`` — model ``state_dict`` after the
+        last training epoch.
+      - ``{name}_fold{n}_model_best.pth`` — model ``state_dict`` at the epoch
+        with the highest validation F2. Skipped if ``best_model_state`` is
+        ``None`` (no epoch achieved F2 > 0).
+
+    **Why save both last and best model weights?**
+    The best-F2 checkpoint is what should be used for evaluation and
+    deployment. The last-epoch checkpoint is saved as a safety net: if the
+    best-F2 threshold was never exceeded (e.g. training collapsed early) and
+    ``best_model_state`` is ``None``, the last-epoch weights are still
+    available. It also allows diagnosing whether the model was still improving
+    at the end of training.
+
+    **Integration-level:** ``plot_roc_curve`` re-runs a forward pass over
+    ``eval_loader``, requiring a live model and a device. All other artifacts
+    are generated purely from the in-memory ``detailed_results`` and
+    ``metrics_history`` without additional inference.
 
     Args:
-        model: Trained model (used only for ROC curve inference).
-        eval_loader: DataLoader over the evaluation split (used only for ROC curve).
-        best_model_state: ``state_dict`` captured at the epoch with the highest
-            F2-Score during training. Pass ``None`` to skip saving the best-model
-            file while still writing all other artifacts.
-        detailed_results: Per-sample prediction records for the fold.
-        metrics_history: Per-epoch metric dicts for the fold.
+        model: Trained model (weights at the last epoch). Used only by
+            ``plot_roc_curve`` for inference.
+        eval_loader: DataLoader over the test split. Used only by
+            ``plot_roc_curve``.
+        best_model_state: Dict returned by ``run_training_loop`` containing
+            ``'state_dict'``, ``'best_epoch'``, and ``'best_val_f2'``.
+            Pass ``None`` to skip saving the best-model file while still
+            writing all other artifacts.
+        detailed_results: Per-sample prediction records collected during test
+            evaluation (from ``validate_one_epoch`` with
+            ``return_details=True``).
+        metrics_history: Per-epoch metric dicts from ``run_training_loop``.
         experiment_name: Unique experiment identifier (used in file names).
-        fold: Fold index (used in file names).
-        fold_output_dir: Directory where all artifacts are written.
-        config: Experiment config dict; must contain keys ``'CLASSES'`` and
-            ``'DEVICE'`` (used by ``plot_confusion_matrix`` and ``plot_roc_curve``).
+        fold: 1-based fold index (used in file names and print messages).
+        fold_output_dir: Directory where all artifacts are written. Must
+            already exist.
+        config: Experiment config dict; must contain ``'CLASSES'`` (list of
+            class label strings) and ``'DEVICE'`` (device string).
     """
     print(f"\n[Fold {fold}] Generating and saving evaluation artifacts...")
 
