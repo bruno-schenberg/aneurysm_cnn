@@ -14,12 +14,10 @@ echo -e "## Job started at $(date +'%d-%m-%Y as %T') #####################\n"
 ## ---------------------------------------------------------------------------
 ## Configurable parameters (override with env vars at submission time)
 ##
-##   INPUT_DIR=$HOME/data/nifti OUTPUT_DIR=$HOME/data/cases-3 \
-##     TARGET_SHAPE=256x256x128 VARIANTS="A B C D" \
-##     sbatch hpc/data/dataset_gen.slurm
+##   TARGET_SHAPE=256x256x128 VARIANTS="A B C D" sbatch hpc/data/dataset_gen.slurm
 ##
 ## ---------------------------------------------------------------------------
-INPUT_DIR=${INPUT_DIR:-$HOME/data/nifti}
+INPUT_DIR=${INPUT_DIR:-$HOME/data/cases-3/nifti}
 OUTPUT_DIR=${OUTPUT_DIR:-$HOME/data/cases-3}
 TARGET_SHAPE=${TARGET_SHAPE:-256x256x128}
 VARIANTS=${VARIANTS:-B}
