@@ -69,12 +69,10 @@ if torch.cuda.is_available():
 echo -e "## ...Verification Complete. ##\n"
 
 ## 5. Execute Training Script.
-## Override experiments file via EXPERIMENTS_FILE env var (optional).
-EXPERIMENTS_ARG=""
-if [ -n "$EXPERIMENTS_FILE" ]; then
-    EXPERIMENTS_ARG="--experiments $EXPERIMENTS_FILE"
-fi
-python -u train_models.py $EXPERIMENTS_ARG
+## Default to the 256×256×128 baseline experiments; override by setting
+## EXPERIMENTS_FILE before submitting: EXPERIMENTS_FILE=other.json sbatch ...
+EXPERIMENTS_FILE="${EXPERIMENTS_FILE:-experiments_256_baseline.json}"
+python -u train_models.py --experiments "$EXPERIMENTS_FILE"
 
 ## 6. Copy the output experiments.
 srun cp -r $WRKDIR/training_engine/experiments/. $HOME/aneurysm_cnn/experiments/
