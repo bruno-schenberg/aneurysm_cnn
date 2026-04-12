@@ -54,6 +54,7 @@ def train_one_epoch(
     criterion: torch.nn.Module,
     optimizer: torch.optim.Optimizer,
     device: str,
+    grad_accum_steps: int = 1,
 ) -> Tuple[float, float]:
     """
     Runs one full pass over the training set, updating model weights.
@@ -73,10 +74,33 @@ def train_one_epoch(
     epoch, regardless of whether the last batch is smaller than the rest
     (which it often is).
 
-    **Gradient zeroing:** ``optimizer.zero_grad()`` is called at the start
-    of each batch, not at the end. Both orderings are valid, but zeroing
-    before the forward pass is the conventional PyTorch pattern and avoids
-    accidentally carrying stale gradients into the first batch.
+    **Why loss is scaled before backward:**
+    When ``grad_accum_steps=N``, the loss is divided by ``N`` before
+    ``.backward()`` is called. This ensures that gradients accumulated over
+    N mini-batches sum to the same magnitude as the gradient that would be
+    computed on a single large batch of ``N × batch_size`` samples. Without
+    this scaling, accumulated gradients would be N times larger than expected,
+    effectively multiplying the learning rate by N.
+
+    **Why unscaled loss is logged:**
+    ``running_loss`` accumulates the *unscaled* ``loss.item()`` (before the
+    ``/ grad_accum_steps`` scaling). This keeps the reported per-sample loss
+    directly comparable across experiments with different ``grad_accum_steps``
+    values — the loss reflects prediction quality, not the accumulation factor.
+
+    **Why the remainder flush is required:**
+    If the number of batches is not divisible by ``grad_accum_steps``, the
+    final partial accumulation cycle would be silently discarded without an
+    extra ``optimizer.step()`` at the end of the epoch. For small medical
+    imaging datasets this could discard a meaningful fraction of the epoch's
+    gradient signal. The remainder flush fires on the last batch whenever it
+    does not coincide with a regular accumulation step.
+
+    **Gradient zeroing:** ``optimizer.zero_grad()`` is called once before the
+    loop (rather than at the top of each batch), so gradients accumulate across
+    ``grad_accum_steps`` batches. It is reset after every optimizer step.
+    With ``grad_accum_steps=1`` this is functionally identical to zeroing at
+    the start of each batch, preserving exact backwards compatibility.
 
     **Tabular (multimodal) support:** If the batch contains a ``"tabular"``
     key (present when ``USE_TABULAR=True`` is set in the experiment config),
@@ -96,6 +120,10 @@ def train_one_epoch(
             with class weights already applied).
         optimizer: Optimiser holding references to the model parameters.
         device: Target device string (``"cuda"`` or ``"cpu"``).
+        grad_accum_steps: Number of mini-batches to accumulate gradients over
+            before calling ``optimizer.step()``. Defaults to ``1`` (standard
+            per-batch update). The final partial cycle is always flushed so
+            no gradient signal is lost at epoch boundaries.
 
     Returns:
         Tuple of ``(epoch_loss, epoch_acc)`` — the mean per-sample loss and
@@ -105,24 +133,33 @@ def train_one_epoch(
     running_loss = 0.0
     correct_predictions = 0
     total_samples = 0
+    num_batches = len(dataloader)
 
     progress_bar = tqdm(dataloader, desc="Training", unit="batch")
-    for batch in progress_bar:
+    optimizer.zero_grad()  # Zero once before the loop; reset after every step
+    for batch_idx, batch in enumerate(progress_bar):
         inputs, labels = batch["image"].to(device), batch["label"].to(device)
 
-        optimizer.zero_grad()
         if "tabular" in batch:
             outputs = model(inputs, batch["tabular"].to(device))
         else:
             outputs = model(inputs)
         loss = criterion(outputs, labels)
-        loss.backward()
-        optimizer.step()
+        # Scale before backward so accumulated gradients match a true large-batch gradient
+        (loss / grad_accum_steps).backward()
 
+        # Accumulate unscaled loss for logging — comparable across different grad_accum_steps values
         running_loss += loss.item() * inputs.size(0)
         _, preds = torch.max(outputs, 1)
         correct_predictions += torch.sum(preds == labels.data)
         total_samples += inputs.size(0)
+
+        # Step every N batches; also flush on the last batch to avoid discarding remainder gradients
+        is_accum_step = (batch_idx + 1) % grad_accum_steps == 0
+        is_last_batch = (batch_idx + 1) == num_batches
+        if is_accum_step or is_last_batch:
+            optimizer.step()
+            optimizer.zero_grad()
 
         progress_bar.set_postfix(
             loss=loss.item(), acc=correct_predictions.double().item() / total_samples
@@ -266,6 +303,7 @@ def run_training_loop(
     num_epochs: int,
     class_weights: Optional[torch.Tensor] = None,
     patience: int = 0,
+    grad_accum_steps: int = 1,
 ) -> Tuple[List[Dict[str, Any]], float, Optional[Dict[str, Any]]]:
     """
     Trains a model for ``num_epochs`` epochs and returns the best-F2 checkpoint.
@@ -317,6 +355,9 @@ def run_training_loop(
             weighted loss.
         patience: Early stopping patience in epochs. ``0`` disables early
             stopping.
+        grad_accum_steps: Number of mini-batches to accumulate gradients over
+            before calling ``optimizer.step()``. Forwarded unchanged to
+            ``train_one_epoch``. Defaults to ``1`` (standard per-batch update).
 
     Returns:
         A tuple of:
@@ -357,7 +398,7 @@ def run_training_loop(
         print(f"\n--- Epoch {epoch + 1}/{num_epochs} ---")
 
         train_loss, train_acc = train_one_epoch(
-            model, train_loader, criterion, optimizer, device
+            model, train_loader, criterion, optimizer, device, grad_accum_steps=grad_accum_steps
         )
         val_loss, val_acc, val_f2 = validate_one_epoch(
             model, val_loader, criterion, device

@@ -186,6 +186,90 @@ class TestF2Checkpointing:
 
 
 # ---------------------------------------------------------------------------
+# Gradient accumulation
+# ---------------------------------------------------------------------------
+
+
+class TestGradientAccumulation:
+    """train_one_epoch must step the optimiser every N batches and flush the remainder."""
+
+    def _make_batches(self, n: int):
+        """Return a plain list of n identical batches (list supports len())."""
+        return [{"image": torch.randn(2, 4), "label": torch.tensor([0, 1])} for _ in range(n)]
+
+    def _counting_step(self, optimizer):
+        """Wrap optimizer.step to count calls; return counter list."""
+        count = [0]
+        original = optimizer.step
+        def _step(*args, **kwargs):
+            count[0] += 1
+            return original(*args, **kwargs)
+        optimizer.step = _step
+        return count
+
+    def test_grad_accum_1_steps_every_batch(self):
+        """grad_accum_steps=1 must produce exactly one optimizer step per batch."""
+        from src.training import train_one_epoch
+        model = make_tiny_model()
+        optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+        criterion = torch.nn.CrossEntropyLoss()
+        count = self._counting_step(optimizer)
+
+        train_one_epoch(model, self._make_batches(4), criterion, optimizer, "cpu", grad_accum_steps=1)
+        assert count[0] == 4
+
+    def test_grad_accum_4_with_8_batches_produces_2_steps(self):
+        """grad_accum_steps=4 with 8 batches must produce exactly 2 optimizer steps."""
+        from src.training import train_one_epoch
+        model = make_tiny_model()
+        optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+        criterion = torch.nn.CrossEntropyLoss()
+        count = self._counting_step(optimizer)
+
+        train_one_epoch(model, self._make_batches(8), criterion, optimizer, "cpu", grad_accum_steps=4)
+        assert count[0] == 2
+
+    def test_grad_accum_4_with_7_batches_produces_2_steps(self):
+        """grad_accum_steps=4 with 7 batches must flush on batch 4 and the remainder (batch 7)."""
+        from src.training import train_one_epoch
+        model = make_tiny_model()
+        optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+        criterion = torch.nn.CrossEntropyLoss()
+        count = self._counting_step(optimizer)
+
+        train_one_epoch(model, self._make_batches(7), criterion, optimizer, "cpu", grad_accum_steps=4)
+        assert count[0] == 2
+
+    def test_running_loss_logs_unscaled_loss(self):
+        """
+        epoch_loss must reflect unscaled loss.item() * batch_size regardless of
+        grad_accum_steps. Comparing accum=1 and accum=4 with a deterministic
+        criterion verifies the unscaled path.
+        """
+        from src.training import train_one_epoch
+
+        class FixedLoss(torch.nn.Module):
+            """Always returns a fixed scalar loss so we can predict epoch_loss."""
+            def forward(self, outputs, labels):
+                return torch.tensor(0.5, requires_grad=True)
+
+        # With batch_size=2, 4 batches: expected epoch_loss = (4 * 0.5 * 2) / 8 = 0.5
+        criterion = FixedLoss()
+        loader = self._make_batches(4)
+
+        model1 = make_tiny_model()
+        opt1 = torch.optim.SGD(model1.parameters(), lr=0.0)  # lr=0 keeps weights stable
+        loss1, _ = train_one_epoch(model1, loader, criterion, opt1, "cpu", grad_accum_steps=1)
+
+        model2 = make_tiny_model()
+        opt2 = torch.optim.SGD(model2.parameters(), lr=0.0)
+        loss4, _ = train_one_epoch(model2, loader, criterion, opt2, "cpu", grad_accum_steps=4)
+
+        assert abs(loss1 - 0.5) < 1e-4, f"Expected ~0.5, got {loss1}"
+        assert abs(loss4 - 0.5) < 1e-4, f"Expected ~0.5, got {loss4}"
+
+
+# ---------------------------------------------------------------------------
 # Tabular (multimodal) training loop
 # ---------------------------------------------------------------------------
 

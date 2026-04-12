@@ -66,6 +66,7 @@ from .data_preprocess import (
     build_dataloaders,
     get_class_weights,
     get_data_list,
+    parse_input_resolution,
     set_seed,
     split_data,
 )
@@ -195,6 +196,7 @@ def run_one_fold(
     )
 
     # [Step 2] Run the training loop; checkpoints at the highest val F2 epoch
+    grad_accum_steps = config.get("GRAD_ACCUM_STEPS", 1)
     metrics_history, total_time, best_model_checkpoint = run_training_loop(
         model=model,
         train_loader=train_loader,
@@ -205,6 +207,7 @@ def run_one_fold(
         num_epochs=config["EPOCHS"],
         class_weights=weights_tensor,
         patience=config.get("EARLY_STOPPING_PATIENCE", 0),
+        grad_accum_steps=grad_accum_steps,
     )
     print(f"Fold {fold} training duration: {total_time:.2f} minutes.")
 
@@ -454,6 +457,8 @@ def run_experiment(config: Dict[str, Any]) -> None:
     use_tabular = config.get("USE_TABULAR", False)
 
     all_fold_predictions: Dict[str, Any] = {}
+    # Resolve INPUT_RESOLUTION string to a spatial-size tuple once for all folds
+    spatial_size = parse_input_resolution(config.get("INPUT_RESOLUTION", "128x128x128"))
 
     for fold_idx, train_files, val_files, test_files in fold_splits:
         train_loader, val_loader, test_loader = build_dataloaders(
@@ -465,6 +470,7 @@ def run_experiment(config: Dict[str, Any]) -> None:
             seed=config["RANDOM_SEED"],
             oversample=oversample,
             use_tabular=use_tabular,
+            spatial_size=spatial_size,
         )
 
         # Compute class weights from the training fold only to prevent label leakage
