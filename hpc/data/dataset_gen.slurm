@@ -20,7 +20,7 @@ echo -e "## Job started at $(date +'%d-%m-%Y as %T') #####################\n"
 INPUT_DIR=${INPUT_DIR:-$HOME/data/cases-3/nifti}
 OUTPUT_DIR=${OUTPUT_DIR:-$HOME/data/cases-3}
 TARGET_SHAPE=${TARGET_SHAPE:-256x256x128}
-VARIANTS=${VARIANTS:-B}
+VARIANTS=${VARIANTS:-A B C D}
 N_WORKERS=${N_WORKERS:-4}
 
 ## ---------------------------------------------------------------------------
