@@ -69,7 +69,7 @@ from typing import Dict, Generator, List, Optional, Tuple
 
 import numpy as np
 import torch
-from monai.data import DataLoader, Dataset
+from monai.data import CacheDataset, DataLoader, Dataset
 from monai.transforms import (
     Compose,
     EnsureChannelFirstd,
@@ -596,6 +596,7 @@ def build_dataloaders(
     oversample: bool = False,
     use_tabular: bool = False,
     spatial_size: Tuple[int, int, int] = (128, 128, 128),
+    cache_rate: float = 1.0,
 ) -> Tuple[DataLoader, DataLoader, DataLoader]:
     """
     Wraps train, val, and test record lists in MONAI Datasets and PyTorch
@@ -658,6 +659,15 @@ def build_dataloaders(
             Defaults to ``(128, 128, 128)`` to preserve exact backwards
             compatibility with all existing experiments. Pass a different tuple
             to override the output resolution for all three DataLoaders.
+        cache_rate: Fraction of the dataset to cache in RAM (0.0–1.0). When
+            greater than zero, ``CacheDataset`` is used instead of ``Dataset``.
+            MONAI's ``CacheDataset`` automatically detects the first random
+            transform in the pipeline, caches all deterministic transforms
+            (load, channel expansion, resize, intensity scaling), and applies
+            the stochastic augmentations fresh at every ``__getitem__`` call.
+            This eliminates repeated NIfTI I/O from epoch 2 onwards, which is
+            the dominant runtime bottleneck for large volumes (256³). Set to
+            ``0.0`` to revert to the original lazy-loading behaviour.
 
     Returns:
         Tuple of ``(train_loader, val_loader, test_loader)``.
@@ -677,9 +687,14 @@ def build_dataloaders(
             weights=sample_weights, num_samples=len(sample_weights), replacement=True
         )
 
-    train_ds = Dataset(data=train_files, transform=train_transform)
-    val_ds = Dataset(data=val_files, transform=eval_transform)
-    test_ds = Dataset(data=test_files, transform=eval_transform)
+    if cache_rate > 0.0:
+        train_ds = CacheDataset(data=train_files, transform=train_transform, cache_rate=cache_rate, num_workers=4)
+        val_ds = CacheDataset(data=val_files, transform=eval_transform, cache_rate=cache_rate, num_workers=2)
+        test_ds = CacheDataset(data=test_files, transform=eval_transform, cache_rate=cache_rate, num_workers=2)
+    else:
+        train_ds = Dataset(data=train_files, transform=train_transform)
+        val_ds = Dataset(data=val_files, transform=eval_transform)
+        test_ds = Dataset(data=test_files, transform=eval_transform)
 
     train_loader = DataLoader(
         train_ds,

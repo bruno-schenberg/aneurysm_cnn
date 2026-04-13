@@ -505,3 +505,60 @@ class TestRealDataPipeline:
         labels = batch["label"]
         assert labels.dtype in (torch.int32, torch.int64, torch.long)
         assert all(l.item() in (0, 1) for l in labels)
+
+
+# ---------------------------------------------------------------------------
+# build_dataloaders — cache_rate parameter
+# ---------------------------------------------------------------------------
+
+
+class TestBuildDataloadersCacheRate:
+    """
+    build_dataloaders must use CacheDataset when cache_rate > 0 and fall back to
+    the plain Dataset when cache_rate == 0.  These tests are structural (they
+    check the dataset type without loading real files), so they run in-process
+    with no GPU or mounted dataset required.
+    """
+
+    def _fake_files(self, n: int = 2) -> list:
+        """Return minimal records; the dataset type check doesn't load files."""
+        return [{"image": f"/fake/{i}.nii.gz", "label": i % 2, "path": f"{i}.nii.gz"} for i in range(n)]
+
+    def test_cache_rate_zero_uses_plain_dataset(self):
+        """cache_rate=0.0 must produce plain MONAI Dataset objects (lazy loading)."""
+        from monai.data import Dataset
+        from monai.data import CacheDataset
+        train_loader, val_loader, test_loader = build_dataloaders(
+            train_files=self._fake_files(4),
+            val_files=self._fake_files(2),
+            test_files=self._fake_files(2),
+            batch_size=2,
+            val_batch_size=2,
+            seed=42,
+            cache_rate=0.0,
+        )
+        assert isinstance(train_loader.dataset, Dataset)
+        assert not isinstance(train_loader.dataset, CacheDataset)
+
+    def test_cache_rate_positive_uses_cache_dataset(self, monkeypatch):
+        """cache_rate=1.0 must wrap the data in a MONAI CacheDataset.
+
+        CacheDataset fills its cache at __init__ time, which would try to load
+        real NIfTI files.  We patch _fill_cache to a no-op so the structural
+        check runs without filesystem access, then verify the dataset type.
+        """
+        from monai.data import CacheDataset
+        monkeypatch.setattr(CacheDataset, "_fill_cache", lambda *a, **kw: None)
+
+        train_loader, val_loader, test_loader = build_dataloaders(
+            train_files=self._fake_files(4),
+            val_files=self._fake_files(2),
+            test_files=self._fake_files(2),
+            batch_size=2,
+            val_batch_size=2,
+            seed=42,
+            cache_rate=1.0,
+        )
+        assert isinstance(train_loader.dataset, CacheDataset)
+        assert isinstance(val_loader.dataset, CacheDataset)
+        assert isinstance(test_loader.dataset, CacheDataset)
