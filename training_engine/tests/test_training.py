@@ -45,7 +45,7 @@ class TestF2Checkpointing:
         ]
         call_state = {"n": 0}
 
-        def mock_validate(model, dataloader, criterion, device, return_details=False):
+        def mock_validate(model, dataloader, criterion, device, return_details=False, use_amp=True):
             result = val_returns[call_state["n"]]
             call_state["n"] += 1
             return result
@@ -140,7 +140,7 @@ class TestF2Checkpointing:
         ]
         call_state = {"n": 0}
 
-        def mock_validate(model, dataloader, criterion, device, return_details=False):
+        def mock_validate(model, dataloader, criterion, device, return_details=False, use_amp=True):
             result = val_returns[call_state["n"]]
             call_state["n"] += 1
             return result
@@ -327,3 +327,90 @@ class TestTabularTrainingLoop:
         criterion = torch.nn.CrossEntropyLoss()
         loss, acc = train_one_epoch(model, make_mock_loader(), criterion, optimizer, "cpu")
         assert isinstance(loss, float)
+        assert isinstance(acc, float)
+
+
+# ---------------------------------------------------------------------------
+# AMP (automatic mixed precision)
+# ---------------------------------------------------------------------------
+
+
+class TestAMP:
+    """
+    AMP is disabled on CPU regardless of use_amp flag.  These tests verify that:
+      1. use_amp=True on CPU runs without error (autocast is a no-op on CPU).
+      2. use_amp=False on CPU also runs without error.
+      3. run_training_loop threads use_amp through to the epoch functions.
+    """
+
+    def test_train_one_epoch_use_amp_true_cpu(self):
+        """train_one_epoch with use_amp=True must run without error on CPU."""
+        from src.training import train_one_epoch
+        model = make_tiny_model()
+        optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+        criterion = torch.nn.CrossEntropyLoss()
+        loss, acc = train_one_epoch(
+            model, make_mock_loader(), criterion, optimizer, "cpu", use_amp=True
+        )
+        assert isinstance(loss, float)
+        assert isinstance(acc, float)
+
+    def test_train_one_epoch_use_amp_false_cpu(self):
+        """train_one_epoch with use_amp=False must run without error on CPU."""
+        from src.training import train_one_epoch
+        model = make_tiny_model()
+        optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+        criterion = torch.nn.CrossEntropyLoss()
+        loss, acc = train_one_epoch(
+            model, make_mock_loader(), criterion, optimizer, "cpu", use_amp=False
+        )
+        assert isinstance(loss, float)
+        assert isinstance(acc, float)
+
+    def test_validate_one_epoch_use_amp_true_cpu(self):
+        """validate_one_epoch with use_amp=True must run without error on CPU."""
+        from src.training import validate_one_epoch
+        model = make_tiny_model()
+        criterion = torch.nn.CrossEntropyLoss()
+        loss, acc, f2 = validate_one_epoch(
+            model, make_mock_loader(), criterion, "cpu", use_amp=True
+        )
+        assert isinstance(loss, float)
+        assert isinstance(acc, float)
+        assert isinstance(f2, float)
+
+    def test_run_training_loop_threads_use_amp(self, monkeypatch):
+        """run_training_loop must forward use_amp=False to train_one_epoch and validate_one_epoch."""
+        import src.training as training_module
+        amp_flags_seen = []
+
+        original_train = training_module.train_one_epoch
+        def capturing_train(model, loader, criterion, optimizer, device, grad_accum_steps=1, use_amp=True):
+            amp_flags_seen.append(("train", use_amp))
+            return original_train(model, loader, criterion, optimizer, device,
+                                  grad_accum_steps=grad_accum_steps, use_amp=use_amp)
+
+        original_val = training_module.validate_one_epoch
+        def capturing_val(model, loader, criterion, device, return_details=False, use_amp=True):
+            amp_flags_seen.append(("val", use_amp))
+            return original_val(model, loader, criterion, device,
+                                return_details=return_details, use_amp=use_amp)
+
+        monkeypatch.setattr(training_module, "train_one_epoch", capturing_train)
+        monkeypatch.setattr(training_module, "validate_one_epoch", capturing_val)
+
+        model = make_tiny_model()
+        optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+        run_training_loop(
+            model=model,
+            train_loader=make_mock_loader(),
+            val_loader=make_mock_loader(),
+            criterion_cls=torch.nn.CrossEntropyLoss,
+            optimizer=optimizer,
+            device="cpu",
+            num_epochs=1,
+            use_amp=False,
+        )
+
+        assert ("train", False) in amp_flags_seen
+        assert ("val", False) in amp_flags_seen

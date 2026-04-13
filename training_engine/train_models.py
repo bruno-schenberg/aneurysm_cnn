@@ -61,6 +61,17 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "GRAD_ACCUM_STEPS": 1,  # Number of mini-batches to accumulate gradients before calling optimizer.step().
                              # 1 = standard per-batch update (default). N > 1 simulates a batch size of
                              # N × BATCH_SIZE without the corresponding memory cost.
+    # --- Mixed precision ---
+    "USE_AMP": True,        # Enable automatic mixed precision (bfloat16) on CUDA/ROCm devices.
+                             # bfloat16 has the same dynamic range as float32 (no overflow, no GradScaler
+                             # needed) and is natively accelerated on AMD Instinct MI-series and NVIDIA
+                             # Ampere+ GPUs. Automatically disabled on CPU. Set to false to train in FP32.
+    # --- Dataset caching ---
+    "CACHE_RATE": 1.0,      # Fraction of the dataset to cache in RAM after the first epoch (0.0–1.0).
+                             # 1.0 = cache everything. MONAI CacheDataset caches the deterministic
+                             # transforms (load, resize, intensity scale) and re-applies stochastic
+                             # augmentation live, so each epoch sees different augmentations. Set to
+                             # 0.0 to revert to lazy per-batch loading (original behaviour).
 }
 
 # Maps data_path_key values from experiments.json to filesystem paths.

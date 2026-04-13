@@ -208,6 +208,7 @@ def run_one_fold(
         class_weights=weights_tensor,
         patience=config.get("EARLY_STOPPING_PATIENCE", 0),
         grad_accum_steps=grad_accum_steps,
+        use_amp=config.get("USE_AMP", True),
     )
     print(f"Fold {fold} training duration: {total_time:.2f} minutes.")
 
@@ -236,7 +237,8 @@ def run_one_fold(
     print(f"\n[Fold {fold}] Final {eval_set_name} Set Evaluation...")
     eval_criterion = nn.CrossEntropyLoss()
     eval_loss, eval_acc, eval_f2, detailed_results = validate_one_epoch(
-        model, eval_loader, eval_criterion, config["DEVICE"], return_details=True
+        model, eval_loader, eval_criterion, config["DEVICE"], return_details=True,
+        use_amp=config.get("USE_AMP", True),
     )
     assert isinstance(detailed_results, list), (
         "validate_one_epoch did not return detailed results as a list."
@@ -471,6 +473,7 @@ def run_experiment(config: Dict[str, Any]) -> None:
             oversample=oversample,
             use_tabular=use_tabular,
             spatial_size=spatial_size,
+            cache_rate=config.get("CACHE_RATE", 1.0),
         )
 
         # Compute class weights from the training fold only to prevent label leakage

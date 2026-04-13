@@ -55,6 +55,7 @@ def train_one_epoch(
     optimizer: torch.optim.Optimizer,
     device: str,
     grad_accum_steps: int = 1,
+    use_amp: bool = True,
 ) -> Tuple[float, float]:
     """
     Runs one full pass over the training set, updating model weights.
@@ -124,6 +125,12 @@ def train_one_epoch(
             before calling ``optimizer.step()``. Defaults to ``1`` (standard
             per-batch update). The final partial cycle is always flushed so
             no gradient signal is lost at epoch boundaries.
+        use_amp: If ``True`` and running on a CUDA device, wraps the forward
+            pass in ``torch.amp.autocast`` with ``bfloat16`` precision.
+            bfloat16 is preferred over float16 because it has the same dynamic
+            range as float32 (no overflow risk, no GradScaler needed) and is
+            natively accelerated on AMD Instinct MI-series and NVIDIA Ampere+
+            GPUs. Disabled automatically on CPU.
 
     Returns:
         Tuple of ``(epoch_loss, epoch_acc)`` — the mean per-sample loss and
@@ -135,16 +142,20 @@ def train_one_epoch(
     total_samples = 0
     num_batches = len(dataloader)
 
+    _device_type = "cuda" if "cuda" in str(device) else "cpu"
+    _amp_enabled = use_amp and _device_type == "cuda"
+
     progress_bar = tqdm(dataloader, desc="Training", unit="batch")
     optimizer.zero_grad()  # Zero once before the loop; reset after every step
     for batch_idx, batch in enumerate(progress_bar):
         inputs, labels = batch["image"].to(device), batch["label"].to(device)
 
-        if "tabular" in batch:
-            outputs = model(inputs, batch["tabular"].to(device))
-        else:
-            outputs = model(inputs)
-        loss = criterion(outputs, labels)
+        with torch.amp.autocast(device_type=_device_type, dtype=torch.bfloat16, enabled=_amp_enabled):
+            if "tabular" in batch:
+                outputs = model(inputs, batch["tabular"].to(device))
+            else:
+                outputs = model(inputs)
+            loss = criterion(outputs, labels)
         # Scale before backward so accumulated gradients match a true large-batch gradient
         (loss / grad_accum_steps).backward()
 
@@ -181,6 +192,7 @@ def validate_one_epoch(
     criterion: torch.nn.Module,
     device: str,
     return_details: bool = False,
+    use_amp: bool = True,
 ) -> Union[
     Tuple[float, float, float],
     Tuple[float, float, float, List[Dict[str, Any]]],
@@ -231,6 +243,10 @@ def validate_one_epoch(
         device: Target device string.
         return_details: If ``True``, return per-sample prediction dicts as a
             fourth element of the return tuple.
+        use_amp: If ``True`` and running on a CUDA device, wraps inference in
+            ``torch.amp.autocast`` with ``bfloat16`` precision. Mirrors the
+            training setting so validation loss is computed in the same
+            numerical regime. Disabled automatically on CPU.
 
     Returns:
         Always returns ``(epoch_loss, epoch_acc, val_f2)``. When
@@ -246,16 +262,20 @@ def validate_one_epoch(
     all_labels: List[int] = []
     detailed_results: List[Dict[str, Any]] = []
 
+    _device_type = "cuda" if "cuda" in str(device) else "cpu"
+    _amp_enabled = use_amp and _device_type == "cuda"
+
     with torch.no_grad():
         progress_bar = tqdm(dataloader, desc="Validation", unit="batch")
         for batch in progress_bar:
             inputs, labels = batch["image"].to(device), batch["label"].to(device)
 
-            if "tabular" in batch:
-                outputs = model(inputs, batch["tabular"].to(device))
-            else:
-                outputs = model(inputs)
-            loss = criterion(outputs, labels)
+            with torch.amp.autocast(device_type=_device_type, dtype=torch.bfloat16, enabled=_amp_enabled):
+                if "tabular" in batch:
+                    outputs = model(inputs, batch["tabular"].to(device))
+                else:
+                    outputs = model(inputs)
+                loss = criterion(outputs, labels)
 
             running_loss += loss.item() * inputs.size(0)
             _, preds = torch.max(outputs, 1)
@@ -304,6 +324,7 @@ def run_training_loop(
     class_weights: Optional[torch.Tensor] = None,
     patience: int = 0,
     grad_accum_steps: int = 1,
+    use_amp: bool = True,
 ) -> Tuple[List[Dict[str, Any]], float, Optional[Dict[str, Any]]]:
     """
     Trains a model for ``num_epochs`` epochs and returns the best-F2 checkpoint.
@@ -358,6 +379,9 @@ def run_training_loop(
         grad_accum_steps: Number of mini-batches to accumulate gradients over
             before calling ``optimizer.step()``. Forwarded unchanged to
             ``train_one_epoch``. Defaults to ``1`` (standard per-batch update).
+        use_amp: Forwarded to ``train_one_epoch`` and ``validate_one_epoch``.
+            When ``True`` and running on CUDA, enables bfloat16 autocast for
+            both training and validation passes.
 
     Returns:
         A tuple of:
@@ -398,10 +422,11 @@ def run_training_loop(
         print(f"\n--- Epoch {epoch + 1}/{num_epochs} ---")
 
         train_loss, train_acc = train_one_epoch(
-            model, train_loader, criterion, optimizer, device, grad_accum_steps=grad_accum_steps
+            model, train_loader, criterion, optimizer, device,
+            grad_accum_steps=grad_accum_steps, use_amp=use_amp,
         )
         val_loss, val_acc, val_f2 = validate_one_epoch(
-            model, val_loader, criterion, device
+            model, val_loader, criterion, device, use_amp=use_amp,
         )
 
         print(
