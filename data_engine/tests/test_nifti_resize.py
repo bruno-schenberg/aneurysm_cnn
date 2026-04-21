@@ -388,3 +388,48 @@ class TestRealDataPipeline256:
             assert np.allclose(zooms[0], zooms[2], atol=1e-3), (
                 f"{src.name}: spacing not isotropic: {zooms}"
             )
+
+    def test_all_variants_correct_shape(self, tmp_path):
+        """All four variants must produce (256, 256, 128) on every real scan."""
+        source_files = sorted(SAMPLE_NIFTI_DIR.rglob("*.nii.gz"))
+        assert len(source_files) > 0
+
+        target = (256, 256, 128)
+        fns = [
+            ("A", generate_variant_a),
+            ("B", generate_variant_b),
+            ("C", generate_variant_c),
+            ("D", generate_variant_d),
+        ]
+        for src in source_files:
+            for tag, fn in fns:
+                out = tmp_path / f"{tag}_{src.name}"
+                fn(src, out, target_shape=target)
+                assert out.exists(), f"Variant {tag}: no output for {src.name}"
+                assert nib.load(out).shape == target, (
+                    f"Variant {tag} {src.name}: expected {target}, got {nib.load(out).shape}"
+                )
+
+    def test_all_variants_nonzero_signal(self, tmp_path):
+        """Every variant must preserve non-zero brain signal in its output window."""
+        source_files = sorted(SAMPLE_NIFTI_DIR.rglob("*.nii.gz"))
+        assert len(source_files) > 0
+
+        target = (256, 256, 128)
+        fns = [
+            ("A", generate_variant_a),
+            ("B", generate_variant_b),
+            ("C", generate_variant_c),
+            ("D", generate_variant_d),
+        ]
+        for src in source_files:
+            for tag, fn in fns:
+                out = tmp_path / f"{tag}_{src.name}"
+                fn(src, out, target_shape=target)
+                data = nib.load(out).get_fdata(dtype=np.float32)
+                nonzero_fraction = np.count_nonzero(data) / data.size
+                assert nonzero_fraction > 0.10, (
+                    f"Variant {tag} {src.name}: only {nonzero_fraction:.1%} non-zero voxels "
+                    f"— crop window may miss brain tissue"
+                )
+
