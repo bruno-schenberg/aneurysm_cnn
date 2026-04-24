@@ -25,18 +25,22 @@ from data_engine.src.nifti_resize import (
     _variant_b_from_data,
     _variant_c_from_data,
     _variant_d_from_data,
+    _variant_e_from_data,
+    _variant_f_from_data,
     VALID_TARGET_SHAPES,
 )
 
 # Default source directory. Overridden at runtime by --input-dir.
-# Kept as a named constant so the intent is clear if someone reads the source
-# without looking at the argparse section.
 DEFAULT_INPUT_DIR = Path("/mnt/data/cases-3/nifti")
 
 # Output directories keyed first by resolution string, then by variant key.
 #
-# The 128x128x128 paths are identical to the pre-feature paths — callers that
+# The 128x128x128 paths are identical to the pre-redesign paths — callers that
 # do not pass --target-shape continue to write to the same locations.
+#
+# Naming convention:
+#   - 192x192x128 datasets use suffix "192"  (e.g. dataset_A192)
+#   - 256x256x176 datasets use suffix "176"  (e.g. dataset_A176)
 #
 # To add a new resolution: add an entry to VALID_TARGET_SHAPES in
 # nifti_resize.py AND a matching entry here. No other code changes are needed.
@@ -46,12 +50,24 @@ OUTPUT_PATHS: Dict[str, Dict[str, Path]] = {
         "B": Path("/mnt/data/cases-3/dataset_B_resampled_shrunk"),
         "C": Path("/mnt/data/cases-3/dataset_C_cropped"),
         "D": Path("/mnt/data/cases-3/dataset_D_shrunk"),
+        "E": Path("/mnt/data/cases-3/dataset_E_fixed_cropped"),
+        "F": Path("/mnt/data/cases-3/dataset_F_fixed_shrunk"),
     },
-    "256x256x128": {
-        "A": Path("/mnt/data/cases-3/dataset_A256_resampled_cropped"),
-        "B": Path("/mnt/data/cases-3/dataset_B256_resampled_shrunk"),
-        "C": Path("/mnt/data/cases-3/dataset_C256_cropped"),
-        "D": Path("/mnt/data/cases-3/dataset_D256_shrunk"),
+    "192x192x128": {
+        "A": Path("/mnt/data/cases-3/dataset_A192"),
+        "B": Path("/mnt/data/cases-3/dataset_B192"),
+        "C": Path("/mnt/data/cases-3/dataset_C192"),
+        "D": Path("/mnt/data/cases-3/dataset_D192"),
+        "E": Path("/mnt/data/cases-3/dataset_E192"),
+        "F": Path("/mnt/data/cases-3/dataset_F192"),
+    },
+    "256x256x176": {
+        "A": Path("/mnt/data/cases-3/dataset_A176"),
+        "B": Path("/mnt/data/cases-3/dataset_B176"),
+        "C": Path("/mnt/data/cases-3/dataset_C176"),
+        "D": Path("/mnt/data/cases-3/dataset_D176"),
+        "E": Path("/mnt/data/cases-3/dataset_E176"),
+        "F": Path("/mnt/data/cases-3/dataset_F176"),
     },
 }
 
@@ -141,7 +157,44 @@ def _task_d(args: tuple[Path, Path, tuple[int, int, int]]) -> tuple[str, str | N
         return label, f"{type(exc).__name__}: {exc}"
 
 
-_TASK_FN = {"A": _task_a, "B": _task_b, "C": _task_c, "D": _task_d}
+def _task_e(args: tuple[Path, Path, tuple[int, int, int]]) -> tuple[str, str | None]:
+    file_path, output_path, target_shape = args
+    label = f"{file_path.name}:E"
+    if output_path.exists():
+        return label, None
+    try:
+        data, affine = _load(file_path)
+        _variant_e_from_data(data, affine, output_path, target_shape=target_shape)
+        del data, affine
+        gc.collect()
+        return label, None
+    except Exception as exc:
+        return label, f"{type(exc).__name__}: {exc}"
+
+
+def _task_f(args: tuple[Path, Path, tuple[int, int, int]]) -> tuple[str, str | None]:
+    file_path, output_path, target_shape = args
+    label = f"{file_path.name}:F"
+    if output_path.exists():
+        return label, None
+    try:
+        data, affine = _load(file_path)
+        _variant_f_from_data(data, affine, output_path, target_shape=target_shape)
+        del data, affine
+        gc.collect()
+        return label, None
+    except Exception as exc:
+        return label, f"{type(exc).__name__}: {exc}"
+
+
+_TASK_FN = {
+    "A": _task_a,
+    "B": _task_b,
+    "C": _task_c,
+    "D": _task_d,
+    "E": _task_e,
+    "F": _task_f,
+}
 
 
 # ---------------------------------------------------------------------------
@@ -169,12 +222,12 @@ def _run_variant(
     result, and the pool stalls.
 
     Args:
-        variant_key: One of 'A', 'B', 'C', 'D'.
+        variant_key: One of 'A', 'B', 'C', 'D', 'E', 'F'.
         nifti_files: Flat list of source ``.nii.gz`` paths (may include class
             subdirectory structure which is mirrored in the output).
         n_workers: Number of parallel worker processes.
         target_shape: Output voxel grid passed through to the variant function.
-        target_shape_key: String key into ``OUTPUT_PATHS`` (e.g. '128x128x128').
+        target_shape_key: String key into ``OUTPUT_PATHS`` (e.g. '192x192x128').
             Determines which output directory set is used.
     """
     task_fn = _TASK_FN[variant_key]
@@ -221,7 +274,7 @@ def _run_variant(
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
-            "Generate preprocessing variants (A–D) of every NIfTI file. "
+            "Generate preprocessing variants (A–F) of every NIfTI file. "
             "Each variant is processed in its own pool loop. "
             "Each worker handles one file and exits (maxtasksperchild=1)."
         )
@@ -241,14 +294,13 @@ def main() -> None:
     parser.add_argument(
         "--target-shape",
         choices=list(VALID_TARGET_SHAPES),
-        default="128x128x128",
+        default="192x192x128",
         metavar="SHAPE",
         help=(
             "Output voxel grid for all variants. "
             f"Supported values: {', '.join(VALID_TARGET_SHAPES)}. "
-            "Default: 128x128x128 (existing behaviour). "
-            "Each shape writes to a separate output directory set so the "
-            "128x128x128 and 256x256x128 datasets can coexist on disk."
+            "Default: 192x192x128. "
+            "Each shape writes to a separate output directory set."
         ),
     )
     parser.add_argument(
@@ -258,8 +310,8 @@ def main() -> None:
         metavar="N",
         help=(
             f"Parallel workers per variant (default: {DEFAULT_WORKERS}). "
-            "Variants A/B (MONAI Spacing) peak at ~4 GB per worker at 128³; "
-            "256x256x128 volumes are 8× larger — reduce to 2 if you see OOM errors."
+            "Variants A/B/E/F (MONAI Spacing) peak at ~4 GB per worker at 192³; "
+            "256x256x176 volumes are larger — reduce to 2 if you see OOM errors."
         ),
     )
     parser.add_argument(
@@ -271,13 +323,13 @@ def main() -> None:
     parser.add_argument(
         "--variants",
         nargs="+",
-        choices=["A", "B", "C", "D"],
-        default=["C", "D", "A", "B"],
+        choices=["A", "B", "C", "D", "E", "F"],
+        default=["C", "D", "A", "B", "E", "F"],
         metavar="V",
         help=(
-            "Variants to generate, in order (default: C D A B). "
+            "Variants to generate, in order (default: C D A B E F). "
             "C and D run first as they are cheaper and confirm the pipeline "
-            "works before the more expensive A/B resampling runs."
+            "works before the more expensive resampling runs."
         ),
     )
     args = parser.parse_args()

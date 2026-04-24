@@ -93,7 +93,8 @@ from sklearn.model_selection import StratifiedKFold, train_test_split
 # a new entry here — no other module needs to be modified.
 VALID_RESOLUTIONS: Dict[str, Tuple[int, int, int]] = {
     "128x128x128": (128, 128, 128),
-    "256x256x128": (256, 256, 128),
+    "192x192x128": (192, 192, 128),
+    "256x256x176": (256, 256, 176),
     "256x256x256": (256, 256, 256),
 }
 
