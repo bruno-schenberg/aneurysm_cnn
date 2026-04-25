@@ -12,7 +12,7 @@ set -e
 
 CLUSTER="drummond"
 LOCAL_DIR="/mnt/data/newnifti"
-REMOTE_DIR="data/nifti"  # merges into the existing nifti folder on the cluster
+REMOTE_DIR="data/cases-3/nifti"  # merges into the existing nifti folder on the cluster
 
 SSH_OPTS="-o ServerAliveInterval=30 -o ServerAliveCountMax=20"
 
