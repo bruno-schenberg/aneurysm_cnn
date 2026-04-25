@@ -19,6 +19,7 @@ echo -e "## Job started at $(date +'%d-%m-%Y as %T') #####################\n"
 ##
 ## ---------------------------------------------------------------------------
 INPUT_DIR=${INPUT_DIR:-$HOME/data/cases-3/nifti}
+OUTPUT_BASE=${OUTPUT_BASE:-$HOME/data/cases-3}
 TARGET_SHAPE=${TARGET_SHAPE:-192x192x128}
 VARIANTS=${VARIANTS:-"C D A B E F"}
 N_WORKERS=${N_WORKERS:-4}
@@ -30,6 +31,7 @@ echo -e "## Job ID:          $SLURM_JOB_ID"
 echo -e "## Execution node:  $(hostname -s)"
 echo -e "## Submit dir:      $SLURM_SUBMIT_DIR"
 echo -e "## Input dir:       $INPUT_DIR"
+echo -e "## Output base:     $OUTPUT_BASE"
 echo -e "## Target shape:    $TARGET_SHAPE"
 echo -e "## Variants:        $VARIANTS"
 echo -e "## Workers:         $N_WORKERS \n"
@@ -53,6 +55,7 @@ cd $HOME/aneurysm_cnn
 
 python -u data_engine/dataset_gen.py \
     --input-dir   "$INPUT_DIR"    \
+    --output-base "$OUTPUT_BASE"  \
     --target-shape "$TARGET_SHAPE" \
     --variants    $VARIANTS       \
     --workers     "$N_WORKERS"
