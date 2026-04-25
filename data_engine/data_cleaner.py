@@ -74,16 +74,31 @@ def _build_audit_log(conversion_results: list[dict], final_data: list[dict]) -> 
     return full_audit_results
 
 
-def run_pipeline(raw_dir: str | Path, nifti_dir: str | Path, max_workers: int | None = None) -> None:
+def run_pipeline(
+    raw_dir: str | Path,
+    nifti_dir: str | Path,
+    max_workers: int | None = None,
+    log_dir: str | Path | None = None,
+) -> None:
     """
     Executes the full DICOM to NIfTI ingestion and standardization pipeline.
 
     Args:
         raw_dir: Path to the directory containing raw DICOM case folders.
         nifti_dir: Path to the directory where NIfTI outputs should be saved.
+        max_workers: Number of parallel worker processes for NIfTI conversion.
+        log_dir: Directory for output CSVs and log files. Defaults to OUTPUT_DIR
+            (data_engine/output/). Override to avoid overwriting logs from a
+            previous run (e.g. when processing a small supplementary batch).
     """
     raw_dir = Path(raw_dir)
     nifti_dir = Path(nifti_dir)
+
+    out_dir = Path(log_dir) if log_dir else OUTPUT_DIR
+    validation_summary_path = out_dir / "folder_rename_map.csv"
+    mixed_series_path       = out_dir / "mixed_series_analysis.csv"
+    ingestion_log_path      = out_dir / "ingestion.log"
+    audit_log_path          = out_dir / "ingestion_summary.csv"
 
     # Fail fast if the output path's mount point is not accessible.
     # This prevents silent fallback to an in-repo path when the external SSD
@@ -104,9 +119,9 @@ def run_pipeline(raw_dir: str | Path, nifti_dir: str | Path, max_workers: int | 
     nifti_dir_str = str(nifti_dir)
 
     # Ensure output directory exists before the logger tries to open its file
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    
-    logger = setup_logger(str(INGESTION_LOG_PATH))
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    logger = setup_logger(str(ingestion_log_path))
     logger.info("Starting DICOM Ingestion & NIfTI Standardization Pipeline")
 
     try:
@@ -120,7 +135,7 @@ def run_pipeline(raw_dir: str | Path, nifti_dir: str | Path, max_workers: int | 
         validated_data = validate_dcms(organized_data, raw_dir_str)
 
         # 3. Produce a detailed breakdown of any mixed-series folders for manual review.
-        analyze_mixed_folders(validated_data, raw_dir_str, str(MIXED_SERIES_CSV_PATH))
+        analyze_mixed_folders(validated_data, raw_dir_str, str(mixed_series_path))
 
         # 4. Join with classification data from classes.csv
         data_with_classes = join_class_data(validated_data, str(CLASSES_CSV_PATH))
@@ -138,11 +153,11 @@ def run_pipeline(raw_dir: str | Path, nifti_dir: str | Path, max_workers: int | 
 
         # 8. Write the audit log — must cover 100% of input cases for traceability.
         full_audit_results = _build_audit_log(conversion_results, final_data)
-        write_audit_log(full_audit_results, str(AUDIT_LOG_PATH))
-        logger.info(f"Successfully created audit log at '{AUDIT_LOG_PATH}'")
+        write_audit_log(full_audit_results, str(audit_log_path))
+        logger.info(f"Successfully created audit log at '{audit_log_path}'")
 
         # 9. Write the per-case validation summary used for dataset quality review.
-        with open(VALIDATION_SUMMARY_CSV_PATH, 'w', newline='') as csvfile:
+        with open(validation_summary_path, 'w', newline='') as csvfile:
             fieldnames = [
                 'original_name', 'fixed_name', 'data_path', 'total_dcms',
                 'validation_status', 'duplicate_slice_count', 'scout_slice_count', 'orientation',
@@ -153,7 +168,7 @@ def run_pipeline(raw_dir: str | Path, nifti_dir: str | Path, max_workers: int | 
             writer.writeheader()
             writer.writerows(final_data)
 
-        logger.info(f"Successfully created validation summary at '{VALIDATION_SUMMARY_CSV_PATH}'")
+        logger.info(f"Successfully created validation summary at '{validation_summary_path}'")
         logger.info("Pipeline execution completed successfully.")
 
     except Exception as e:
@@ -179,6 +194,21 @@ if __name__ == "__main__":
         default=None,
         help="Number of parallel worker processes for NIfTI conversion (default: os.cpu_count())"
     )
+    parser.add_argument(
+        "--log-dir",
+        default=None,
+        help=(
+            "Directory for output CSVs and log files "
+            f"(default: data_engine/output/). "
+            "Override to avoid overwriting logs from a previous run, "
+            "e.g. --log-dir data_engine/output/newraw_batch"
+        )
+    )
     args = parser.parse_args()
 
-    run_pipeline(Path(args.raw_dir), Path(args.nifti_dir), max_workers=args.workers)
+    run_pipeline(
+        Path(args.raw_dir),
+        Path(args.nifti_dir),
+        max_workers=args.workers,
+        log_dir=args.log_dir,
+    )
