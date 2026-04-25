@@ -25,49 +25,52 @@ from data_engine.src.nifti_resize import (
     _variant_b_from_data,
     _variant_c_from_data,
     _variant_d_from_data,
+    _variant_e_from_data,
+    _variant_f_from_data,
     VALID_TARGET_SHAPES,
 )
 
-# Default source directory. Overridden at runtime by --input-dir.
-# Kept as a named constant so the intent is clear if someone reads the source
-# without looking at the argparse section.
-DEFAULT_INPUT_DIR = Path("/mnt/data/cases-3/nifti")
-DEFAULT_OUTPUT_DIR = Path("/mnt/data/cases-3")
+# Default source and output base directories.
+# Override at runtime with --input-dir and --output-base.
+DEFAULT_INPUT_DIR   = Path("/mnt/data/cases-3/nifti")
+DEFAULT_OUTPUT_BASE = Path("/mnt/data/cases-3")
 
-# Folder name suffixes for each variant at each resolution, relative to
-# --output-dir. Output paths are built at runtime from the base directory so
-# the same script works on both the local workstation (/mnt/data/cases-3) and
-# the HPC cluster ($HOME/data/cases-3) without hardcoded paths.
+# Subfolder names relative to the output base, keyed by resolution then variant.
+# Full paths are built at runtime as: output_base / OUTPUT_FOLDER_NAMES[shape][variant]
+#
+# Naming convention:
+#   128x128x128 — legacy names kept for backward compatibility
+#   192x192x128 — suffix "192"  (e.g. dataset_A192)
+#   256x256x176 — suffix "176"  (e.g. dataset_A176)
+#
+# To add a new resolution: add an entry to VALID_TARGET_SHAPES in
+# nifti_resize.py AND a matching entry here. No other code changes are needed.
 OUTPUT_FOLDER_NAMES: Dict[str, Dict[str, str]] = {
     "128x128x128": {
         "A": "dataset_A_resampled_cropped",
         "B": "dataset_B_resampled_shrunk",
         "C": "dataset_C_cropped",
         "D": "dataset_D_shrunk",
+        "E": "dataset_E_fixed_cropped",
+        "F": "dataset_F_fixed_shrunk",
     },
-    "256x256x128": {
-        "A": "dataset_A256_resampled_cropped",
-        "B": "dataset_B256_resampled_shrunk",
-        "C": "dataset_C256_cropped",
-        "D": "dataset_D256_shrunk",
+    "192x192x128": {
+        "A": "dataset_A192",
+        "B": "dataset_B192",
+        "C": "dataset_C192",
+        "D": "dataset_D192",
+        "E": "dataset_E192",
+        "F": "dataset_F192",
+    },
+    "256x256x176": {
+        "A": "dataset_A176",
+        "B": "dataset_B176",
+        "C": "dataset_C176",
+        "D": "dataset_D176",
+        "E": "dataset_E176",
+        "F": "dataset_F176",
     },
 }
-
-
-def _build_output_paths(output_dir: Path) -> Dict[str, Dict[str, Path]]:
-    """Build the full output path dict from a base directory.
-
-    Called once at startup after argument parsing so the same folder-name
-    structure works regardless of whether the base is ``/mnt/data/cases-3``
-    (local workstation) or ``$HOME/data/cases-3`` (HPC cluster).
-    """
-    return {
-        shape_key: {
-            variant_key: output_dir / folder_name
-            for variant_key, folder_name in variants.items()
-        }
-        for shape_key, variants in OUTPUT_FOLDER_NAMES.items()
-    }
 
 DEFAULT_WORKERS = 4
 
@@ -155,7 +158,44 @@ def _task_d(args: tuple[Path, Path, tuple[int, int, int]]) -> tuple[str, str | N
         return label, f"{type(exc).__name__}: {exc}"
 
 
-_TASK_FN = {"A": _task_a, "B": _task_b, "C": _task_c, "D": _task_d}
+def _task_e(args: tuple[Path, Path, tuple[int, int, int]]) -> tuple[str, str | None]:
+    file_path, output_path, target_shape = args
+    label = f"{file_path.name}:E"
+    if output_path.exists():
+        return label, None
+    try:
+        data, affine = _load(file_path)
+        _variant_e_from_data(data, affine, output_path, target_shape=target_shape)
+        del data, affine
+        gc.collect()
+        return label, None
+    except Exception as exc:
+        return label, f"{type(exc).__name__}: {exc}"
+
+
+def _task_f(args: tuple[Path, Path, tuple[int, int, int]]) -> tuple[str, str | None]:
+    file_path, output_path, target_shape = args
+    label = f"{file_path.name}:F"
+    if output_path.exists():
+        return label, None
+    try:
+        data, affine = _load(file_path)
+        _variant_f_from_data(data, affine, output_path, target_shape=target_shape)
+        del data, affine
+        gc.collect()
+        return label, None
+    except Exception as exc:
+        return label, f"{type(exc).__name__}: {exc}"
+
+
+_TASK_FN = {
+    "A": _task_a,
+    "B": _task_b,
+    "C": _task_c,
+    "D": _task_d,
+    "E": _task_e,
+    "F": _task_f,
+}
 
 
 # ---------------------------------------------------------------------------
@@ -168,7 +208,7 @@ def _run_variant(
     n_workers: int,
     target_shape: tuple[int, int, int],
     target_shape_key: str,
-    output_paths: Dict[str, Dict[str, Path]],
+    output_base: Path,
 ) -> list[tuple[str, str]]:
     """
     Run one variant across all files using a dedicated fork pool.
@@ -184,17 +224,16 @@ def _run_variant(
     result, and the pool stalls.
 
     Args:
-        variant_key: One of 'A', 'B', 'C', 'D'.
+        variant_key: One of 'A', 'B', 'C', 'D', 'E', 'F'.
         nifti_files: Flat list of source ``.nii.gz`` paths (may include class
             subdirectory structure which is mirrored in the output).
         n_workers: Number of parallel worker processes.
         target_shape: Output voxel grid passed through to the variant function.
-        target_shape_key: String key into ``output_paths`` (e.g. '128x128x128').
+        target_shape_key: String key into ``OUTPUT_PATHS`` (e.g. '192x192x128').
             Determines which output directory set is used.
-        output_paths: Nested dict of output base paths built from ``--output-dir``.
     """
     task_fn = _TASK_FN[variant_key]
-    out_base = output_paths[target_shape_key][variant_key]
+    out_base = output_base / OUTPUT_FOLDER_NAMES[target_shape_key][variant_key]
 
     tasks: list[tuple[Path, Path, tuple[int, int, int]]] = []
     for file_path in nifti_files:
@@ -237,7 +276,7 @@ def _run_variant(
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
-            "Generate preprocessing variants (A–D) of every NIfTI file. "
+            "Generate preprocessing variants (A–F) of every NIfTI file. "
             "Each variant is processed in its own pool loop. "
             "Each worker handles one file and exits (maxtasksperchild=1)."
         )
@@ -251,33 +290,30 @@ def main() -> None:
             f"Root folder containing .nii.gz source files, optionally organised "
             f"into class subdirectories (0/ and 1/). "
             f"Default: {DEFAULT_INPUT_DIR}. "
-            "Override with the HPC cluster path (e.g. $HOME/data/nifti)."
+            "Override with the HPC cluster path (e.g. $HOME/data/cases-3/nifti)."
         ),
     )
     parser.add_argument(
-        "--output-dir",
+        "--output-base",
         type=Path,
-        default=DEFAULT_OUTPUT_DIR,
+        default=DEFAULT_OUTPUT_BASE,
         metavar="DIR",
         help=(
-            f"Base directory under which all output dataset folders are created. "
-            f"Default: {DEFAULT_OUTPUT_DIR}. "
-            "Override on HPC: e.g. $HOME/data/cases-3. "
-            "Output folders (e.g. dataset_B256_resampled_shrunk) are created "
-            "as subdirectories of this path."
+            f"Base directory under which dataset subfolders are created. "
+            f"Default: {DEFAULT_OUTPUT_BASE}. "
+            "Override with the HPC cluster path (e.g. $HOME/data/cases-3)."
         ),
     )
     parser.add_argument(
         "--target-shape",
         choices=list(VALID_TARGET_SHAPES),
-        default="128x128x128",
+        default="192x192x128",
         metavar="SHAPE",
         help=(
             "Output voxel grid for all variants. "
             f"Supported values: {', '.join(VALID_TARGET_SHAPES)}. "
-            "Default: 128x128x128 (existing behaviour). "
-            "Each shape writes to a separate output directory set so the "
-            "128x128x128 and 256x256x128 datasets can coexist on disk."
+            "Default: 192x192x128. "
+            "Each shape writes to a separate output directory set."
         ),
     )
     parser.add_argument(
@@ -287,8 +323,8 @@ def main() -> None:
         metavar="N",
         help=(
             f"Parallel workers per variant (default: {DEFAULT_WORKERS}). "
-            "Variants A/B (MONAI Spacing) peak at ~4 GB per worker at 128³; "
-            "256x256x128 volumes are 8× larger — reduce to 2 if you see OOM errors."
+            "Variants A/B/E/F (MONAI Spacing) peak at ~4 GB per worker at 192³; "
+            "256x256x176 volumes are larger — reduce to 2 if you see OOM errors."
         ),
     )
     parser.add_argument(
@@ -300,13 +336,13 @@ def main() -> None:
     parser.add_argument(
         "--variants",
         nargs="+",
-        choices=["A", "B", "C", "D"],
-        default=["C", "D", "A", "B"],
+        choices=["A", "B", "C", "D", "E", "F"],
+        default=["C", "D", "A", "B", "E", "F"],
         metavar="V",
         help=(
-            "Variants to generate, in order (default: C D A B). "
+            "Variants to generate, in order (default: C D A B E F). "
             "C and D run first as they are cheaper and confirm the pipeline "
-            "works before the more expensive A/B resampling runs."
+            "works before the more expensive resampling runs."
         ),
     )
     args = parser.parse_args()
@@ -317,12 +353,10 @@ def main() -> None:
     )
 
     input_dir: Path = args.input_dir
+    output_base: Path = args.output_base
     if not input_dir.exists():
         logging.error("Input directory not found: %s", input_dir)
         sys.exit(1)
-
-    output_dir: Path = args.output_dir
-    output_paths = _build_output_paths(output_dir)
 
     target_shape_key: str = args.target_shape
     target_shape: tuple[int, int, int] = VALID_TARGET_SHAPES[target_shape_key]
@@ -340,18 +374,18 @@ def main() -> None:
 
     n_workers = min(args.workers, len(nifti_files))
     logging.info(
-        "%d files | shape: %s | variants: %s | %d workers per variant | output: %s",
+        "%d files | shape: %s | variants: %s | %d workers per variant | output base: %s",
         len(nifti_files),
         target_shape_key,
         " ".join(args.variants),
         n_workers,
-        output_dir,
+        output_base,
     )
 
     all_failures: list[tuple[str, str]] = []
     for variant_key in args.variants:
         failures = _run_variant(
-            variant_key, nifti_files, n_workers, target_shape, target_shape_key, output_paths
+            variant_key, nifti_files, n_workers, target_shape, target_shape_key, output_base
         )
         all_failures.extend(failures)
 

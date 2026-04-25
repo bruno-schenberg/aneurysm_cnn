@@ -475,27 +475,27 @@ def _flag_exam_size_outliers(data_mapping: list[dict]) -> list[dict]:
     """
     Flags validated cases whose physical exam coverage is a statistical outlier.
 
-    **Rationale:** A healthy brain CTA/MRA typically covers a consistent anatomical
-    range (roughly 100–200 mm of axial coverage). Cases far outside this range are
-    likely partial scans, planning scans, or mis-exported series. Including them in
-    training would add noise — the CNN would see volumes with very different fields
-    of view labeled as the same class.
+    **Rationale:** A usable brain CTA/MRA must cover enough axial extent to include
+    the circle of Willis and surrounding anatomy. The limits are fixed by anatomy,
+    not derived statistically from the dataset:
 
-    **Method — Tukey's IQR fences:**
-    The IQR (interquartile range) method is used rather than a z-score because it
-    is robust to non-normal distributions and to the small sample sizes typical of
-    medical imaging datasets. The fences are:
+      MIN_EXAM_SIZE_MM = 90 mm — below this the scan is a partial acquisition or
+        planning scout that does not cover enough of the brain to be useful. The
+        original IQR-based lower fence was introduced to catch a 4000-slice exam
+        that was caused by mixed series being included; that problem is now handled
+        upstream by scout filtering and MIXED_SERIES_ERROR detection. The 90 mm
+        floor retains the intent (exclude genuinely short scans) without the
+        side-effect of flagging valid exams whenever the dataset distribution shifts.
 
-      lower_fence = Q1 − 1.5 × IQR
-      upper_fence = Q3 + 1.5 × IQR
+      MAX_EXAM_SIZE_MM = 300 mm — above this after scout filtering the series is
+        almost certainly a mis-export (e.g. a whole-spine acquisition). A standard
+        full-head brain CTA will not exceed this value.
 
-    Cases below the lower fence are marked ``BELOW_LIMIT``.
-    Cases above the upper fence are marked ``ABOVE_LIMIT``.
+    Cases below ``MIN_EXAM_SIZE_MM`` are marked ``BELOW_LIMIT``.
+    Cases above ``MAX_EXAM_SIZE_MM`` are marked ``ABOVE_LIMIT``.
 
     Only cases with ``validation_status == 'OK'`` are considered — cases that
-    already failed validation are not re-classified here. The outlier check is
-    run after all individual validations are complete so that the fence values
-    are computed from the clean, validated subset only.
+    already failed validation are not re-classified here.
 
     Args:
         data_mapping: Full list of case record dicts from ``validate_dcms``.
@@ -516,33 +516,29 @@ def _flag_exam_size_outliers(data_mapping: list[dict]) -> list[dict]:
     if not exam_sizes:
         return data_mapping
 
-    q1 = np.percentile(exam_sizes, 25)
-    q3 = np.percentile(exam_sizes, 75)
-    iqr = q3 - q1
-    lower_fence = q1 - 1.5 * iqr
-    upper_fence = q3 + 1.5 * iqr
+    MIN_EXAM_SIZE_MM = 90.0
+    MAX_EXAM_SIZE_MM = 300.0
 
-    logger.info("\nAnalyzing exam size distribution for 'OK' series...")
-    logger.info(f"  - Q1: {q1:.2f}, Q3: {q3:.2f}, IQR: {iqr:.2f}")
-    logger.info(f"  - Lower Fence: {lower_fence:.2f}, Upper Fence: {upper_fence:.2f}")
+    logger.info("\nChecking exam sizes against absolute limits...")
+    logger.info(f"  - Minimum: {MIN_EXAM_SIZE_MM:.1f} mm, Maximum: {MAX_EXAM_SIZE_MM:.1f} mm")
 
     for item in ok_exams:
         if isinstance(item.get('exam_size'), (int, float, np.number)):
-            if item['exam_size'] < lower_fence:
+            if item['exam_size'] < MIN_EXAM_SIZE_MM:
                 item['validation_status'] = 'BELOW_LIMIT'
-            elif item['exam_size'] > upper_fence:
+            elif item['exam_size'] > MAX_EXAM_SIZE_MM:
                 item['validation_status'] = 'ABOVE_LIMIT'
 
     outliers_below = [item for item in ok_exams if item.get('validation_status') == 'BELOW_LIMIT']
     outliers_above = [item for item in ok_exams if item.get('validation_status') == 'ABOVE_LIMIT']
 
     if outliers_below:
-        logger.info(f"\nFound {len(outliers_below)} exams BELOW the lower fence:")
+        logger.info(f"\nFound {len(outliers_below)} exams BELOW {MIN_EXAM_SIZE_MM:.0f} mm:")
         for item in outliers_below:
             logger.info(f"  - {item['fixed_name']} (Exam Size: {item['exam_size']:.2f})")
 
     if outliers_above:
-        logger.info(f"\nFound {len(outliers_above)} exams ABOVE the upper fence:")
+        logger.info(f"\nFound {len(outliers_above)} exams ABOVE {MAX_EXAM_SIZE_MM:.0f} mm:")
         for item in outliers_above:
             logger.info(f"  - {item['fixed_name']} (Exam Size: {item['exam_size']:.2f})")
 
