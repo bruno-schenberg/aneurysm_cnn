@@ -45,10 +45,20 @@ DATASETS = [
     ("B_128", "dataset_B_resampled_shrunk"),
     ("C_128", "dataset_C_cropped"),
     ("D_128", "dataset_D_shrunk"),
-    ("A_256", "dataset_A256_resampled_cropped"),
-    ("B_256", "dataset_B256_resampled_shrunk"),
-    ("C_256", "dataset_C256_cropped"),
-    ("D_256", "dataset_D256_shrunk"),
+    # New 192×192×128 variants
+    ("A_192", "dataset_A192"),
+    ("B_192", "dataset_B192"),
+    ("C_192", "dataset_C192"),
+    ("D_192", "dataset_D192"),
+    ("E_192", "dataset_E192"),
+    ("F_192", "dataset_F192"),
+    # New 256×256×176 variants
+    ("A_176", "dataset_A176"),
+    ("B_176", "dataset_B176"),
+    ("C_176", "dataset_C176"),
+    ("D_176", "dataset_D176"),
+    ("E_176", "dataset_E176"),
+    ("F_176", "dataset_F176"),
 ]
 
 FIELDNAMES = [
