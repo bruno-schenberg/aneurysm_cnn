@@ -1,0 +1,74 @@
+[
+    {
+        "name": "R3D50_A192_lr1e4",
+        "model": "R3D50",
+        "balancing": "weighted_cost_function",
+        "data_path_key": "A192",
+        "EPOCHS": 100,
+        "BATCH_SIZE": 8,
+        "LEARNING_RATE": 0.0001,
+        "USE_KFOLD": false,
+        "VAL_SPLIT_RATIO": 0.20,
+        "EARLY_STOPPING_PATIENCE": 10
+    },
+    {
+        "name": "R3D50_B192_lr1e4",
+        "model": "R3D50",
+        "balancing": "weighted_cost_function",
+        "data_path_key": "B192",
+        "EPOCHS": 100,
+        "BATCH_SIZE": 8,
+        "LEARNING_RATE": 0.0001,
+        "USE_KFOLD": false,
+        "VAL_SPLIT_RATIO": 0.20,
+        "EARLY_STOPPING_PATIENCE": 10
+    },
+    {
+        "name": "R3D50_C192_lr1e4",
+        "model": "R3D50",
+        "balancing": "weighted_cost_function",
+        "data_path_key": "C192",
+        "EPOCHS": 100,
+        "BATCH_SIZE": 8,
+        "LEARNING_RATE": 0.0001,
+        "USE_KFOLD": false,
+        "VAL_SPLIT_RATIO": 0.20,
+        "EARLY_STOPPING_PATIENCE": 10
+    },
+    {
+        "name": "R3D50_D192_lr1e4",
+        "model": "R3D50",
+        "balancing": "weighted_cost_function",
+        "data_path_key": "D192",
+        "EPOCHS": 100,
+        "BATCH_SIZE": 8,
+        "LEARNING_RATE": 0.0001,
+        "USE_KFOLD": false,
+        "VAL_SPLIT_RATIO": 0.20,
+        "EARLY_STOPPING_PATIENCE": 10
+    },
+    {
+        "name": "R3D50_E192_lr1e4",
+        "model": "R3D50",
+        "balancing": "weighted_cost_function",
+        "data_path_key": "E192",
+        "EPOCHS": 100,
+        "BATCH_SIZE": 8,
+        "LEARNING_RATE": 0.0001,
+        "USE_KFOLD": false,
+        "VAL_SPLIT_RATIO": 0.20,
+        "EARLY_STOPPING_PATIENCE": 10
+    },
+    {
+        "name": "R3D50_F192_lr1e4",
+        "model": "R3D50",
+        "balancing": "weighted_cost_function",
+        "data_path_key": "F192",
+        "EPOCHS": 100,
+        "BATCH_SIZE": 8,
+        "LEARNING_RATE": 0.0001,
+        "USE_KFOLD": false,
+        "VAL_SPLIT_RATIO": 0.20,
+        "EARLY_STOPPING_PATIENCE": 10
+    }
+]
