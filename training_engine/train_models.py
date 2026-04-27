@@ -83,6 +83,13 @@ DATASET_PATHS: Dict[str, str] = {
     "B": f"{_DATA_ROOT}/dataset_B_resampled_shrunk",       # single-step isotropic resample → pad to 128³
     "C": f"{_DATA_ROOT}/dataset_C_cropped",                # Native resolution → crop to 128³
     "D": f"{_DATA_ROOT}/dataset_D_shrunk",                 # Native resolution → shrink to 128³
+    # 192×192×128 variants
+    "A192": f"{_DATA_ROOT}/dataset_A192",  # 1mm isotropic resample → crop to 192×192×128
+    "B192": f"{_DATA_ROOT}/dataset_B192",  # single-step resample → pad to 192×192×128
+    "C192": f"{_DATA_ROOT}/dataset_C192",  # Native resolution → crop to 192×192×128
+    "D192": f"{_DATA_ROOT}/dataset_D192",  # Native resolution → shrink to 192×192×128
+    "E192": f"{_DATA_ROOT}/dataset_E192",  # Fixed spacing → crop to 192×192×128
+    "F192": f"{_DATA_ROOT}/dataset_F192",  # Fixed spacing → shrink to 192×192×128
     # 256×256×128 variants
     "A256": f"{_DATA_ROOT}/dataset_A256_resampled_cropped",  # 0.9375mm isotropic resample → crop to 256×256×128
     "B256": f"{_DATA_ROOT}/dataset_B256_resampled_shrunk",   # single-step resample → pad to 256×256×128
@@ -100,6 +107,12 @@ DATASET_RESOLUTIONS: Dict[str, str] = {
     "B": "128x128x128",
     "C": "128x128x128",
     "D": "128x128x128",
+    "A192": "192x192x128",
+    "B192": "192x192x128",
+    "C192": "192x192x128",
+    "D192": "192x192x128",
+    "E192": "192x192x128",
+    "F192": "192x192x128",
     "A256": "256x256x128",
     "B256": "256x256x128",
     "C256": "256x256x128",
