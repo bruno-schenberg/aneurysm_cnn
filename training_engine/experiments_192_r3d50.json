@@ -8,6 +8,7 @@
         "BATCH_SIZE": 8,
         "LEARNING_RATE": 0.0001,
         "INPUT_RESOLUTION": "192x192x128",
+        "USE_AMP": false,
         "USE_KFOLD": false,
         "VAL_SPLIT_RATIO": 0.20,
         "EARLY_STOPPING_PATIENCE": 10
@@ -21,6 +22,7 @@
         "BATCH_SIZE": 8,
         "LEARNING_RATE": 0.0001,
         "INPUT_RESOLUTION": "192x192x128",
+        "USE_AMP": false,
         "USE_KFOLD": false,
         "VAL_SPLIT_RATIO": 0.20,
         "EARLY_STOPPING_PATIENCE": 10
@@ -34,6 +36,7 @@
         "BATCH_SIZE": 8,
         "LEARNING_RATE": 0.0001,
         "INPUT_RESOLUTION": "192x192x128",
+        "USE_AMP": false,
         "USE_KFOLD": false,
         "VAL_SPLIT_RATIO": 0.20,
         "EARLY_STOPPING_PATIENCE": 10
@@ -47,6 +50,7 @@
         "BATCH_SIZE": 8,
         "LEARNING_RATE": 0.0001,
         "INPUT_RESOLUTION": "192x192x128",
+        "USE_AMP": false,
         "USE_KFOLD": false,
         "VAL_SPLIT_RATIO": 0.20,
         "EARLY_STOPPING_PATIENCE": 10
@@ -60,6 +64,7 @@
         "BATCH_SIZE": 8,
         "LEARNING_RATE": 0.0001,
         "INPUT_RESOLUTION": "192x192x128",
+        "USE_AMP": false,
         "USE_KFOLD": false,
         "VAL_SPLIT_RATIO": 0.20,
         "EARLY_STOPPING_PATIENCE": 10
@@ -73,6 +78,7 @@
         "BATCH_SIZE": 8,
         "LEARNING_RATE": 0.0001,
         "INPUT_RESOLUTION": "192x192x128",
+        "USE_AMP": false,
         "USE_KFOLD": false,
         "VAL_SPLIT_RATIO": 0.20,
         "EARLY_STOPPING_PATIENCE": 10
