@@ -27,9 +27,9 @@ Usage:
     python data_engine/check_fov_air.py
     python data_engine/check_fov_air.py \\
         --nifti-dir        /mnt/data/nifti \\
-        --survey-csv       data_engine/nifti_survey.csv \\
-        --groups-csv       data_engine/nifti_survey_groups.csv \\
-        --output           data_engine/fov_air.csv \\
+        --survey-csv       data_engine/diagnostics/outputs/nifti_survey.csv \\
+        --groups-csv       data_engine/diagnostics/outputs/nifti_survey_groups.csv \\
+        --output           data_engine/diagnostics/outputs/fov_air.csv \\
         --threshold        -200
 """
 
@@ -235,9 +235,9 @@ if __name__ == "__main__":
         description="Measure air border depth on each face of every NIfTI exam."
     )
     parser.add_argument("--nifti-dir",   default="/mnt/data/nifti")
-    parser.add_argument("--survey-csv",  default="data_engine/nifti_survey.csv")
-    parser.add_argument("--groups-csv",  default="data_engine/nifti_survey_groups.csv")
-    parser.add_argument("--output",      default="data_engine/fov_air.csv")
+    parser.add_argument("--survey-csv",  default="data_engine/diagnostics/outputs/nifti_survey.csv")
+    parser.add_argument("--groups-csv",  default="data_engine/diagnostics/outputs/nifti_survey_groups.csv")
+    parser.add_argument("--output",      default="data_engine/diagnostics/outputs/fov_air.csv")
     parser.add_argument(
         "--threshold", type=float, default=-200,
         help="Max HU for a slice to be classified as air (default: -200).",

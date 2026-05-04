@@ -4,7 +4,7 @@ survey_nifti.py
 Reads every NIfTI file under /mnt/data/nifti and writes a CSV with
 per-exam dimensions, voxel spacing, and real-world physical size.
 
-Output: data_engine/nifti_survey.csv
+Output: data_engine/diagnostics/outputs/nifti_survey.csv
 
 Usage:
     python data_engine/survey_nifti.py [--nifti-dir /mnt/data/nifti]
@@ -242,7 +242,7 @@ if __name__ == "__main__":
     parser.add_argument("--nifti-dir", default="/mnt/data/nifti")
     parser.add_argument(
         "--output",
-        default=os.path.join(os.path.dirname(__file__), "nifti_survey.csv"),
+        default=os.path.join(os.path.dirname(__file__), "outputs/nifti_survey.csv"),
     )
     args = parser.parse_args()
     main(args.nifti_dir, args.output)

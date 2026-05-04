@@ -1,0 +1,5 @@
+exam,class,group_id,group_count,dim_x,dim_y,dim_z,spacing_x_mm,spacing_y_mm,spacing_z_mm,fov_x_mm,fov_y_mm,fov_z_mm,air_x_low_px,air_x_low_mm,air_x_high_px,air_x_high_mm,air_y_low_px,air_y_low_mm,air_y_high_px,air_y_high_mm,air_z_low_px,air_z_low_mm,air_z_high_px,air_z_high_mm,content_x_mm,content_y_mm,content_z_mm
+BP002,0,8,322,768,768,284,0.2344,0.2344,0.5,180.0,180.0,142.0,0,0.0,0,0.0,0,0.0,0,0.0,0,0.0,0,0.0,180.0,180.0,142.0
+BP042,1,1,218,512,512,216,0.4688,0.4688,0.6,240.0,240.0,129.6,0,0.0,0,0.0,0,0.0,0,0.0,0,0.0,0,0.0,240.0,240.0,129.6
+BP082,1,6,183,696,768,272,0.2344,0.2344,0.5,163.1,180.0,136.0,0,0.0,0,0.0,0,0.0,0,0.0,0,0.0,0,0.0,163.1,180.0,136.0
+BP240,1,4,16,512,512,416,0.4688,0.4688,0.3,240.0,240.0,124.8,0,0.0,0,0.0,0,0.0,0,0.0,0,0.0,0,0.0,240.0,240.0,124.8
