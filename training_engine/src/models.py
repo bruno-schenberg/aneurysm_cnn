@@ -3,66 +3,6 @@ models.py
 
 Model registry for the aneurysm CNN training engine. Provides a factory
 function (``get_model``) that constructs any supported architecture by name.
-
-## Common interface contract
-
-Every architecture in ``SUPPORTED_MODELS`` accepts a single-channel 128³
-input tensor of shape ``(B, 1, 128, 128, 128)`` and produces raw class logits
-of shape ``(B, num_classes)``. The logits are passed to ``CrossEntropyLoss``
-in the training loop — no softmax is applied inside the model.
-
-## Transfer learning strategy
-
-Training a 3D CNN from scratch on a small aneurysm dataset (typically a few
-hundred cases) risks severe overfitting: the model has millions of parameters
-but too few examples to constrain them. Transfer learning addresses this by
-initialising the network with weights learned on a large dataset, then
-fine-tuning on the target task. The pretrained weights encode general-purpose
-feature detectors (edges, textures, shapes) that are useful across many tasks,
-so the model needs to learn much less from the small dataset.
-
-Two pretrained sources are used:
-
-  **Kinetics-400 (torchvision R3D-18):** a large video action-recognition
-  dataset (~300k clips). Although video data is very different from medical
-  imaging, the spatial 3D convolution filters still learn useful low-level
-  features (edges, gradients, local structure). The key advantage is dataset
-  size and filter diversity.
-
-  **MedicalNet / Med3D (MONAI ResNet-18 and ResNet-50):** a ResNet pretrained
-  on 23 segmentation datasets covering brain, abdomen, cardiac, and other
-  anatomical regions — approximately 2.4k labelled volumes in total. The
-  features are learned directly on 3D medical images, which share the same
-  intensity characteristics, noise properties, and anatomical structure as
-  the aneurysm volumes. This is the more principled choice for medical imaging.
-
-## Single-channel adaptation
-
-Pretrained 3D CNNs expect RGB-like multi-channel input. The aneurysm volumes
-have a single intensity channel. Two adaptation strategies are used:
-
-  **Channel averaging (torchvision R3D-18):** the three pretrained input
-  filters are averaged along the channel dimension to produce one filter.
-  This preserves the spatial frequency selectivity learned during pretraining
-  rather than discarding it. Summing instead of averaging would triple the
-  activation magnitudes, requiring the subsequent batch-norm layers to
-  re-calibrate; averaging keeps the magnitude scale consistent.
-
-  **Native single-channel (MONAI models):** MONAI's ResNet, DenseNet, and
-  SwinUNETR constructors accept ``n_input_channels=1`` directly. The first
-  conv layer is created with the correct number of channels from the start,
-  and the pretrained weights (where available) are also single-channel.
-
-## Pretrained weight sources
-
-  - Kinetics-400: downloaded by torchvision on first use.
-  - MedicalNet: downloaded from ``TencentMedicalNet/MedicalNet-Resnet18`` and
-    ``TencentMedicalNet/MedicalNet-Resnet50`` on Hugging Face Hub by MONAI on
-    first use. Requires MONAI >= 1.3.1.
-  - BTCV (SwinUNETR): loaded from a local cache file at
-    ``/root/.cache/monai/models/swin_unetr.base_5000ep_f48_fe.pth``.
-    Must be downloaded manually.
-  - DenseNet-121, UNet3D: no pretrained weights — trained from scratch.
 """
 
 from typing import Optional
@@ -78,6 +18,7 @@ from monai.networks.nets import DenseNet, SwinUNETR, UNETR, resnet10, resnet18, 
 SUPPORTED_MODELS: list[str] = [
     "R3D10",            # MONAI ResNet-10   — MedicalNet pretrained (23 medical datasets), lightest CNN
     "R3D18",            # torchvision R3D-18 — Kinetics-400 pretrained, adapted to 1 channel
+    "R3D18_MONAI",      # MONAI ResNet-18   — MedicalNet pretrained
     "R3D50",            # MONAI ResNet-50   — MedicalNet pretrained (23 medical datasets)
     "UNETR",            # MONAI UNETR — pure ViT encoder + CNN decoder, trained from scratch
     "DenseNet121",      # MONAI DenseNet-121 — trained from scratch
@@ -96,39 +37,12 @@ def get_r3d18_pytorch_model(
     """
     Torchvision R3D-18 adapted for single-channel 3D medical image classification.
 
-    R3D-18 is an 18-layer 3D ResNet from torchvision's video model zoo. Each
-    convolution operates on three spatial dimensions (D, H, W) simultaneously,
-    making it naturally suited for volumetric inputs. Pretrained on Kinetics-400
-    (RGB video, 3 channels), it must be adapted to accept single-channel medical
-    volumes.
-
-    **Single-channel adaptation — channel averaging:**
-    The pretrained first conv layer has shape
-    ``(out_channels, 3, kD, kH, kW)`` — three input channels for RGB. We
-    construct a new conv layer with one input channel and initialise its weight
-    as ``mean(pretrained_weights, dim=1, keepdim=True)``. Averaging rather than
-    summing keeps the activation scale consistent: the new single-channel filter
-    responds to grayscale intensity the same way the original RGB filters
-    responded to colour, without inflating the output magnitude.
-
-    **Classification head replacement:**
-    The original Kinetics-400 head (400 action classes) is replaced with a
-    fresh ``nn.Linear(in_features, num_classes)`` layer, initialised randomly.
-    Only this head is newly initialised; all other layers start from pretrained
-    weights and are fine-tuned during training.
-
-    **Why Kinetics-400?**
-    Despite the domain gap between video clips and MRI/CTA volumes, the learned
-    3D spatial filters encode useful low-level structure: local gradients,
-    curvature, and texture patterns that generalise to volumetric medical data.
-    The large pretraining dataset (300k clips) provides much better filter
-    diversity than random initialisation on a small medical dataset.
-
     Args:
-        num_classes: Number of output classes (typically 2: healthy / aneurysm).
-        weights: ``'default'`` loads Kinetics-400 pretrained weights. Any other
-            value initialises the model with random weights (useful for ablation
-            experiments that isolate the effect of pretraining).
+        num_classes: Number of output classes.
+        weights: Optional torchvision weights enum string.
+
+    Returns:
+        Configured PyTorch model.
     """
     if weights == "default":
         model = video_models.r3d_18(weights=video_models.R3D_18_Weights.DEFAULT)
@@ -161,31 +75,11 @@ def get_r3d18_monai_model(num_classes: int) -> torch.nn.Module:
     """
     MONAI ResNet-18 for single-channel 3D medical image classification.
 
-    Uses MONAI's implementation of ResNet-18 with 3D convolutions throughout.
-    Unlike the torchvision variant, MONAI's ResNet accepts ``n_input_channels=1``
-    natively, so no channel adaptation is required.
-
-    **MedicalNet pretraining:**
-    Weights are sourced from the MedicalNet project (Tencent), a ResNet
-    pre-trained on 23 medical imaging segmentation datasets spanning brain MRI,
-    abdominal CT, cardiac MRI, and others — approximately 2.4k labelled 3D
-    volumes. This is the most relevant pretraining source for the aneurysm task:
-    the model has already learned to detect anatomical structures in 3D medical
-    images before any fine-tuning.
-
-    Weights are downloaded automatically from Hugging Face Hub
-    (``TencentMedicalNet/MedicalNet-Resnet18``) on first use. If the download
-    fails (offline environment, rate limit), the model falls back to random
-    initialisation so training can proceed without crashing.
-
-    **Classification head:**
-    The original MedicalNet head is a 400-class linear layer (matching the
-    number of segmentation categories across the pretraining datasets). It is
-    replaced with a fresh linear layer sized for the binary aneurysm task.
-    The ResNet-18 encoder produces 512-dimensional feature vectors.
-
     Args:
-        num_classes: Number of output classes (typically 2: healthy / aneurysm).
+        num_classes: Number of output classes.
+
+    Returns:
+        Configured MONAI ResNet-18 model.
     """
     try:
         model = resnet18(pretrained=True, spatial_dims=3, n_input_channels=1, num_classes=400)
@@ -207,30 +101,11 @@ def get_r3d10_model(num_classes: int) -> torch.nn.Module:
     """
     MONAI ResNet-10 for single-channel 3D medical image classification.
 
-    ResNet-10 is the lightest variant in the MedicalNet family: one residual
-    block per stage instead of ResNet-18's two, giving roughly half the
-    parameter count (~6M vs ~11M). Despite its size, it uses the same layer
-    structure (layer1–layer4) and produces the same 512-dimensional feature
-    vector before the classification head.
-
-    **Why ResNet-10 is worth testing:**
-    On small datasets (a few hundred cases), a model with fewer parameters is
-    less likely to overfit. The capacity reduction also means faster training
-    and lower GPU memory usage. Prior aneurysm detection literature frequently
-    uses ResNet-10 as the primary architecture precisely for this reason —
-    it often matches or outperforms larger models when labelled data is scarce.
-
-    **MedicalNet pretraining:**
-    Same source as ResNet-18 and ResNet-50 — the MedicalNet project (Tencent),
-    pre-trained on 23 medical imaging datasets. Weights are downloaded from
-    ``TencentMedicalNet/MedicalNet-Resnet10`` on Hugging Face Hub on first use,
-    with the same offline fallback behaviour as the other MedicalNet variants.
-
-    The 400-class head is replaced with a fresh linear layer sized for the
-    binary aneurysm task. The encoder produces 512-dimensional features.
-
     Args:
-        num_classes: Number of output classes (typically 2: healthy / aneurysm).
+        num_classes: Number of output classes.
+
+    Returns:
+        Configured MONAI ResNet-10 model.
     """
     try:
         model = resnet10(pretrained=True, spatial_dims=3, n_input_channels=1, num_classes=400)
@@ -249,23 +124,11 @@ def get_r3d50_model(num_classes: int) -> torch.nn.Module:
     """
     MONAI ResNet-50 for single-channel 3D medical image classification.
 
-    ResNet-50 uses bottleneck residual blocks (1×1 → 3×3 → 1×1 convolutions)
-    instead of the plain 3×3 → 3×3 blocks in ResNet-18. This increases model
-    capacity (25M vs 11M parameters) and the encoder feature dimension (2048
-    vs 512), at the cost of higher memory usage and longer training time.
-
-    **MedicalNet pretraining:**
-    Identical source to the ResNet-18 variant — the MedicalNet project
-    (Tencent), pre-trained on the same 23 medical imaging datasets. Weights are
-    downloaded from ``TencentMedicalNet/MedicalNet-Resnet50`` on Hugging Face
-    Hub on first use, with the same offline fallback behaviour.
-
-    The original 400-class head is replaced with a fresh linear layer sized for
-    the binary aneurysm task. ResNet-50's bottleneck encoder produces
-    2048-dimensional features before the classification head.
-
     Args:
-        num_classes: Number of output classes (typically 2: healthy / aneurysm).
+        num_classes: Number of output classes.
+
+    Returns:
+        Configured MONAI ResNet-50 model.
     """
     try:
         model = resnet50(pretrained=True, spatial_dims=3, n_input_channels=1, num_classes=400)
@@ -286,26 +149,11 @@ def get_densenet121_monai_model(num_classes: int) -> torch.nn.Module:
     """
     MONAI DenseNet-121 for single-channel 3D medical image classification.
 
-    DenseNet differs from ResNet in its connectivity pattern: every layer
-    receives feature maps from *all* preceding layers in the dense block, not
-    just the immediately previous one. This dense reuse of earlier features
-    encourages the network to learn complementary representations at each layer
-    rather than redundant ones, and provides strong gradient flow to early
-    layers without requiring residual shortcuts.
-
-    DenseNet-121 has four dense blocks with 6, 12, 24, and 16 layers
-    respectively, separated by transition layers that halve spatial resolution.
-    The growth rate (32) controls how many new feature maps each layer adds to
-    the collective representation; the initial feature count is 64.
-
-    **No pretrained weights:**
-    No MedicalNet or Kinetics-400 weights are available for 3D DenseNet-121,
-    so this model is trained entirely from scratch on the aneurysm dataset.
-    Despite the lack of pretraining, DenseNet's feature reuse architecture
-    provides some regularisation that mitigates overfitting on small datasets.
-
     Args:
-        num_classes: Number of output classes (typically 2: healthy / aneurysm).
+        num_classes: Number of output classes.
+
+    Returns:
+        Configured MONAI DenseNet-121 model.
     """
     model = DenseNet(
         spatial_dims=3,
@@ -325,55 +173,16 @@ class SwinUNETRClassifier(nn.Module):
     """
     SwinUNETR encoder repurposed for 3D volumetric classification.
 
-    SwinUNETR is a hierarchical Swin Transformer architecture originally
-    designed for 3D medical image segmentation. A Swin Transformer partitions
-    the volume into non-overlapping windows and applies self-attention within
-    each window, with a shifting window mechanism between layers to allow
-    cross-window information exchange. The hierarchical design produces
-    multi-scale feature maps at four resolutions.
-
-    **Encoder-only adaptation:**
-    The full SwinUNETR is constructed to load the pretrained checkpoint
-    (which covers the encoder sub-module ``swinViT``), but the decoder and
-    segmentation head are discarded. Only the deepest encoder output is used
-    for classification. This repurposes the powerful Transformer feature
-    extractor for a classification task without requiring segmentation labels.
-
-    **Classification head:**
-    The deepest encoder output has shape
-    ``(B, feature_size×16, D/32, H/32, W/32)`` — for ``feature_size=48``
-    and a 128³ input this is ``(B, 768, 4, 4, 4)``. Global Average Pooling
-    collapses the spatial dimensions to ``(B, 768)``, which is then mapped to
-    class logits by a linear layer. GAP is preferred over flattening because
-    it is spatially invariant and produces a fixed-length vector regardless of
-    input size.
-
-    **BTCV pretraining:**
-    The Swin Transformer encoder (``swinViT``) is loaded from a checkpoint
-    trained on the BTCV (Beyond the Cranial Vault) multi-organ segmentation
-    challenge — 14 abdominal organ classes. The weights are read from a local
-    cache file at ``/root/.cache/monai/models/swin_unetr.base_5000ep_f48_fe.pth``.
-    If the file is absent, the model falls back to random initialisation and
-    prints a warning — construction and the forward pass still succeed.
-
-    **Note on MONAI >= 1.4:**
-    Earlier MONAI versions required an ``img_size`` constructor argument to
-    pre-compute positional encodings. From MONAI >= 1.4, the window-based
-    attention is position-independent and accepts inputs of any spatial size.
-    The ``img_size`` parameter is kept in the constructor signature for API
-    compatibility but is not forwarded to SwinUNETR.
-
-    **Dependency:** requires ``einops`` (``pip install einops``) for the
-    Swin Transformer window-partitioning operations.
+    The model drops the decoder and applies Global Average Pooling to the
+    deepest encoder output, followed by a linear classification head.
 
     Args:
         img_size: Input spatial size. Kept for API compatibility; not passed
-            to SwinUNETR internally (see MONAI >= 1.4 note above).
-        in_channels: Number of input channels (1 for single-channel MRI/CTA).
-        num_classes: Number of output classes (typically 2).
-        feature_size: Base feature dimensionality for the Swin Transformer.
-            Must match the pretrained checkpoint (48 for the BTCV checkpoint).
-        use_pretrained: If ``True``, attempts to load the BTCV encoder weights.
+            to SwinUNETR internally.
+        in_channels: Number of input channels.
+        num_classes: Number of output classes.
+        feature_size: Base feature dimension (default 48).
+        use_pretrained: If ``True``, attempts to load BTCV pretrained weights.
     """
 
     def __init__(
@@ -442,12 +251,13 @@ class SwinUNETRClassifier(nn.Module):
 
 def get_swinunetr_model(num_classes: int) -> torch.nn.Module:
     """
-    Constructs a ``SwinUNETRClassifier`` configured for 128³ single-channel inputs.
-
-    See ``SwinUNETRClassifier`` for full architecture and pretrained weight details.
+    Constructs a ``SwinUNETRClassifier``.
 
     Args:
-        num_classes: Number of output classes (typically 2: healthy / aneurysm).
+        num_classes: Number of output classes.
+        
+    Returns:
+        Configured SwinUNETRClassifier model.
     """
     return SwinUNETRClassifier(
         img_size=(128, 128, 128),  # kept for API compatibility; not passed to SwinUNETR internally
@@ -563,16 +373,13 @@ def get_unetr_model(
     """
     Constructs a ``UNETRClassifier`` with ViT-Base hyperparameters.
 
-    See ``UNETRClassifier`` for full architecture details and the scientific
-    rationale for including a pure ViT alongside the hierarchical SwinUNETR.
-
     Args:
-        num_classes: Number of output classes (typically 2: healthy / aneurysm).
+        num_classes: Number of output classes.
         img_size: Spatial size of the input volumes. Must match the actual
-            input shape because the ViT positional embeddings are constructed
-            for exactly this number of patches (``img_size / patch_size`` per
-            axis). Defaults to ``(128, 128, 128)``; pass ``(256, 256, 128)``
-            when using the 256×256×128 dataset variants.
+            input shape for ViT positional embeddings.
+            
+    Returns:
+        Configured UNETRClassifier model.
     """
     return UNETRClassifier(
         num_classes=num_classes,
@@ -818,10 +625,11 @@ def get_unet3d_with_backbone_model(num_classes: int) -> torch.nn.Module:
     """
     Constructs a ``UNet3DWithBackbone`` with a MONAI ResNet-18 encoder.
 
-    See ``UNet3DWithBackbone`` for full architecture and pretrained weight details.
-
     Args:
-        num_classes: Number of output classes (typically 2: healthy / aneurysm).
+        num_classes: Number of output classes.
+        
+    Returns:
+        Configured UNet3DWithBackbone model.
     """
     return UNet3DWithBackbone(num_classes=num_classes, base_c=32)
 
@@ -963,7 +771,9 @@ def _strip_classifier(model: nn.Module, model_name: str) -> int:
         ValueError: If ``model_name`` is not a recognised architecture.
     """
     name = model_name.lower()
-    if name in ("r3d18", "r3d50"):
+    if name in ("r3d18", "r3d50", "r3d10", "r3d18_monai"):
+        # r3d18_monai, r3d10, and r3d50 are MONAI ResNet derivatives. 
+        # r3d18 is a torchvision ResNet. All have an .fc layer at the end.
         dim = model.fc.in_features
         model.fc = nn.Identity()
         return dim
@@ -1057,56 +867,40 @@ def get_model(
     """
     Construct and return a model by name.
 
-    This is the single entry point used by the orchestrator to instantiate any
-    supported architecture. Using a factory function decouples the training
-    pipeline from specific model classes: adding a new architecture requires
-    only a new branch here and a new entry in ``SUPPORTED_MODELS``, with no
-    changes to the orchestrator or training loop.
-
-    Model names are matched case-insensitively so ``"r3d18"``, ``"R3D18"``,
-    and ``"R3d18"`` all produce the same model.
-
-    Every returned model:
-      - Accepts input of shape ``(B, 1, *spatial_size)``
-      - Returns raw logits of shape ``(B, num_classes)``
-      - Is on CPU; the caller is responsible for ``.to(device)``
-
-    When ``use_tabular=True``, the model's classification head is stripped and
-    it is wrapped in a ``MultiModalWrapper`` that accepts an additional
-    ``tabular`` tensor of shape ``(B, tabular_dim)`` alongside the image.
-    The wrapper's ``forward`` signature becomes ``forward(image, tabular)``.
+    Every returned model accepts input of shape ``(B, 1, *spatial_size)``
+    and returns raw logits of shape ``(B, num_classes)``.
 
     Args:
         model_name: Architecture name. Must be one of ``SUPPORTED_MODELS``
             (case-insensitive). Examples: ``"R3D18"``, ``"R3D50"``.
-        num_classes: Number of output classes (typically 2: healthy / aneurysm).
-        use_tabular: If True, wrap the model for late fusion with tabular features.
-        tabular_dim: Number of tabular input features (default 2: age + gender).
-        spatial_size: Input spatial dimensions as ``(H, W, D)``. Forwarded to
-            UNETR to set positional embedding size; CNN-based models ignore it
-            because they use adaptive average pooling.
+        num_classes: Number of output classes.
+        use_tabular: If ``True``, wraps the model in a ``MultiModalWrapper``.
+        tabular_dim: Dimensionality of the tabular feature vector.
+        spatial_size: Expected spatial size of the input volumes.
 
     Returns:
-        A ``torch.nn.Module`` ready for ``.to(device)`` and training.
+        Configured PyTorch/MONAI model.
 
     Raises:
-        ValueError: If ``model_name`` does not match any entry in
-            ``SUPPORTED_MODELS``.
+        ValueError: If ``model_name`` is not in ``SUPPORTED_MODELS``.
     """
     name = model_name.lower()
 
     if name == "r3d10":
         print("  -> Using MONAI ResNet-10 (MedicalNet pretrained).")
-        return get_r3d10_model(num_classes)
+        model = get_r3d10_model(num_classes)
     elif name == "r3d18":
         print("  -> Using torchvision R3D-18 (Kinetics-400 pretrained).")
         model = get_r3d18_pytorch_model(num_classes)
+    elif name == "r3d18_monai":
+        print("  -> Using MONAI ResNet-18 (MedicalNet pretrained).")
+        model = get_r3d18_monai_model(num_classes)
     elif name == "r3d50":
         print("  -> Using MONAI ResNet-50 (MedicalNet pretrained).")
         model = get_r3d50_model(num_classes)
     elif name == "unetr":
         print("  -> Using MONAI UNETR (pure ViT encoder, from scratch).")
-        return get_unetr_model(num_classes, img_size=spatial_size)
+        model = get_unetr_model(num_classes, img_size=spatial_size)
     elif name == "densenet121":
         print("  -> Using MONAI DenseNet-121 (from scratch).")
         model = get_densenet121_monai_model(num_classes)
