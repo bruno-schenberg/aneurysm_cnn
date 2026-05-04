@@ -36,3 +36,7 @@ Thumbs.db
 *.swp
 .vscode/
 .idea/
+
+# Local Virtual Environments
+data_engine/.venv/
+training_engine/.venv/

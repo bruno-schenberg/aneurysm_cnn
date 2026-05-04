@@ -62,28 +62,51 @@ Raw DICOM files
 
 ## Environment Setup
 
-Three focused conda environments cover all use cases. No `requirements.txt` files are used — all dependencies are managed by conda.
+The project uses Python virtual environments (`.venv`) for local development, and Conda environments for execution on the High-Performance Computing (HPC) cluster. Environment configurations are located in the `infrastructure/` directory.
 
-| Environment | YAML | Where | Stage |
-|-------------|------|-------|-------|
-| `aneurysm_cnn_data` | `environment/data/environment_data.yml` | Local | Data engine |
-| `aneurysm_cnn_cuda` | `environment/cuda/environment_cuda.yml` | Local | Training (CUDA GPU) |
-| `aneurysm_cnn_rocm` | `environment/rocm/environment_rocm.yaml` | HPC cluster | Training (AMD ROCm) |
+| Target | Engine | Type | Path |
+|--------|--------|------|------|
+| Local | Data | `.venv` | Manual setup via `pip` (see packages in `infrastructure/data/environment_data.yml`) |
+| Local | Training (CUDA) | `.venv` | Manual setup via `pip` (see packages in `infrastructure/training/environment_cuda.yml`) |
+| HPC | Data | Conda | `infrastructure/data/environment_data_hpc.yml` |
+| HPC | Training (ROCm) | Conda | `infrastructure/training/environment_rocm.yaml` |
+
+### Local Setup (.venv)
+
+For local development, we use two separate standard Python virtual environments, located directly inside each engine's parent folder.
+
+```bash
+# Data Engine (.venv)
+cd data_engine
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r ../infrastructure/data/environment_data.yml # Equivalent pip packages
+deactivate
+cd ..
+
+# Training Engine with CUDA (.venv)
+cd training_engine
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r ../infrastructure/training/environment_local.yml # Equivalent pip packages
+deactivate
+cd ..
+```
+
+### HPC Setup (Conda)
+
+On the HPC cluster, conda environments are used to manage complex dependencies:
 
 ```bash
 # Activate conda if not already available in your shell
 source /opt/miniconda3/etc/profile.d/conda.sh
 
-# Create the data engine environment (local)
-conda env create -f environment/data/environment_data.yml
+# Create the data engine environment
+conda env create -f infrastructure/data/environment_data_hpc.yml
 conda activate aneurysm_cnn_data
 
-# Create the training environment for CUDA GPU (local)
-conda env create -f environment/cuda/environment_cuda.yml
-conda activate aneurysm_cnn_cuda
-
-# Create the training environment for ROCm GPU (HPC cluster)
-conda env create -f environment/rocm/environment_rocm.yaml
+# Create the training environment for ROCm GPU
+conda env create -f infrastructure/training/environment_rocm.yaml
 conda activate aneurysm_cnn_rocm
 ```
 
@@ -96,7 +119,7 @@ The data engine lives in `data_engine/` and runs exclusively on the local develo
 Entry point: `data_engine/data_cleaner.py`
 
 ```bash
-conda activate aneurysm_cnn_data
+source .venv_data/bin/activate
 python data_engine/data_cleaner.py \
     --raw-dir /mnt/data/cases-3/raw \
     --nifti-dir /mnt/data/cases-3/nifti
@@ -181,7 +204,7 @@ The training engine lives in `training_engine/` and handles experiment configura
 Entry point: `training_engine/train_models.py`
 
 ```bash
-conda activate aneurysm_cnn_cuda   # or aneurysm_cnn_rocm on HPC
+source .venv_cuda/bin/activate   # or aneurysm_cnn_rocm on HPC
 python training_engine/train_models.py
 ```
 
@@ -367,13 +390,14 @@ After all folds complete, `evaluate_models` aggregates predictions across folds 
 ### 1. Prepare data (local only)
 
 ```bash
-conda activate aneurysm_cnn_data
+cd data_engine
+source .venv/bin/activate
 
-python data_engine/data_cleaner.py \
+python data_cleaner.py \
     --raw-dir /mnt/data/cases-3/raw \
     --nifti-dir /mnt/data/cases-3/nifti
 
-python data_engine/dataset_gen.py --workers 3
+python dataset_gen.py --workers 3
 ```
 
 ### 2. Transfer datasets to HPC (if using the cluster)
@@ -404,16 +428,14 @@ Edit `training_engine/experiments.json`. Minimal example:
 ### 4. Run training
 
 ```bash
-conda activate aneurysm_cnn_cuda
+cd training_engine
+source .venv/bin/activate
 
-# Local (from repository root)
-python training_engine/train_models.py
+# Local
+python train_models.py
 
-# HPC — ROCm cluster
-sbatch hpc/rocm/start_script_rocm.slurm
-
-# HPC — CUDA cluster
-sbatch hpc/cuda/start_script_cuda.slurm
+# HPC — ROCm cluster (from repository root)
+sbatch infrastructure/training/start_script_rocm.slurm
 ```
 
 Results are saved to `experiments/<name>/`.
@@ -462,17 +484,18 @@ aneurysm_cnn/
 │       ├── orchestrator.py         # k-fold experiment orchestration; fold result aggregation
 │       └── plots.py                # Confusion matrices, ROC curves, CSVs, metric summaries
 │
-├── environment/
-│   ├── data/environment_data.yml   # Local, data engine (Python 3.11)
-│   ├── cuda/environment_cuda.yml   # Local, training engine (Python 3.11, CUDA 12.1)
-│   └── rocm/environment_rocm.yaml  # HPC, training engine (Python 3.10, ROCm 6.0)
-│
-├── hpc/
-│   ├── cuda/start_script_cuda.slurm
-│   └── rocm/
-│       ├── start_script_rocm.slurm
-│       ├── test_rocm.slurm
-│       └── test_rocm.py
+├── infrastructure/                 # Environment configs and HPC scripts
+│   ├── data/
+│   │   ├── environment_data.yml    # Local, data engine dependencies
+│   │   ├── environment_data_hpc.yml# HPC, data engine (Conda)
+│   │   ├── dataset_gen*.slurm      # HPC scripts for data generation
+│   │   ├── transfer_datasets.sh
+│   │   └── transfer_nifti.sh
+│   └── training/
+│       ├── environment_local.yml   # Local, training engine dependencies
+│       ├── environment_hpc.yaml    # HPC, training engine (Conda)
+│       ├── start_script_rocm.slurm # HPC, ROCm cluster
+│       └── test_rocm.py            # HPC diagnostics
 │
 ├── experiments/                    # GITIGNORED: all training run outputs
 ├── logs/                           # GITIGNORED: cross-cutting runtime logs
