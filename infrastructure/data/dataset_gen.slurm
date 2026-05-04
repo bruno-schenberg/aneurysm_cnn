@@ -1,40 +1,25 @@
 #!/bin/bash
-#SBATCH --job-name=aneurysm_dataset_gen
+#SBATCH --job-name=aneurysm_dataset_gen_all
 #SBATCH --partition=cpu                 # CPU-only — dataset generation needs no GPU
 #SBATCH --output=%x_%j.out
 #SBATCH --error=%x_%j.err
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=4               # Matches DEFAULT_WORKERS in dataset_gen.py
-#SBATCH --mem=48G                       # 192x192x128 ~4 GB/worker; 256x256x176 use --workers 2
-#SBATCH --time=12:00:00                 # 12 h wall time for full dataset, all variants
+#SBATCH --cpus-per-task=4               # Used by 192 run; 176 run is capped at 2
+#SBATCH --mem=48G
+#SBATCH --time=24:00:00                 # 24 h — runs both shapes sequentially
 
 echo -e "## Job started at $(date +'%d-%m-%Y as %T') #####################\n"
 
-## ---------------------------------------------------------------------------
-## Configurable parameters (override with env vars at submission time)
-##
-##   TARGET_SHAPE=192x192x128 VARIANTS="A B C D E F" sbatch hpc/data/dataset_gen.slurm
-##   TARGET_SHAPE=256x256x176 N_WORKERS=2 VARIANTS="A B C D E F" sbatch hpc/data/dataset_gen.slurm
-##
-## ---------------------------------------------------------------------------
 INPUT_DIR=${INPUT_DIR:-$HOME/data/cases-3/nifti}
 OUTPUT_BASE=${OUTPUT_BASE:-$HOME/data/cases-3}
-TARGET_SHAPE=${TARGET_SHAPE:-192x192x128}
 VARIANTS=${VARIANTS:-"C D A B E F"}
-N_WORKERS=${N_WORKERS:-4}
 
-## ---------------------------------------------------------------------------
-## Job information
-## ---------------------------------------------------------------------------
 echo -e "## Job ID:          $SLURM_JOB_ID"
 echo -e "## Execution node:  $(hostname -s)"
-echo -e "## Submit dir:      $SLURM_SUBMIT_DIR"
 echo -e "## Input dir:       $INPUT_DIR"
 echo -e "## Output base:     $OUTPUT_BASE"
-echo -e "## Target shape:    $TARGET_SHAPE"
 echo -e "## Variants:        $VARIANTS"
-echo -e "## Workers:         $N_WORKERS \n"
 
 ## ---------------------------------------------------------------------------
 ## Environment setup
@@ -42,25 +27,46 @@ echo -e "## Workers:         $N_WORKERS \n"
 source $HOME/miniconda3/bin/activate
 conda activate aneurysm_cnn_data_hpc
 
-## Verify environment
 echo -e "## Active env: $CONDA_DEFAULT_ENV"
 echo -e "## Python:     $(which python)"
 python -c "import monai, nibabel, numpy; print(f'monai {monai.__version__}  nibabel {nibabel.__version__}  numpy {numpy.__version__}')"
 echo ""
 
-## ---------------------------------------------------------------------------
-## Dataset generation
-## ---------------------------------------------------------------------------
 cd $HOME/aneurysm_cnn
 
+## ---------------------------------------------------------------------------
+## Run 1 — 192×192×128, 4 workers
+## ---------------------------------------------------------------------------
+echo -e "\n### Pass 1/2 — 192x192x128 | 4 workers ###"
+
 python -u data_engine/dataset_gen.py \
-    --input-dir   "$INPUT_DIR"    \
-    --output-base "$OUTPUT_BASE"  \
-    --target-shape "$TARGET_SHAPE" \
-    --variants    $VARIANTS       \
-    --workers     "$N_WORKERS"
+    --input-dir    "$INPUT_DIR"    \
+    --output-base  "$OUTPUT_BASE"  \
+    --target-shape 192x192x128     \
+    --variants     $VARIANTS       \
+    --workers      4
 
-STATUS=$?
+STATUS_192=$?
+echo -e "### Pass 1/2 finished — exit $STATUS_192 ###"
 
+## ---------------------------------------------------------------------------
+## Run 2 — 256×256×176, 2 workers (larger volumes, less RAM per worker)
+## ---------------------------------------------------------------------------
+echo -e "\n### Pass 2/2 — 256x256x176 | 2 workers ###"
+
+python -u data_engine/dataset_gen.py \
+    --input-dir    "$INPUT_DIR"    \
+    --output-base  "$OUTPUT_BASE"  \
+    --target-shape 256x256x176     \
+    --variants     $VARIANTS       \
+    --workers      2
+
+STATUS_176=$?
+echo -e "### Pass 2/2 finished — exit $STATUS_176 ###"
+
+## ---------------------------------------------------------------------------
+## Final status
+## ---------------------------------------------------------------------------
 echo -e "\n## Job finished at $(date +'%d-%m-%Y as %T') ###################"
-exit $STATUS
+
+[ $STATUS_192 -eq 0 ] && [ $STATUS_176 -eq 0 ] && exit 0 || exit 1

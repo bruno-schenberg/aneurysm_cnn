@@ -489,14 +489,13 @@ aneurysm_cnn/
 │   ├── data/
 │   │   ├── environment_data.yml    # Local, data engine dependencies
 │   │   ├── environment_data_hpc.yml# HPC, data engine (Conda)
-│   │   ├── dataset_gen*.slurm      # HPC scripts for data generation
-│   │   ├── transfer_datasets.sh
+│   │   ├── dataset_gen.slurm       # HPC script for data generation
 │   │   └── transfer_nifti.sh
 │   └── training/
+│       ├── diagnostics/            # HPC diagnostics and test scripts
 │       ├── environment_local.yml   # Local, training engine dependencies
 │       ├── environment_hpc.yaml    # HPC, training engine (Conda)
-│       ├── start_script_rocm.slurm # HPC, ROCm cluster
-│       └── test_rocm.py            # HPC diagnostics
+│       └── start_script_rocm.slurm # HPC, ROCm cluster
 │
 ├── experiments/                    # GITIGNORED: all training run outputs
 ├── logs/                           # GITIGNORED: cross-cutting runtime logs
