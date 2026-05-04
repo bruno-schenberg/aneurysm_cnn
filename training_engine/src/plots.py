@@ -462,7 +462,7 @@ def save_metrics_to_csv(
     The output has one row per training epoch (from ``metrics_history``) plus
     a ``final_eval`` row at the end. The epoch rows contain training and
     validation metrics logged during training (train loss, train acc, val loss,
-    val acc, val F2). The ``final_eval`` row contains Precision, Recall, and
+    val acc, val F2, duration_sec). The ``final_eval`` row contains Precision, Recall, and
     F2-Score computed on the test set after the best-model checkpoint was
     restored.
 
