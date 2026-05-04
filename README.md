@@ -461,7 +461,8 @@ aneurysm_cnn/
 ├── data_engine/                    # Stage 1: DICOM → NIfTI pipeline
 │   ├── data_cleaner.py             # Pipeline entry point (steps 1–5)
 │   ├── dataset_gen.py              # Dataset variant generator (step 6)
-│   ├── check_nifti_quality.py      # Ad-hoc quality inspection script
+│   ├── diagnostics/                # One-time and ad-hoc analysis scripts
+│   │   └── check_nifti_quality.py  # Ad-hoc quality inspection script
 │   ├── dataset/
 │   │   └── classes.csv             # Ground-truth aneurysm labels (tracked in git)
 │   ├── output/                     # GITIGNORED: pipeline runtime artifacts
