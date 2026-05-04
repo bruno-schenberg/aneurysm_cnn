@@ -9,7 +9,7 @@
         "GRAD_ACCUM_STEPS": 2,
         "LEARNING_RATE": 0.0001,
         "INPUT_RESOLUTION": "192x192x128",
-        "USE_AMP": false,
+        "USE_AMP": true,
         "USE_KFOLD": false,
         "VAL_SPLIT_RATIO": 0.20,
         "EARLY_STOPPING_PATIENCE": 15
@@ -24,7 +24,7 @@
         "GRAD_ACCUM_STEPS": 2,
         "LEARNING_RATE": 0.0001,
         "INPUT_RESOLUTION": "192x192x128",
-        "USE_AMP": false,
+        "USE_AMP": true,
         "USE_KFOLD": false,
         "VAL_SPLIT_RATIO": 0.20,
         "EARLY_STOPPING_PATIENCE": 15
@@ -39,7 +39,7 @@
         "GRAD_ACCUM_STEPS": 2,
         "LEARNING_RATE": 0.0001,
         "INPUT_RESOLUTION": "192x192x128",
-        "USE_AMP": false,
+        "USE_AMP": true,
         "USE_KFOLD": false,
         "VAL_SPLIT_RATIO": 0.20,
         "EARLY_STOPPING_PATIENCE": 15
@@ -54,7 +54,7 @@
         "GRAD_ACCUM_STEPS": 2,
         "LEARNING_RATE": 0.0001,
         "INPUT_RESOLUTION": "192x192x128",
-        "USE_AMP": false,
+        "USE_AMP": true,
         "USE_KFOLD": false,
         "VAL_SPLIT_RATIO": 0.20,
         "EARLY_STOPPING_PATIENCE": 15
@@ -69,7 +69,7 @@
         "GRAD_ACCUM_STEPS": 2,
         "LEARNING_RATE": 0.0001,
         "INPUT_RESOLUTION": "192x192x128",
-        "USE_AMP": false,
+        "USE_AMP": true,
         "USE_KFOLD": false,
         "VAL_SPLIT_RATIO": 0.20,
         "EARLY_STOPPING_PATIENCE": 15
@@ -84,7 +84,7 @@
         "GRAD_ACCUM_STEPS": 2,
         "LEARNING_RATE": 0.0001,
         "INPUT_RESOLUTION": "192x192x128",
-        "USE_AMP": false,
+        "USE_AMP": true,
         "USE_KFOLD": false,
         "VAL_SPLIT_RATIO": 0.20,
         "EARLY_STOPPING_PATIENCE": 15

@@ -51,9 +51,9 @@ Three separate random number streams are seeded here:
     stochasticity.
 
 MONAI's ``set_determinism`` seeds its own internal operations. Setting
-``cudnn.deterministic = True`` and disabling ``cudnn.benchmark`` ensures that
-CUDA convolution algorithms are chosen deterministically rather than by runtime
-auto-tuning, at a small cost in throughput.
+``cudnn.deterministic = True`` ensures that CUDA convolution algorithms are
+chosen deterministically. ``benchmark`` is left enabled so cuDNN can auto-tune
+the fastest algorithm per input shape — critical for 3D convolutions on ROCm.
 
 DataLoader workers are separate processes that inherit a copy of the parent's
 random state at spawn time, which means they would all produce identical random
@@ -162,12 +162,11 @@ def set_seed(seed: int = 42) -> None:
       - ``set_determinism``: MONAI's wrapper that calls ``torch.manual_seed``,
         seeds NumPy, and configures MONAI-internal random states.
 
-    The two cuDNN flags handle a separate source of non-determinism at the
-    CUDA kernel level. When ``benchmark=True`` (the default), CUDA auto-tunes
-    which convolution algorithm is fastest for the current input shape, and the
-    choice can vary between runs. Setting ``deterministic=True`` and
-    ``benchmark=False`` disables this tuning and forces reproducible algorithm
-    selection, at a small performance cost.
+    The cuDNN deterministic flag handles a separate source of non-determinism
+    at the CUDA kernel level. Setting ``deterministic=True`` forces reproducible
+    algorithm selection. ``benchmark`` is left at its default (``True``) so that
+    cuDNN can auto-tune the fastest algorithm for each input shape — this is
+    critical for performance with large 3D convolutions on ROCm/CUDA.
 
     Args:
         seed: Integer seed applied to all RNG sources. Defaults to 42.
@@ -178,7 +177,6 @@ def set_seed(seed: int = 42) -> None:
     torch.cuda.manual_seed_all(seed)
     set_determinism(seed=seed)
     torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
 
 
 def seed_worker(worker_id: int) -> None:
