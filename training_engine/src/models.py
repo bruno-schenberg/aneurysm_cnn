@@ -887,34 +887,24 @@ def get_model(
     name = model_name.lower()
 
     if name == "r3d10":
-        print("  -> Using MONAI ResNet-10 (MedicalNet pretrained).")
         model = get_r3d10_model(num_classes)
     elif name == "r3d18":
-        print("  -> Using torchvision R3D-18 (Kinetics-400 pretrained).")
         model = get_r3d18_pytorch_model(num_classes)
     elif name == "r3d18_monai":
-        print("  -> Using MONAI ResNet-18 (MedicalNet pretrained).")
         model = get_r3d18_monai_model(num_classes)
     elif name == "r3d50":
-        print("  -> Using MONAI ResNet-50 (MedicalNet pretrained).")
         model = get_r3d50_model(num_classes)
     elif name == "unetr":
-        print("  -> Using MONAI UNETR (pure ViT encoder, from scratch).")
         model = get_unetr_model(num_classes, img_size=spatial_size)
     elif name == "densenet121":
-        print("  -> Using MONAI DenseNet-121 (from scratch).")
         model = get_densenet121_monai_model(num_classes)
     elif name == "swinunetr":
-        print("  -> Using MONAI SwinUNETR classifier.")
         model = get_swinunetr_model(num_classes)
     elif name == "unet3d":
-        print("  -> Using custom UNet3D classifier (from scratch).")
         model = UNet3DClassifier(in_channels=1, num_classes=num_classes, base_c=32)
     elif name == "unet3dwithbackbone":
-        print("  -> Using custom UNet3D with MONAI ResNet-18 backbone (MedicalNet).")
         model = get_unet3d_with_backbone_model(num_classes)
     elif name == "mil_r3d18":
-        print("  -> Using MIL classifier with MONAI ResNet-18 instance extractor.")
         instance_extractor = get_r3d18_monai_model(num_classes)
         # ResNet-18 produces 512-dimensional features before the classification head.
         model = MILClassifier(instance_extractor, num_classes, feature_dim=512)  # type: ignore
@@ -925,7 +915,6 @@ def get_model(
         )
 
     if use_tabular:
-        print(f"  -> Wrapping with MultiModalWrapper (tabular_dim={tabular_dim}).")
         feature_dim = _strip_classifier(model, name)
         model = MultiModalWrapper(model, feature_dim, tabular_dim, num_classes)
 

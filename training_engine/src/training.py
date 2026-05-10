@@ -226,12 +226,6 @@ def run_training_loop(
     epochs_without_improvement = 0
     start_time = time.time()
 
-    if patience > 0:
-        print(f"\nStarting training (early stopping patience={patience})...")
-    else:
-        print("\nStarting training...")
-        
-    print("(Epoch progress and metrics are saved to the fold's metrics.csv file)")
 
     for epoch in range(num_epochs):
         epoch_start_time = time.time()
@@ -259,7 +253,6 @@ def run_training_loop(
             epochs_without_improvement += 1
             if patience > 0:
                 if epochs_without_improvement >= patience:
-                    print(f"  -> [Epoch {epoch + 1:03d} | {epoch_duration:.1f}s] Early stopping triggered.")
                     metrics_history.append({
                         "epoch": epoch + 1,
                         "train_loss": train_loss,
@@ -282,7 +275,6 @@ def run_training_loop(
         })
 
     total_training_time = (time.time() - start_time) / 60
-    print(f"\nTraining completed in {total_training_time:.2f} minutes.")
 
     if best_model_checkpoint is None:
         print(

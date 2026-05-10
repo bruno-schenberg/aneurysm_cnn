@@ -180,12 +180,8 @@ def run_one_fold(
         - ``'eval_acc'``: Scalar evaluation accuracy.
         - ``'eval_loss'``: Scalar evaluation loss (unweighted).
     """
-    total_folds = config["N_SPLITS"] if config.get("USE_KFOLD", True) else 1
-    print(f"\n--- Starting Fold {fold}/{total_folds} ---")
-
     fold_output_dir = os.path.join(experiment_output_dir, f"fold_{fold}")
     os.makedirs(fold_output_dir, exist_ok=True)
-    print(f"Results for Fold {fold} will be saved to: {fold_output_dir}")
 
     # [Step 1] Initialise optimiser and loss criterion
     criterion_cls = nn.CrossEntropyLoss
@@ -210,21 +206,11 @@ def run_one_fold(
         grad_accum_steps=grad_accum_steps,
         use_amp=config.get("USE_AMP", True),
     )
-    print(f"Fold {fold} training duration: {total_time:.2f} minutes.")
-
     # [Step 3] Restore F2-optimal checkpoint for final evaluation
     if best_model_checkpoint is not None:
-        print(
-            f"\n[Fold {fold}] Loading F2-optimal checkpoint "
-            f"(epoch {best_model_checkpoint['best_epoch']}, "
-            f"val F2 = {best_model_checkpoint['best_val_f2']:.4f})..."
-        )
         model.load_state_dict(best_model_checkpoint["state_dict"])
     else:
-        print(
-            f"\n[Fold {fold}] Warning: No checkpoint saved (all F2 values were 0). "
-            "Evaluating with final epoch weights."
-        )
+        print(f"  Warning [Fold {fold}]: No checkpoint saved (all F2 = 0). Using final epoch weights.")
 
     # [Step 4] Evaluate on the appropriate set depending on experiment config
     if config.get("HOLD_OUT_TEST_SET", False):
@@ -234,7 +220,6 @@ def run_one_fold(
         eval_loader = val_loader
         eval_set_name = "Validation"
 
-    print(f"\n[Fold {fold}] Final {eval_set_name} Set Evaluation...")
     eval_criterion = nn.CrossEntropyLoss()
     eval_loss, eval_acc, eval_f2, detailed_results = validate_one_epoch(
         model, eval_loader, eval_criterion, config["DEVICE"], return_details=True,
@@ -242,10 +227,6 @@ def run_one_fold(
     )
     assert isinstance(detailed_results, list), (
         "validate_one_epoch did not return detailed results as a list."
-    )
-    print(
-        f"  -> Fold {eval_set_name} Results: "
-        f"Loss: {eval_loss:.4f} | Acc: {eval_acc:.4f} | F2: {eval_f2:.4f}"
     )
 
     # [Step 5] Save best-checkpoint metadata for artifact traceability
@@ -284,6 +265,17 @@ def run_one_fold(
     )
 
     final_metrics = calculate_classification_metrics(detailed_results)
+
+    total_epochs_run = metrics_history[-1]["epoch"] if metrics_history else 0
+    best_epoch = best_model_checkpoint["best_epoch"] if best_model_checkpoint else "N/A"
+    print(
+        f"  Fold {fold} | Epochs: {total_epochs_run} (best: {best_epoch}) | "
+        f"Time: {total_time:.1f} min | "
+        f"Prec: {final_metrics['Precision']:.4f} | "
+        f"Rec: {final_metrics['Recall']:.4f} | "
+        f"F2: {final_metrics['F2-Score']:.4f} | "
+        f"Acc: {eval_acc:.4f} | Loss: {eval_loss:.4f}"
+    )
 
     return {
         "predictions": detailed_results,
@@ -395,14 +387,11 @@ def summarize_experiment_results(
         all_fold_predictions: Dict mapping fold names to FoldResult dicts,
             as accumulated by ``run_experiment``.
     """
-    print("\n" + "=" * 80)
-    print(f"K-FOLD CROSS-VALIDATION COMPLETE FOR: {experiment_name}")
-    print("\nEvaluating aggregate predictions...")
+    print(f"\nSUMMARY: {experiment_name}")
     summary_csv_path = os.path.join(
         experiment_output_dir, f"{experiment_name}_evaluation_summary.csv"
     )
     evaluate_models(all_fold_predictions, summary_csv_path)
-    print("\n" + "=" * 80)
 
 
 # ----------------------------------------------------
@@ -480,13 +469,7 @@ def run_experiment(config: Dict[str, Any]) -> None:
         aneurysm_positive_weight: Optional[torch.Tensor] = None
         if use_class_weights:
             aneurysm_positive_weight = get_class_weights(train_files)
-            if aneurysm_positive_weight is not None:
-                print(
-                    f"Using class weights for fold {fold_idx + 1}: "
-                    f"{aneurysm_positive_weight.tolist()}"
-                )
 
-        print(f"\n[Fold {fold_idx + 1}] Setting up model: {config['model']}")
         model = get_model(
             model_name=config["model"],
             num_classes=len(config["CLASSES"]),

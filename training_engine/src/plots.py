@@ -73,7 +73,6 @@ def plot_confusion_matrix(
     plt.tight_layout()
     plt.savefig(filename)
     plt.close()
-    print(f"Confusion matrix saved to {filename}")
 
 
 def plot_roc_curve(
@@ -132,7 +131,6 @@ def plot_roc_curve(
     plt.legend(loc="lower right")
     plt.savefig(filename)
     plt.close()
-    print(f"ROC curve saved to {filename}")
 
 
 # ── Metric Calculation ────────────────────────────────────────────────────────
@@ -184,12 +182,10 @@ def evaluate_models(
         all_fold_predictions: Dict mapping fold/model name strings to fold result dicts.
         output_csv_path: Path where the summary CSV will be written.
     """
-    print(f"\nEvaluating predictions for {len(all_fold_predictions)} folds...")
     results = []
 
     for model_name, fold_data in all_fold_predictions.items():
         if fold_data and "metrics" in fold_data:
-            print(f"--- Aggregating results for **{model_name}** ---")
             fold_results = {
                 "Model Name": model_name,
                 **fold_data["metrics"],
@@ -197,11 +193,6 @@ def evaluate_models(
                 "Eval Loss": fold_data["eval_loss"],
             }
             results.append(fold_results)
-            print(
-                f"  Eval Acc: {fold_results['Eval Accuracy']:.4f}, "
-                f"Eval Loss: {fold_results['Eval Loss']:.4f}, "
-                f"F2-Score: {fold_results['F2-Score']:.4f}"
-            )
 
     if results:
         results_df = pd.DataFrame(results)
@@ -226,12 +217,8 @@ def evaluate_models(
             [results_df, pd.DataFrame([avg_metrics, std_metrics])], ignore_index=True
         )
 
-        print("\n" + "=" * 50)
-        print("FINAL MODEL EVALUATION SUMMARY")
-        print("=" * 50)
         print(results_df.to_string(index=False, float_format="%.4f"))
         results_df.to_csv(output_csv_path, index=False)
-        print(f"\nEvaluation summary saved to: {output_csv_path}")
     else:
         print("\nNo valid fold data was processed.")
 
@@ -264,7 +251,6 @@ def save_predictions_from_detailed_results(
         writer.writeheader()
         writer.writerows(rows)
 
-    print(f"Test set predictions saved to {filename}")
 
 
 def save_metrics_to_csv(
@@ -292,7 +278,6 @@ def save_metrics_to_csv(
 
     full_metrics_df = pd.concat([history_df, final_metrics_row], ignore_index=True)
     full_metrics_df.to_csv(filename, index=False, float_format="%.4f")
-    print(f"Metrics saved to {filename}")
 
 
 def save_fold_artifacts(
@@ -320,7 +305,6 @@ def save_fold_artifacts(
         fold_output_dir: Directory where all artifacts are written.
         config: Experiment config dict.
     """
-    print(f"\n[Fold {fold}] Generating and saving evaluation artifacts...")
 
     cm_raw_path = os.path.join(fold_output_dir, f"{experiment_name}_fold{fold}_cm_raw.png")
     cm_norm_path = os.path.join(
@@ -361,8 +345,6 @@ def save_fold_artifacts(
 
     # --- Model state files ---
     torch.save(model.state_dict(), last_model_path)
-    print(f"Last model for fold {fold} saved to {last_model_path}")
 
     if best_model_state:
         torch.save(best_model_state, best_model_path)
-        print(f"Best model for fold {fold} saved to {best_model_path}")
