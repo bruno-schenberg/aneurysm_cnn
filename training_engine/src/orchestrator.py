@@ -6,51 +6,12 @@ per-fold DataLoaders, reinitialising the model for each fold, running the
 training loop, restoring the best-F2 checkpoint for final evaluation, saving
 all artifacts, and aggregating results across folds.
 
-## Role in the pipeline
-
-The orchestrator is the conductor that wires together every other module in
-the training engine. It does not implement any training logic itself — that
-lives in ``training.py``. Instead it sequences the pipeline:
-
-    prepare_experiment_setup          ← validate config, seed RNG, split data
-           ↓ (per fold)
-    build_dataloaders                 ← wrap file lists in DataLoaders
-    get_class_weights                 ← compute per-fold loss weights
-    get_model → model.to(device)      ← fresh model for every fold
-    run_one_fold
-        ├─ run_training_loop          ← train + checkpoint best F2
-        ├─ model.load_state_dict      ← restore best checkpoint
-        ├─ validate_one_epoch         ← final test/val evaluation
-        └─ save_fold_artifacts        ← plots, CSVs, model weights
-           ↓ (after all folds)
-    summarize_experiment_results      ← aggregate CSV across folds
-
-## Why reinitialise the model for every fold?
-
-Each fold must start from the same random initialisation to ensure that
-performance differences between folds are attributable to the data split,
-not to accumulated training history from previous folds. ``get_model`` is
-called inside the fold loop so every fold gets a freshly initialised model
-rather than continuing from where the previous fold left off.
-
-## Why delete the model and empty the CUDA cache between folds?
-
-A 3D CNN can occupy several gigabytes of GPU memory. Holding the previous
-fold's model in memory while initialising the next fold's model would require
-temporarily fitting two models simultaneously, which often exceeds available
-VRAM. ``del model`` drops the Python reference, making the object eligible for
-garbage collection, and ``torch.cuda.empty_cache()`` tells the CUDA allocator
-to release any cached (but unused) memory back to the OS so the next fold
-starts with a clean allocation.
-
-## Evaluation set: test vs validation
-
-The ``HOLD_OUT_TEST_SET`` config flag controls which DataLoader is used for
-final fold evaluation. When ``True`` (the default), the 20% hold-out test set
-is used — this is the correct setting for reporting results. When ``False``,
-the validation split is reused for evaluation. The latter is primarily useful
-for debugging on small synthetic datasets where a three-way split would leave
-too few samples in each subset.
+- The model is reinitialised from scratch for every fold so performance
+  differences are attributable to the data split, not accumulated training state.
+- ``del model`` + ``torch.cuda.empty_cache()`` between folds prevents temporarily
+  holding two large models in VRAM simultaneously.
+- ``HOLD_OUT_TEST_SET=True`` evaluates on the 20% hold-out test split (default);
+  ``False`` reuses the validation split, which is useful for debugging on small datasets.
 """
 
 import json
@@ -98,87 +59,30 @@ def run_one_fold(
     Execute one complete fold: train, restore best checkpoint, evaluate, save
     artifacts, and return a result dict for aggregation.
 
-    This function is the innermost unit of the experiment loop. It is called
-    once per fold by ``run_experiment`` with a freshly initialised model and
-    pre-built DataLoaders. All six steps are sequential and each depends on
-    the output of the previous one.
+    Steps: initialise AdamW + CrossEntropyLoss → run training loop →
+    restore best-F2 checkpoint → evaluate on test or val set (unweighted loss)
+    → save checkpoint metadata JSON → save fold artifacts.
 
-    **Step 1 — Optimiser and loss criterion:**
-    ``AdamW`` is used with the learning rate and weight decay from the config.
-    AdamW decouples weight decay from the gradient update, which makes the
-    decay coefficient behave more predictably than the weight decay in
-    standard Adam. ``criterion_cls`` is passed as a *class* (not an instance)
-    to ``run_training_loop``, which instantiates it internally with the correct
-    device placement for the class weights tensor. See ``training.py`` for the
-    rationale.
-
-    **Step 2 — Training loop:**
-    ``run_training_loop`` runs all epochs, checkpointing at the best val F2.
-    It returns the full per-epoch metrics history and the best checkpoint dict
-    (or ``None`` if no epoch achieved F2 > 0).
-
-    **Step 3 — Checkpoint restoration:**
-    After training, the model's weights are at the *last* epoch, not the best
-    epoch. The best-F2 checkpoint is explicitly loaded back with
-    ``load_state_dict`` before evaluation. This is a critical step: evaluating
-    the last-epoch weights instead of the best-F2 weights would measure a
-    different model and likely produce worse (and misleading) results. If no
-    checkpoint was saved (F2 was always 0), the final-epoch weights are used
-    and a warning is printed.
-
-    **Step 4 — Evaluation set selection:**
-    ``HOLD_OUT_TEST_SET=True`` evaluates on the held-out test split (20% of
-    total data, never seen during training or hyperparameter decisions).
-    ``HOLD_OUT_TEST_SET=False`` reuses the validation split. The eval criterion
-    is always an *unweighted* ``CrossEntropyLoss``, regardless of whether
-    class weights were used during training. This ensures the reported eval
-    loss is a fair, unbiased measure of prediction error rather than a
-    weighted loss that depends on the chosen balancing strategy.
-
-    **Step 5 — Checkpoint metadata JSON:**
-    A small JSON file recording the best epoch number and its val F2 is saved
-    alongside the fold artifacts. This provides a human-readable record of
-    which training epoch was selected, making it easy to check whether training
-    had converged or was still improving when the best model was captured.
-
-    **Step 6 — Artifact saving:**
-    Delegates to ``save_fold_artifacts`` in ``plots.py``, which generates
-    confusion matrices, a ROC curve, prediction and metrics CSVs, and model
-    weight files. Only the ``state_dict`` component of the best checkpoint is
-    passed (not the full dict) so the saved ``.pth`` file contains only the
-    weights and can be loaded directly with ``model.load_state_dict``.
-
-    **Tabular (multimodal) support:** When ``config["USE_TABULAR"]`` is
-    ``True``, the DataLoaders produced by ``prepare_experiment_setup`` include
-    a ``"tabular"`` key in each batch. The model passed in will already be a
-    ``MultiModalWrapper`` (constructed by ``get_model`` in ``run_experiment``).
-    The training and validation functions detect the ``"tabular"`` key at
-    runtime and adjust the forward call automatically — no changes are needed
-    here to support the multimodal path.
+    The eval criterion is always unweighted ``CrossEntropyLoss``, regardless of
+    training balancing strategy, so the reported eval loss is an unbiased measure
+    of prediction error.
 
     Args:
         fold: 1-based fold index, used in print messages and file names.
         train_loader: DataLoader for the training portion of this fold.
         val_loader: DataLoader for the validation portion of this fold.
-        test_loader: DataLoader for the hold-out test set (identical across
-            all folds — it is not a per-fold split).
+        test_loader: DataLoader for the hold-out test set (identical across folds).
         model: Freshly initialised model, already moved to the correct device.
             Will be a ``MultiModalWrapper`` when ``USE_TABULAR=True``.
         config: Fully-formed experiment config dict.
         weights_tensor: Per-class loss weights tensor for weighted
-            ``CrossEntropyLoss``, or ``None`` if balancing is not
-            ``'weighted_cost_function'``.
+            ``CrossEntropyLoss``, or ``None`` if not using weighted loss.
         experiment_output_dir: Root directory for this experiment's outputs.
             A ``fold_{n}`` subdirectory is created inside it.
 
     Returns:
-        A FoldResult dict containing:
-        - ``'predictions'``: List of per-sample prediction dicts
-          (filename, true_label, pred_label).
-        - ``'metrics'``: Dict of ``{'Precision', 'Recall', 'F2-Score'}``
-          computed on the evaluation set.
-        - ``'eval_acc'``: Scalar evaluation accuracy.
-        - ``'eval_loss'``: Scalar evaluation loss (unweighted).
+        A FoldResult dict containing ``'predictions'``, ``'metrics'``,
+        ``'eval_acc'``, and ``'eval_loss'``.
     """
     fold_output_dir = os.path.join(experiment_output_dir, f"fold_{fold}")
     os.makedirs(fold_output_dir, exist_ok=True)
@@ -295,23 +199,10 @@ def prepare_experiment_setup(config: Dict[str, Any]) -> tuple[str, Any]:
     Validate the experiment configuration, seed the RNG, create the output
     directory, and return a fold-split generator.
 
-    This function runs once per experiment, before the fold loop. It is
-    separated from ``run_experiment`` so that setup-time failures (missing
-    data path, bad config) surface before any GPU work begins.
-
-    **Why seed here, not inside the fold loop?**
-    ``set_seed`` is called once at setup time so that the data split itself
-    is reproducible. If it were called at the start of each fold, the split
-    would be re-seeded to the same state every iteration, producing identical
-    folds rather than different k-fold partitions. The split generator
-    (``fold_splits``) is created after seeding, so its entire sequence is
-    deterministic from this single seed call.
-
-    **Generator, not a list:**
-    ``split_data`` returns a generator. The fold loop in ``run_experiment``
-    advances it one fold at a time, so only one fold's file lists are in
-    memory at once. This matters for large datasets but is mostly a style
-    choice here since the file lists are small.
+    Called once per experiment before the fold loop so that setup-time failures
+    (missing data path, bad config) surface before any GPU work begins. ``set_seed``
+    is called here — not inside the fold loop — so the data split itself is
+    reproducible and each fold produces a different k-fold partition.
 
     Args:
         config: Fully-formed experiment config dict as produced by
@@ -319,9 +210,7 @@ def prepare_experiment_setup(config: Dict[str, Any]) -> tuple[str, Any]:
 
     Returns:
         Tuple of ``(experiment_output_dir, fold_splits)`` where
-        ``experiment_output_dir`` is the path to the experiment's output
-        directory (created if it does not exist) and ``fold_splits`` is a
-        generator yielding ``(fold_idx, train_files, val_files, test_files)``
+        ``fold_splits`` yields ``(fold_idx, train_files, val_files, test_files)``
         tuples.
 
     Raises:
@@ -376,16 +265,13 @@ def summarize_experiment_results(
     """
     Aggregate per-fold results and save the experiment-level summary CSV.
 
-    Thin wrapper around ``evaluate_models`` in ``plots.py``. Called once after
-    all folds complete. The summary CSV contains one row per fold plus Average
-    and Std. Dev. rows; see ``evaluate_models`` for details.
+    Thin wrapper around ``evaluate_models`` in ``plots.py``. The summary CSV
+    contains one row per fold plus Average and Std. Dev. rows.
 
     Args:
-        experiment_name: Unique experiment identifier, used to name the
-            output CSV file.
+        experiment_name: Unique experiment identifier, used to name the output CSV.
         experiment_output_dir: Root output directory for the experiment.
-        all_fold_predictions: Dict mapping fold names to FoldResult dicts,
-            as accumulated by ``run_experiment``.
+        all_fold_predictions: Dict mapping fold names to FoldResult dicts.
     """
     print(f"\nSUMMARY: {experiment_name}")
     summary_csv_path = os.path.join(
@@ -403,38 +289,14 @@ def run_experiment(config: Dict[str, Any]) -> None:
     """
     Run a complete cross-validation experiment end-to-end.
 
-    This is the top-level entry point called by ``train_models.py`` for each
-    experiment defined in ``experiments.json``. It sequences setup, the fold
-    loop, and post-experiment summarisation.
+    Top-level entry point called by ``train_models.py`` for each experiment.
+    Sequences setup, the fold loop, and post-experiment summarisation.
 
-    **Balancing strategy resolution:**
-    The ``balancing`` config field is a string (``'weighted_cost_function'``,
-    ``'oversampling'``, or ``'none'``) that resolves to two independent
-    boolean flags:
-
-      - ``oversample=True``: passed to ``build_dataloaders``, which attaches
-        a ``WeightedRandomSampler`` to the training loader so each class
-        appears equally often per epoch.
-      - ``use_class_weights=True``: triggers a call to ``get_class_weights``
-        on the training fold, producing a weight tensor passed to the loss
-        function so misclassifying the minority class is penalised more
-        heavily.
-
-    Both flags are mutually exclusive in practice (the config only sets one
-    strategy per experiment), but the code does not enforce this — they could
-    theoretically be combined.
-
-    **Class weight computation inside the fold loop:**
-    ``get_class_weights`` is called *after* ``split_data`` and *inside* the
-    fold loop, using only ``train_files`` for the current fold. This prevents
-    label leakage: the loss weighting is derived solely from the training
-    distribution of each fold, not from the full dataset.
-
-    **Optional backup:**
-    If the ``EXPERIMENT_BACKUP_DIR`` environment variable is set, the entire
-    experiment output directory is copied there after all folds complete using
-    ``shutil.copytree``. This is used on HPC clusters where the local
-    ``experiments/`` directory may be purged after a job finishes.
+    The ``balancing`` config field resolves to two flags: ``oversample=True``
+    attaches a ``WeightedRandomSampler`` to the training loader; ``use_class_weights=True``
+    passes per-class loss weights to the criterion. Both are derived from the
+    training fold only to prevent label leakage. If ``EXPERIMENT_BACKUP_DIR`` is
+    set in the environment, the output directory is copied there after all folds complete.
 
     Args:
         config: Fully-formed experiment config dict as returned by
