@@ -18,16 +18,16 @@ Metrics per exam per dataset:
                  then volumetric product.  0 = nothing cropped.
   spacing_mm — effective per-axis voxel spacing in the output
 
-Output: data_engine/resize_quality.csv  +  console summary
+Output: data_engine/diagnostics/outputs/resize_quality.csv  +  console summary
 
 Usage:
-    python data_engine/check_resize_quality.py
-    python data_engine/check_resize_quality.py \\
-        --variants-csv  data_engine/nifti_survey_variants.csv \\
-        --survey-csv    data_engine/nifti_survey.csv \\
+    python data_engine/diagnostics/check_resize_quality.py
+    python data_engine/diagnostics/check_resize_quality.py \\
+        --variants-csv  data_engine/diagnostics/outputs/nifti_survey_variants.csv \\
+        --survey-csv    data_engine/diagnostics/outputs/nifti_survey.csv \\
         --raw-nifti-dir /mnt/data/nifti-sample \\
         --datasets-dir  /mnt/data/nifti-sample-datasets \\
-        --output        data_engine/resize_quality.csv
+        --output        data_engine/diagnostics/outputs/resize_quality.csv
 """
 
 import argparse
@@ -263,10 +263,10 @@ def main(variants_csv, survey_csv, datasets_dir, raw_nifti_dir, output_csv):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Resize quality check for all dataset variants.")
-    parser.add_argument("--variants-csv",  default="data_engine/nifti_survey_variants.csv")
-    parser.add_argument("--survey-csv",    default="data_engine/nifti_survey.csv")
+    parser.add_argument("--variants-csv",  default="data_engine/diagnostics/outputs/nifti_survey_variants.csv")
+    parser.add_argument("--survey-csv",    default="data_engine/diagnostics/outputs/nifti_survey.csv")
     parser.add_argument("--raw-nifti-dir", default="/mnt/data/nifti-sample")
     parser.add_argument("--datasets-dir",  default="/mnt/data/nifti-sample-datasets")
-    parser.add_argument("--output",        default="data_engine/resize_quality.csv")
+    parser.add_argument("--output",        default="data_engine/diagnostics/outputs/resize_quality.csv")
     args = parser.parse_args()
     main(args.variants_csv, args.survey_csv, args.datasets_dir, args.raw_nifti_dir, args.output)

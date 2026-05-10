@@ -56,7 +56,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     # --- Input resolution ---
     "INPUT_RESOLUTION": "128x128x128",  # Target spatial size for each volume after the Resized transform;
                                          # parsed by parse_input_resolution into a (H, W, D) tuple for the pipeline.
-                                         # Valid values: '128x128x128', '256x256x128', '256x256x256'.
+                                         # Valid values: '128x128x128', '192x192x128', '256x256x176', '256x256x256'.
     # --- Gradient accumulation ---
     "GRAD_ACCUM_STEPS": 1,  # Number of mini-batches to accumulate gradients before calling optimizer.step().
                              # 1 = standard per-batch update (default). N > 1 simulates a batch size of
@@ -113,10 +113,10 @@ DATASET_RESOLUTIONS: Dict[str, str] = {
     "D192": "192x192x128",
     "E192": "192x192x128",
     "F192": "192x192x128",
-    "A256": "256x256x128",
-    "B256": "256x256x128",
-    "C256": "256x256x128",
-    "D256": "256x256x128",
+    "A256": "256x256x176",
+    "B256": "256x256x176",
+    "C256": "256x256x176",
+    "D256": "256x256x176",
     "SAMPLE": "128x128x128",
     "SAMPLE_D": "128x128x128",
 }

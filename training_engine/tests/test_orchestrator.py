@@ -63,7 +63,8 @@ class TestEvalLoaderSelection:
             patch("src.orchestrator.validate_one_epoch") as mock_val,
             patch("src.orchestrator.save_fold_artifacts"),
             patch(
-                "src.orchestrator.calculate_classification_metrics", return_value={}
+                "src.orchestrator.calculate_classification_metrics",
+                return_value={"Precision": 0.0, "Recall": 0.0, "F2-Score": 0.0},
             ),
         ):
             mock_train.return_value = ([], 0.1, fake_checkpoint)
@@ -148,7 +149,8 @@ class TestEvalLoaderSelection:
             patch("src.orchestrator.validate_one_epoch") as mock_val,
             patch("src.orchestrator.save_fold_artifacts"),
             patch(
-                "src.orchestrator.calculate_classification_metrics", return_value={}
+                "src.orchestrator.calculate_classification_metrics",
+                return_value={"Precision": 0.0, "Recall": 0.0, "F2-Score": 0.0},
             ),
         ):
             mock_train.return_value = ([], 0.1, None)  # no checkpoint

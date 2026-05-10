@@ -6,10 +6,10 @@ Deep analysis of nifti_survey.csv to inform resize strategy decisions.
 Outputs:
   - Console summary stats per class
   - Simulation of padding/cropping waste for candidate target shapes
-  - Plots saved to data_engine/survey_plots/
+  - Plots saved to data_engine/outputs/survey_plots/
 
 Usage:
-    python data_engine/analyse_nifti_survey.py
+    python data_engine/diagnostics/analyse_nifti_survey.py
 """
 
 import csv
@@ -21,8 +21,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-CSV_PATH = os.path.join(os.path.dirname(__file__), "nifti_survey.csv")
-PLOT_DIR = os.path.join(os.path.dirname(__file__), "survey_plots")
+CSV_PATH = os.path.join(os.path.dirname(__file__), "outputs/nifti_survey.csv")
+PLOT_DIR = os.path.join(os.path.dirname(__file__), "outputs/survey_plots")
 os.makedirs(PLOT_DIR, exist_ok=True)
 
 
