@@ -48,9 +48,9 @@ class TestParseInputResolution:
         """'128x128x128' must return (128, 128, 128)."""
         assert parse_input_resolution("128x128x128") == (128, 128, 128)
 
-    def test_256x256x128_returns_correct_tuple(self):
-        """'256x256x128' must return (256, 256, 128)."""
-        assert parse_input_resolution("256x256x128") == (256, 256, 128)
+    def test_256x256x176_returns_correct_tuple(self):
+        """'256x256x176' must return (256, 256, 176)."""
+        assert parse_input_resolution("256x256x176") == (256, 256, 176)
 
     def test_256x256x256_returns_correct_tuple(self):
         """'256x256x256' must return (256, 256, 256)."""
