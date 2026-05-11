@@ -74,8 +74,12 @@ echo -e "## ...Verification Complete. ##\n"
 EXPERIMENTS_FILE="${EXPERIMENTS_FILE:-experiments_256_baseline.json}"
 python -u train_models.py --experiments "$EXPERIMENTS_FILE"
 
-## 6. Copy the output experiments.
-srun cp -r $WRKDIR/training_engine/experiments/. $HOME/aneurysm_cnn/experiments/
+## 6. Copy the output experiments (only if the directory was created by training).
+if [ -d "$WRKDIR/training_engine/experiments" ]; then
+    srun cp -r $WRKDIR/training_engine/experiments/. $HOME/aneurysm_cnn/experiments/
+else
+    echo "WARNING: experiments directory not found — training may have failed."
+fi
 
 ## Cleanup Scratch
 rm -rf $WRKDIR
