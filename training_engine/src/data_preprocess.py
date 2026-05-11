@@ -135,7 +135,9 @@ def get_data_list(root_dir: str, tabular_csv: Optional[str] = None) -> List[Dict
 
     Args:
         root_dir: Path to the dataset root containing ``0/`` and ``1/`` subdirs.
-        tabular_csv: Optional CSV with columns ``case_id``, ``age``, ``gender``.
+        tabular_csv: Optional CSV with columns ``exam``, ``Age``, ``gender``
+            (matches ``data_engine/dataset/classes.csv``). Rows where ``Age``
+            or ``gender`` are blank are skipped.
 
     Returns:
         List of record dicts, one per NIfTI file.
@@ -148,10 +150,14 @@ def get_data_list(root_dir: str, tabular_csv: Optional[str] = None) -> List[Dict
         with open(tabular_csv, newline="") as f:
             reader = csv.DictReader(f)
             for row in reader:
+                # Skip rows where age or gender are missing (e.g. excluded cases in classes.csv,
+                # or before gender data has been populated).
+                if not row.get("Age") or not row.get("gender"):
+                    continue
                 # Age normalised to [0, 1] by dividing by 100 (known patient age range).
                 # Gender encoded as 0.0 / 1.0.
-                tabular_data[row["case_id"]] = np.array(
-                    [float(row["age"]) / 100.0, float(row["gender"])],
+                tabular_data[row["exam"]] = np.array(
+                    [float(row["Age"]) / 100.0, float(row["gender"])],
                     dtype=np.float32,
                 )
 
@@ -388,9 +394,9 @@ def build_dataloaders(
         )
 
     if cache_rate > 0.0:
-        train_ds = CacheDataset(data=train_files, transform=train_transform, cache_rate=cache_rate, num_workers=4)
-        val_ds = CacheDataset(data=val_files, transform=eval_transform, cache_rate=cache_rate, num_workers=2)
-        test_ds = CacheDataset(data=test_files, transform=eval_transform, cache_rate=cache_rate, num_workers=2)
+        train_ds = CacheDataset(data=train_files, transform=train_transform, cache_rate=cache_rate, num_workers=4, progress=False)
+        val_ds = CacheDataset(data=val_files, transform=eval_transform, cache_rate=cache_rate, num_workers=2, progress=False)
+        test_ds = CacheDataset(data=test_files, transform=eval_transform, cache_rate=cache_rate, num_workers=2, progress=False)
     else:
         train_ds = Dataset(data=train_files, transform=train_transform)
         val_ds = Dataset(data=val_files, transform=eval_transform)

@@ -345,10 +345,10 @@ class TestTabularDataLoading:
         return str(root)
 
     def _write_csv(self, tmp_path, rows):
-        """Writes a tabular CSV and returns its path."""
+        """Writes a tabular CSV in classes.csv format and returns its path."""
         csv_path = str(tmp_path / "metadata.csv")
         with open(csv_path, "w") as f:
-            f.write("case_id,age,gender\n")
+            f.write("exam,Age,gender\n")
             for case_id, age, gender in rows:
                 f.write(f"{case_id},{age},{gender}\n")
         return csv_path

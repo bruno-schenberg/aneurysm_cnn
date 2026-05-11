@@ -35,7 +35,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
 
     # --- Tabular metadata (age/gender) fusion — optional late-fusion feature ---
     "USE_TABULAR": False,   # True = fuse age/gender with CNN features (late fusion); False = image-only
-    "TABULAR_CSV": None,    # Path to CSV with columns: case_id, age, gender (required when USE_TABULAR=True)
+    "TABULAR_CSV": None,    # Path to CSV with columns: exam, Age, gender (matches data_engine/dataset/classes.csv; required when USE_TABULAR=True)
 
     # --- Training parameters — override any of these in experiments.json as needed ---
     "DEVICE": "cuda" if torch.cuda.is_available() else "cpu",  # Auto-detected; override with 'cpu' to force CPU
