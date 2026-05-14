@@ -98,6 +98,7 @@ DATASET_PATHS: Dict[str, str] = {
     # Sample / testing
     "SAMPLE": os.path.expanduser("~/sample_dataset"),       # Synthetic dataset for container/pipeline testing
     "SAMPLE_D": "/mnt/data/nifti-sample-dataset-D",         # 12-case variant-D sample for local integration testing
+    "SAMPLE_A128": "/mnt/data/nifti-sample-datasets/dataset_A_resampled_cropped",  # 4-case 128³ sample for smoke-testing all models
 }
 
 # Maps each dataset key to the INPUT_RESOLUTION it was generated at.
@@ -119,6 +120,7 @@ DATASET_RESOLUTIONS: Dict[str, str] = {
     "D256": "256x256x176",
     "SAMPLE": "128x128x128",
     "SAMPLE_D": "128x128x128",
+    "SAMPLE_A128": "128x128x128",
 }
 
 

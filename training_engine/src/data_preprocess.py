@@ -305,23 +305,35 @@ def split_data(
     """
     labels = [x["label"] for x in all_data]
 
+    # Stratification requires at least 2 samples per class in every partition.
+    # Fall back to non-stratified splitting when any class is too small.
+    can_stratify = min(labels.count(c) for c in set(labels)) >= 2
+    if not can_stratify:
+        print(
+            "  Warning [split_data]: too few samples per class for stratified splitting "
+            f"(class counts: { {c: labels.count(c) for c in set(labels)} }). "
+            "Falling back to non-stratified random split."
+        )
+
     stratified_dev_indices, test_indices = train_test_split(
         range(len(all_data)),
         test_size=test_size,
         shuffle=True,
-        stratify=labels,
+        stratify=labels if can_stratify else None,
         random_state=seed,
     )
     dev_data = [all_data[i] for i in stratified_dev_indices]
     test_files = [all_data[i] for i in test_indices]
     dev_labels = [d["label"] for d in dev_data]
 
+    can_stratify_dev = min(dev_labels.count(c) for c in set(dev_labels)) >= 2 if dev_labels else False
+
     if not use_kfold:
         train_idx, val_idx = train_test_split(
             range(len(dev_data)),
             test_size=val_split_ratio,
             shuffle=True,
-            stratify=dev_labels,
+            stratify=dev_labels if can_stratify_dev else None,
             random_state=seed,
         )
         yield 0, [dev_data[i] for i in train_idx], [dev_data[i] for i in val_idx], test_files
