@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=dataset_gen_128
-#SBATCH --partition=cpu
+#SBATCH --partition=gpu-amd
 #SBATCH --output=%x_%j.out
 #SBATCH --error=%x_%j.err
 #SBATCH --nodes=1
