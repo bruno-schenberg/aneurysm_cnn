@@ -35,9 +35,24 @@ echo ""
 cd $HOME/aneurysm_cnn
 
 ## ---------------------------------------------------------------------------
-## Run 1 — 192×192×128, 4 workers
+## Run 1 — 128×128×128, 4 workers (smallest volumes, cheapest pass)
 ## ---------------------------------------------------------------------------
-echo -e "\n### Pass 1/2 — 192x192x128 | 4 workers ###"
+echo -e "\n### Pass 1/3 — 128x128x128 | 4 workers ###"
+
+python -u data_engine/dataset_gen.py \
+    --input-dir    "$INPUT_DIR"    \
+    --output-base  "$OUTPUT_BASE"  \
+    --target-shape 128x128x128     \
+    --variants     $VARIANTS       \
+    --workers      4
+
+STATUS_128=$?
+echo -e "### Pass 1/3 finished — exit $STATUS_128 ###"
+
+## ---------------------------------------------------------------------------
+## Run 2 — 192×192×128, 4 workers
+## ---------------------------------------------------------------------------
+echo -e "\n### Pass 2/3 — 192x192x128 | 4 workers ###"
 
 python -u data_engine/dataset_gen.py \
     --input-dir    "$INPUT_DIR"    \
@@ -47,12 +62,12 @@ python -u data_engine/dataset_gen.py \
     --workers      4
 
 STATUS_192=$?
-echo -e "### Pass 1/2 finished — exit $STATUS_192 ###"
+echo -e "### Pass 2/3 finished — exit $STATUS_192 ###"
 
 ## ---------------------------------------------------------------------------
-## Run 2 — 256×256×176, 2 workers (larger volumes, less RAM per worker)
+## Run 3 — 256×256×176, 2 workers (larger volumes, less RAM per worker)
 ## ---------------------------------------------------------------------------
-echo -e "\n### Pass 2/2 — 256x256x176 | 2 workers ###"
+echo -e "\n### Pass 3/3 — 256x256x176 | 2 workers ###"
 
 python -u data_engine/dataset_gen.py \
     --input-dir    "$INPUT_DIR"    \
@@ -62,11 +77,11 @@ python -u data_engine/dataset_gen.py \
     --workers      2
 
 STATUS_176=$?
-echo -e "### Pass 2/2 finished — exit $STATUS_176 ###"
+echo -e "### Pass 3/3 finished — exit $STATUS_176 ###"
 
 ## ---------------------------------------------------------------------------
 ## Final status
 ## ---------------------------------------------------------------------------
 echo -e "\n## Job finished at $(date +'%d-%m-%Y as %T') ###################"
 
-[ $STATUS_192 -eq 0 ] && [ $STATUS_176 -eq 0 ] && exit 0 || exit 1
+[ $STATUS_128 -eq 0 ] && [ $STATUS_192 -eq 0 ] && [ $STATUS_176 -eq 0 ] && exit 0 || exit 1
