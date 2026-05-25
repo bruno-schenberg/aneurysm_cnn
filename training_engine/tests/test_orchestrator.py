@@ -44,6 +44,7 @@ def fake_checkpoint(tiny_model):
     return {
         "state_dict": tiny_model.state_dict(),
         "best_epoch": 1,
+        "best_val_auc": 0.82,
         "best_val_f2": 0.75,
     }
 
@@ -68,7 +69,7 @@ class TestEvalLoaderSelection:
             ),
         ):
             mock_train.return_value = ([], 0.1, fake_checkpoint)
-            mock_val.return_value = (0.5, 0.7, 0.6, [])
+            mock_val.return_value = (0.5, 0.7, 0.6, 0.80, [])
 
             run_one_fold(
                 fold=0,
@@ -135,6 +136,7 @@ class TestEvalLoaderSelection:
             metadata = json.load(f)
 
         assert metadata["best_epoch"] == fake_checkpoint["best_epoch"]
+        assert abs(metadata["best_val_auc"] - fake_checkpoint["best_val_auc"]) < 1e-6
         assert abs(metadata["best_val_f2"] - fake_checkpoint["best_val_f2"]) < 1e-6
 
     def test_no_metadata_json_when_no_checkpoint(
@@ -154,7 +156,7 @@ class TestEvalLoaderSelection:
             ),
         ):
             mock_train.return_value = ([], 0.1, None)  # no checkpoint
-            mock_val.return_value = (0.5, 0.7, 0.0, [])
+            mock_val.return_value = (0.5, 0.7, 0.0, 0.0, [])
 
             run_one_fold(
                 fold=0,

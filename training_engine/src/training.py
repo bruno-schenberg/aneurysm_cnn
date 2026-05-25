@@ -2,13 +2,14 @@
 training.py
 
 Implements the per-epoch training and validation loops and the full multi-epoch
-training loop for a single cross-validation fold. 
+training loop for a single cross-validation fold.
 
-- We checkpoint on F2-score instead of accuracy or F1 because a false negative
-  (missed aneurysm) is far more dangerous than a false positive. F2 weights
-  recall higher than precision.
-- ``run_training_loop`` receives the loss criterion as a class rather than an 
-  instance so it can instantiate it internally with the correct weight tensor 
+- We checkpoint on ROC-AUC because it is threshold-independent and more stable
+  than F2 on small, imbalanced validation sets. F2 (which weights recall over
+  precision) is still computed each epoch and recorded in the metrics history for
+  reference, but AUC drives the model selection decision.
+- ``run_training_loop`` receives the loss criterion as a class rather than an
+  instance so it can instantiate it internally with the correct weight tensor
   for the current fold's device.
 """
 
@@ -17,7 +18,7 @@ import time
 from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import torch
-from sklearn.metrics import fbeta_score
+from sklearn.metrics import fbeta_score, roc_auc_score
 
 
 # ----------------------------------------------------
@@ -102,8 +103,8 @@ def validate_one_epoch(
     return_details: bool = False,
     use_amp: bool = True,
 ) -> Union[
-    Tuple[float, float, float],
-    Tuple[float, float, float, List[Dict[str, Any]]],
+    Tuple[float, float, float, float],
+    Tuple[float, float, float, float, List[Dict[str, Any]]],
 ]:
     """
     Runs one full pass over a validation or test set without updating weights.
@@ -114,12 +115,14 @@ def validate_one_epoch(
         criterion: Instantiated loss function.
         device: Target device string.
         return_details: If ``True``, return per-sample prediction dicts as a
-            fourth element of the return tuple.
+            fifth element of the return tuple.
         use_amp: Use mixed precision.
 
     Returns:
-        ``(epoch_loss, epoch_acc, val_f2)``. When ``return_details=True``, 
-        also returns a list of per-sample dicts.
+        ``(epoch_loss, epoch_acc, val_f2, val_auc)``. When ``return_details=True``,
+        also returns a list of per-sample dicts as the fifth element.
+        ``val_auc`` is set to ``0.0`` when the validation set contains only one
+        class (AUC is undefined in that case).
     """
     model.eval()
     running_loss = 0.0
@@ -127,6 +130,7 @@ def validate_one_epoch(
     total_samples = 0
     all_preds: List[int] = []
     all_labels: List[int] = []
+    all_probs: List[float] = []
     detailed_results: List[Dict[str, Any]] = []
 
     _device_type = "cuda" if "cuda" in str(device) else "cpu"
@@ -150,6 +154,9 @@ def validate_one_epoch(
 
             all_preds.extend(preds.cpu().tolist())
             all_labels.extend(labels.cpu().tolist())
+            # Collect P(class=1) for threshold-independent AUC computation
+            probs = torch.softmax(outputs.float(), dim=1)[:, 1]
+            all_probs.extend(probs.cpu().tolist())
 
             if return_details:
                 paths = batch["path"]
@@ -163,10 +170,15 @@ def validate_one_epoch(
     epoch_loss = running_loss / total_samples
     epoch_acc = (correct_predictions.double() / total_samples).item()
     val_f2 = fbeta_score(all_labels, all_preds, beta=2, pos_label=1, zero_division=0)
+    try:
+        val_auc = roc_auc_score(all_labels, all_probs)
+    except ValueError:
+        # Only one class present in the validation set — AUC is undefined
+        val_auc = 0.0
 
     if return_details:
-        return epoch_loss, epoch_acc, val_f2, detailed_results
-    return epoch_loss, epoch_acc, val_f2
+        return epoch_loss, epoch_acc, val_f2, val_auc, detailed_results
+    return epoch_loss, epoch_acc, val_f2, val_auc
 
 
 # ----------------------------------------------------
@@ -188,7 +200,11 @@ def run_training_loop(
     use_amp: bool = True,
 ) -> Tuple[List[Dict[str, Any]], float, Optional[Dict[str, Any]]]:
     """
-    Trains a model for ``num_epochs`` epochs and returns the best-F2 checkpoint.
+    Trains a model for ``num_epochs`` epochs and returns the best-AUC checkpoint.
+
+    Checkpointing is driven by ``val_auc`` (ROC-AUC), which is more stable than
+    F2 on small, imbalanced validation sets because it is threshold-independent.
+    ``val_f2`` is still tracked in ``metrics_history`` for reporting.
 
     Args:
         model: Network to train.
@@ -205,9 +221,10 @@ def run_training_loop(
 
     Returns:
         A tuple of:
-          - ``metrics_history``: List of per-epoch dicts.
+          - ``metrics_history``: List of per-epoch dicts (includes ``val_f2`` and ``val_auc``).
           - ``total_training_time_minutes``: Wall-clock training duration in minutes.
-          - ``best_model_checkpoint``: Dict with ``state_dict``, ``best_epoch``, ``best_val_f2``.
+          - ``best_model_checkpoint``: Dict with ``state_dict``, ``best_epoch``,
+            ``best_val_auc``, and ``best_val_f2``.
     """
     if not isinstance(criterion_cls, type):
         raise TypeError(
@@ -221,34 +238,37 @@ def run_training_loop(
     )
 
     metrics_history: List[Dict[str, Any]] = []
-    best_val_f2 = 0.0
+    best_val_auc = 0.0
     best_model_checkpoint: Optional[Dict[str, Any]] = None
     epochs_without_improvement = 0
     start_time = time.time()
 
-
     for epoch in range(num_epochs):
         epoch_start_time = time.time()
-        
+
         train_loss, train_acc = train_one_epoch(
             model, train_loader, criterion, optimizer, device,
             grad_accum_steps=grad_accum_steps, use_amp=use_amp,
         )
-        val_loss, val_acc, val_f2 = validate_one_epoch(
+        val_loss, val_acc, val_f2, val_auc = validate_one_epoch(
             model, val_loader, criterion, device, use_amp=use_amp,
         )
-        
+
         epoch_duration = time.time() - epoch_start_time
 
-        if val_f2 > best_val_f2:
-            best_val_f2 = val_f2
+        if val_auc > best_val_auc:
+            best_val_auc = val_auc
             best_model_checkpoint = {
                 "state_dict": copy.deepcopy(model.state_dict()),
                 "best_epoch": epoch + 1,
+                "best_val_auc": val_auc,
                 "best_val_f2": val_f2,
             }
             epochs_without_improvement = 0
-            print(f"  -> [Epoch {epoch + 1:03d} | {epoch_duration:.1f}s] New best model: val F2 = {best_val_f2:.4f}")
+            print(
+                f"  -> [Epoch {epoch + 1:03d} | {epoch_duration:.1f}s] "
+                f"New best model: val AUC = {best_val_auc:.4f} (F2 = {val_f2:.4f})"
+            )
         else:
             epochs_without_improvement += 1
             if patience > 0:
@@ -260,6 +280,7 @@ def run_training_loop(
                         "val_loss": val_loss,
                         "val_acc": val_acc,
                         "val_f2": val_f2,
+                        "val_auc": val_auc,
                         "duration_sec": epoch_duration,
                     })
                     break
@@ -271,6 +292,7 @@ def run_training_loop(
             "val_loss": val_loss,
             "val_acc": val_acc,
             "val_f2": val_f2,
+            "val_auc": val_auc,
             "duration_sec": epoch_duration,
         })
 
@@ -278,7 +300,7 @@ def run_training_loop(
 
     if best_model_checkpoint is None:
         print(
-            "Warning: No epoch produced a positive F2-score. "
+            "Warning: No epoch produced a positive AUC score. "
             "No best-model checkpoint was saved."
         )
 

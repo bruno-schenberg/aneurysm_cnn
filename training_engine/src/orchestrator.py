@@ -110,7 +110,7 @@ def run_one_fold(
         grad_accum_steps=grad_accum_steps,
         use_amp=config.get("USE_AMP", True),
     )
-    # [Step 3] Restore F2-optimal checkpoint for final evaluation
+    # [Step 3] Restore AUC-optimal checkpoint for final evaluation
     if best_model_checkpoint is not None:
         model.load_state_dict(best_model_checkpoint["state_dict"])
     else:
@@ -125,7 +125,7 @@ def run_one_fold(
         eval_set_name = "Validation"
 
     eval_criterion = nn.CrossEntropyLoss()
-    eval_loss, eval_acc, eval_f2, detailed_results = validate_one_epoch(
+    eval_loss, eval_acc, eval_f2, eval_auc, detailed_results = validate_one_epoch(
         model, eval_loader, eval_criterion, config["DEVICE"], return_details=True,
         use_amp=config.get("USE_AMP", True),
     )
@@ -142,6 +142,7 @@ def run_one_fold(
             json.dump(
                 {
                     "best_epoch": best_model_checkpoint["best_epoch"],
+                    "best_val_auc": best_model_checkpoint["best_val_auc"],
                     "best_val_f2": best_model_checkpoint["best_val_f2"],
                 },
                 f,
@@ -178,6 +179,7 @@ def run_one_fold(
         f"Prec: {final_metrics['Precision']:.4f} | "
         f"Rec: {final_metrics['Recall']:.4f} | "
         f"F2: {final_metrics['F2-Score']:.4f} | "
+        f"AUC: {eval_auc:.4f} | "
         f"Acc: {eval_acc:.4f} | Loss: {eval_loss:.4f}"
     )
 

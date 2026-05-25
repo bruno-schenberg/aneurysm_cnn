@@ -1,5 +1,5 @@
 """
-Tests for training.py — F2 checkpointing criterion.
+Tests for training.py — AUC checkpointing criterion.
 
 All tests run on CPU with mock DataLoaders. No GPU or real data required.
 """
@@ -26,22 +26,22 @@ def make_mock_loader():
 
 
 # ---------------------------------------------------------------------------
-# F2 Checkpointing
+# AUC Checkpointing
 # ---------------------------------------------------------------------------
 
-class TestF2Checkpointing:
-    """run_training_loop must checkpoint the epoch with highest val_f2, not lowest val_loss."""
+class TestAUCCheckpointing:
+    """run_training_loop must checkpoint the epoch with highest val_auc, not lowest val_loss."""
 
-    def test_checkpoints_f2_optimal_epoch(self, monkeypatch):
+    def test_checkpoints_auc_optimal_epoch(self, monkeypatch):
         """
-        Epoch 2 has higher val_loss but better val_f2 than epoch 1 and 3.
+        Epoch 2 has higher val_loss but better val_auc than epoch 1 and 3.
         The saved checkpoint must correspond to epoch 2.
         """
-        # (val_loss, val_acc, val_f2) returned by validate_one_epoch per epoch
+        # (val_loss, val_acc, val_f2, val_auc) returned by validate_one_epoch per epoch
         val_returns = [
-            (0.30, 0.70, 0.40),  # epoch 1 — best loss, mediocre F2
-            (0.50, 0.65, 0.85),  # epoch 2 — worse loss, best F2 → must be checkpointed
-            (0.20, 0.80, 0.30),  # epoch 3 — best loss of all, worst F2
+            (0.30, 0.70, 0.40, 0.65),  # epoch 1 — best loss, mediocre AUC
+            (0.50, 0.65, 0.85, 0.90),  # epoch 2 — worse loss, best AUC → must be checkpointed
+            (0.20, 0.80, 0.30, 0.70),  # epoch 3 — best loss of all, worse AUC
         ]
         call_state = {"n": 0}
 
@@ -70,14 +70,14 @@ class TestF2Checkpointing:
 
         assert best_checkpoint is not None
         assert best_checkpoint["best_epoch"] == 2
-        assert best_checkpoint["best_val_f2"] == pytest.approx(0.85)
+        assert best_checkpoint["best_val_auc"] == pytest.approx(0.90)
 
-    def test_metrics_history_contains_val_f2(self, monkeypatch):
-        """Each entry in metrics_history includes the val_f2 field."""
+    def test_metrics_history_contains_val_f2_and_val_auc(self, monkeypatch):
+        """Each entry in metrics_history includes both val_f2 and val_auc fields."""
         monkeypatch.setattr(
             training_module,
             "validate_one_epoch",
-            lambda *a, **kw: (0.4, 0.7, 0.6),
+            lambda *a, **kw: (0.4, 0.7, 0.6, 0.75),
         )
         monkeypatch.setattr(
             training_module, "train_one_epoch", lambda *a, **kw: (0.5, 0.7)
@@ -99,16 +99,17 @@ class TestF2Checkpointing:
         assert len(metrics_history) == 2
         for record in metrics_history:
             assert "val_f2" in record
+            assert "val_auc" in record
             assert "epoch" in record
             assert "train_loss" in record
             assert "val_loss" in record
 
-    def test_checkpoint_is_none_when_all_f2_zero(self, monkeypatch):
-        """When every epoch produces val_f2 == 0, no checkpoint is saved."""
+    def test_checkpoint_is_none_when_all_auc_zero(self, monkeypatch):
+        """When every epoch produces val_auc == 0.0, no checkpoint is saved."""
         monkeypatch.setattr(
             training_module,
             "validate_one_epoch",
-            lambda *a, **kw: (0.5, 0.6, 0.0),
+            lambda *a, **kw: (0.5, 0.6, 0.0, 0.0),
         )
         monkeypatch.setattr(
             training_module, "train_one_epoch", lambda *a, **kw: (0.5, 0.6)
@@ -129,14 +130,15 @@ class TestF2Checkpointing:
 
         assert best_checkpoint is None
 
-    def test_checkpoint_metadata_reflects_f2_optimal_epoch(self, monkeypatch):
+    def test_checkpoint_metadata_reflects_auc_optimal_epoch(self, monkeypatch):
         """
-        The checkpoint metadata (best_epoch, best_val_f2) must correspond to the
-        epoch with the highest val_f2, and the checkpoint must contain a state_dict key.
+        The checkpoint metadata must correspond to the epoch with the highest
+        val_auc. The checkpoint must contain state_dict, best_val_auc, and
+        best_val_f2 keys.
         """
         val_returns = [
-            (0.4, 0.7, 0.9),  # epoch 1 — best F2
-            (0.3, 0.8, 0.1),  # epoch 2 — better loss, worse F2
+            (0.4, 0.7, 0.9, 0.88),  # epoch 1 — best AUC
+            (0.3, 0.8, 0.1, 0.60),  # epoch 2 — better loss, worse AUC
         ]
         call_state = {"n": 0}
 
@@ -165,6 +167,7 @@ class TestF2Checkpointing:
 
         assert best_checkpoint is not None
         assert best_checkpoint["best_epoch"] == 1
+        assert best_checkpoint["best_val_auc"] == pytest.approx(0.88)
         assert best_checkpoint["best_val_f2"] == pytest.approx(0.9)
         assert "state_dict" in best_checkpoint
 
@@ -314,10 +317,11 @@ class TestTabularTrainingLoop:
         from src.training import validate_one_epoch
         model = self.make_tabular_model()
         criterion = torch.nn.CrossEntropyLoss()
-        loss, acc, f2 = validate_one_epoch(model, self.make_tabular_loader(), criterion, "cpu")
+        loss, acc, f2, auc = validate_one_epoch(model, self.make_tabular_loader(), criterion, "cpu")
         assert isinstance(loss, float)
         assert isinstance(acc, float)
         assert isinstance(f2, float)
+        assert isinstance(auc, float)
 
     def test_image_only_loader_still_works(self):
         """Batches without 'tabular' key must still call model(image) correctly."""
@@ -372,12 +376,13 @@ class TestAMP:
         from src.training import validate_one_epoch
         model = make_tiny_model()
         criterion = torch.nn.CrossEntropyLoss()
-        loss, acc, f2 = validate_one_epoch(
+        loss, acc, f2, auc = validate_one_epoch(
             model, make_mock_loader(), criterion, "cpu", use_amp=True
         )
         assert isinstance(loss, float)
         assert isinstance(acc, float)
         assert isinstance(f2, float)
+        assert isinstance(auc, float)
 
     def test_run_training_loop_threads_use_amp(self, monkeypatch):
         """run_training_loop must forward use_amp=False to train_one_epoch and validate_one_epoch."""

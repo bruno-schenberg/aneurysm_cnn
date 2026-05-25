@@ -49,7 +49,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "EARLY_STOPPING_PATIENCE": 0,  # Epochs without val F2 improvement before stopping; 0 = disabled
     "WEIGHT_DECAY": 1e-4,          # AdamW weight decay (L2 regularisation strength)
     "HOLD_OUT_TEST_SET": True,  # True = reserve TEST_SPLIT_RATIO of data for final evaluation, never seen during training
-    "TEST_SPLIT_RATIO": 0.20,   # Fraction of total dataset held out for final evaluation (applies when HOLD_OUT_TEST_SET=True)
+    "TEST_SPLIT_RATIO": 0.15,   # Fraction of total dataset held out for final evaluation (applies when HOLD_OUT_TEST_SET=True)
     "VAL_BATCH_SIZE": 4,        # Validation and evaluation batch size
     "CLASSES": ["0", "1"],      # Class label strings: '0' = healthy, '1' = aneurysm
     "OUTPUT_DIR": "./experiments",  # Root directory where per-experiment output subdirectories are created
