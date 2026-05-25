@@ -27,6 +27,7 @@ from monai.transforms import (
     LoadImaged,
     RandFlipd,
     RandGaussianNoised,
+    RandRotate90d,
     RandRotated,
     RandScaleIntensityd,
     RandZoomd,
@@ -234,8 +235,9 @@ def get_transforms(
     → ``Resized`` → ``ScaleIntensityd`` → ``EnsureTyped``.
 
     Augmentation transforms (``augment=True``, training only): three axis-wise
-    ``RandFlipd``, ``RandRotated`` (±15°), ``RandScaleIntensityd``, ``RandZoomd``
-    (90–110%), ``RandGaussianNoised``.
+    ``RandFlipd``, ``RandRotate90d`` (0/90/180/270° in axial plane), ``RandRotated``
+    (±15°), ``RandScaleIntensityd``, ``RandZoomd`` (90–110%), ``RandGaussianNoised``
+    (std=0.05 on [0,1]-scaled data).
 
     Args:
         spatial_size: Target ``(H, W, D)`` shape for ``Resized``.
@@ -257,10 +259,11 @@ def get_transforms(
             RandFlipd(keys=keys, prob=0.5, spatial_axis=0),
             RandFlipd(keys=keys, prob=0.5, spatial_axis=1),
             RandFlipd(keys=keys, prob=0.5, spatial_axis=2),
+            RandRotate90d(keys=keys, prob=0.5, max_k=3, spatial_axes=(0, 1)),
             RandRotated(keys=keys, range_x=0.26, range_y=0.26, range_z=0.26, prob=0.5),
             RandScaleIntensityd(keys=keys, factors=0.1, prob=0.5),
             RandZoomd(keys=keys, min_zoom=0.9, max_zoom=1.1, prob=0.3, keep_size=True),
-            RandGaussianNoised(keys=keys, prob=0.2, mean=0.0, std=0.01),
+            RandGaussianNoised(keys=keys, prob=0.2, mean=0.0, std=0.05),
         ])
     ensure_keys = ["image", "tabular"] if use_tabular else ["image"]
     transforms.append(EnsureTyped(keys=ensure_keys))
