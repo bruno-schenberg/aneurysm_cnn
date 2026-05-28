@@ -1,0 +1,367 @@
+## Job started at 19-05-2026 as 11:20:13 #####################
+
+## Job ID:                        4303
+## Execution Node:                gn02
+## Submit Directory:              /home/bschenberg/aneurysm_cnn
+## Scratch Directory:             /scratch/local/4303 
+
+
+## Verifying Environment & GPU... ##
+Active Conda Env: aneurysm_cnn_rocm
+Python Path: /home/bschenberg/miniconda3/envs/aneurysm_cnn_rocm/bin/python
+PyTorch Version: 2.9.1+rocm6.4
+ROCm/HIP Available: True
+Found 1 GPUs.
+  - Device 0: AMD Instinct MI210
+## ...Verification Complete. ##
+
+Found 18 experiments to run.
+Using device: cuda
+
+================================================================================
+STARTING EXPERIMENT: R3D18_A128_none
+  - Model: R3D18, Epochs: 100, BS: 4, LR: 0.0001
+  - Balancing: none, Folds: 1 (single 80/20 split)
+  - Results will be saved to: ./experiments/R3D18_A128_none
+================================================================================
+  -> [Epoch 005 | 136.3s] New best model: val F2 = 0.0485
+  -> [Epoch 007 | 137.0s] New best model: val F2 = 0.0909
+  -> [Epoch 012 | 137.9s] New best model: val F2 = 0.2174
+  -> [Epoch 022 | 136.7s] New best model: val F2 = 0.3053
+  -> [Epoch 026 | 136.7s] New best model: val F2 = 0.3689
+  -> [Epoch 031 | 138.0s] New best model: val F2 = 0.4225
+  -> [Epoch 033 | 137.4s] New best model: val F2 = 0.4331
+  -> [Epoch 036 | 137.1s] New best model: val F2 = 0.5000
+  Fold 1 | Epochs: 51 (best: 36) | Time: 118.2 min | Prec: 0.3438 | Rec: 0.7097 | F2: 0.5851 | Acc: 0.6600 | Loss: 0.7370
+
+SUMMARY: R3D18_A128_none
+           Model Name  Precision  Recall  F2-Score  Eval Accuracy  Eval Loss
+R3D18_A128_none_fold1     0.3438  0.7097    0.5851         0.6600     0.7370
+              Average     0.3438  0.7097    0.5851         0.6600     0.7370
+            Std. Dev.        NaN     NaN       NaN            NaN        NaN
+[INFO] Results backed up to: /home/bschenberg/aneurysm_cnn/experiments/R3D18_A128_none
+
+================================================================================
+STARTING EXPERIMENT: R3D18_B128_none
+  - Model: R3D18, Epochs: 100, BS: 4, LR: 0.0001
+  - Balancing: none, Folds: 1 (single 80/20 split)
+  - Results will be saved to: ./experiments/R3D18_B128_none
+================================================================================
+  -> [Epoch 002 | 139.7s] New best model: val F2 = 0.0495
+  -> [Epoch 005 | 138.7s] New best model: val F2 = 0.1415
+  -> [Epoch 007 | 139.9s] New best model: val F2 = 0.3252
+  -> [Epoch 015 | 137.1s] New best model: val F2 = 0.4348
+  -> [Epoch 018 | 138.4s] New best model: val F2 = 0.4724
+  -> [Epoch 021 | 138.7s] New best model: val F2 = 0.5474
+  -> [Epoch 033 | 139.5s] New best model: val F2 = 0.6250
+  -> [Epoch 043 | 139.7s] New best model: val F2 = 0.6429
+  -> [Epoch 047 | 138.3s] New best model: val F2 = 0.6475
+  -> [Epoch 053 | 140.4s] New best model: val F2 = 0.6704
+  -> [Epoch 059 | 139.4s] New best model: val F2 = 0.7047
+  Fold 1 | Epochs: 74 (best: 59) | Time: 171.4 min | Prec: 0.2982 | Rec: 0.5484 | F2: 0.4696 | Acc: 0.6400 | Loss: 0.8795
+
+SUMMARY: R3D18_B128_none
+           Model Name  Precision  Recall  F2-Score  Eval Accuracy  Eval Loss
+R3D18_B128_none_fold1     0.2982  0.5484    0.4696         0.6400     0.8795
+              Average     0.2982  0.5484    0.4696         0.6400     0.8795
+            Std. Dev.        NaN     NaN       NaN            NaN        NaN
+[INFO] Results backed up to: /home/bschenberg/aneurysm_cnn/experiments/R3D18_B128_none
+
+================================================================================
+STARTING EXPERIMENT: R3D18_C128_none
+  - Model: R3D18, Epochs: 100, BS: 4, LR: 0.0001
+  - Balancing: none, Folds: 1 (single 80/20 split)
+  - Results will be saved to: ./experiments/R3D18_C128_none
+================================================================================
+  -> [Epoch 001 | 137.8s] New best model: val F2 = 0.4688
+  Fold 1 | Epochs: 16 (best: 1) | Time: 36.9 min | Prec: 0.2771 | Rec: 0.7419 | F2: 0.5556 | Acc: 0.5467 | Loss: 0.6884
+
+SUMMARY: R3D18_C128_none
+           Model Name  Precision  Recall  F2-Score  Eval Accuracy  Eval Loss
+R3D18_C128_none_fold1     0.2771  0.7419    0.5556         0.5467     0.6884
+              Average     0.2771  0.7419    0.5556         0.5467     0.6884
+            Std. Dev.        NaN     NaN       NaN            NaN        NaN
+[INFO] Results backed up to: /home/bschenberg/aneurysm_cnn/experiments/R3D18_C128_none
+
+================================================================================
+STARTING EXPERIMENT: R3D18_D128_none
+  - Model: R3D18, Epochs: 100, BS: 4, LR: 0.0001
+  - Balancing: none, Folds: 1 (single 80/20 split)
+  - Results will be saved to: ./experiments/R3D18_D128_none
+================================================================================
+  -> [Epoch 004 | 138.4s] New best model: val F2 = 0.2778
+  -> [Epoch 005 | 136.9s] New best model: val F2 = 0.3571
+  -> [Epoch 018 | 139.9s] New best model: val F2 = 0.5590
+  -> [Epoch 033 | 139.8s] New best model: val F2 = 0.5986
+  Fold 1 | Epochs: 48 (best: 33) | Time: 111.6 min | Prec: 0.3400 | Rec: 0.5484 | F2: 0.4885 | Acc: 0.6867 | Loss: 0.6187
+
+SUMMARY: R3D18_D128_none
+           Model Name  Precision  Recall  F2-Score  Eval Accuracy  Eval Loss
+R3D18_D128_none_fold1     0.3400  0.5484    0.4885         0.6867     0.6187
+              Average     0.3400  0.5484    0.4885         0.6867     0.6187
+            Std. Dev.        NaN     NaN       NaN            NaN        NaN
+[INFO] Results backed up to: /home/bschenberg/aneurysm_cnn/experiments/R3D18_D128_none
+
+================================================================================
+STARTING EXPERIMENT: R3D18_E128_none
+  - Model: R3D18, Epochs: 100, BS: 4, LR: 0.0001
+  - Balancing: none, Folds: 1 (single 80/20 split)
+  - Results will be saved to: ./experiments/R3D18_E128_none
+================================================================================
+  -> [Epoch 012 | 142.0s] New best model: val F2 = 0.0490
+  -> [Epoch 017 | 140.0s] New best model: val F2 = 0.3516
+  -> [Epoch 025 | 143.9s] New best model: val F2 = 0.4198
+  -> [Epoch 033 | 142.4s] New best model: val F2 = 0.4362
+  -> [Epoch 046 | 138.2s] New best model: val F2 = 0.4630
+  Fold 1 | Epochs: 61 (best: 46) | Time: 143.1 min | Prec: 0.3133 | Rec: 0.8387 | F2: 0.6280 | Acc: 0.5867 | Loss: 0.8286
+
+SUMMARY: R3D18_E128_none
+           Model Name  Precision  Recall  F2-Score  Eval Accuracy  Eval Loss
+R3D18_E128_none_fold1     0.3133  0.8387    0.6280         0.5867     0.8286
+              Average     0.3133  0.8387    0.6280         0.5867     0.8286
+            Std. Dev.        NaN     NaN       NaN            NaN        NaN
+[INFO] Results backed up to: /home/bschenberg/aneurysm_cnn/experiments/R3D18_E128_none
+
+================================================================================
+STARTING EXPERIMENT: R3D18_F128_none
+  - Model: R3D18, Epochs: 100, BS: 4, LR: 0.0001
+  - Balancing: none, Folds: 1 (single 80/20 split)
+  - Results will be saved to: ./experiments/R3D18_F128_none
+================================================================================
+  -> [Epoch 007 | 138.7s] New best model: val F2 = 0.1818
+  -> [Epoch 021 | 140.1s] New best model: val F2 = 0.3043
+  -> [Epoch 022 | 142.9s] New best model: val F2 = 0.6098
+  Fold 1 | Epochs: 37 (best: 22) | Time: 86.8 min | Prec: 0.3065 | Rec: 0.6129 | F2: 0.5108 | Acc: 0.6333 | Loss: 0.6801
+
+SUMMARY: R3D18_F128_none
+           Model Name  Precision  Recall  F2-Score  Eval Accuracy  Eval Loss
+R3D18_F128_none_fold1     0.3065  0.6129    0.5108         0.6333     0.6801
+              Average     0.3065  0.6129    0.5108         0.6333     0.6801
+            Std. Dev.        NaN     NaN       NaN            NaN        NaN
+[INFO] Results backed up to: /home/bschenberg/aneurysm_cnn/experiments/R3D18_F128_none
+
+================================================================================
+STARTING EXPERIMENT: R3D18_A128_oversampling
+  - Model: R3D18, Epochs: 100, BS: 4, LR: 0.0001
+  - Balancing: oversampling, Folds: 1 (single 80/20 split)
+  - Results will be saved to: ./experiments/R3D18_A128_oversampling
+================================================================================
+  -> [Epoch 001 | 137.9s] New best model: val F2 = 0.0463
+  -> [Epoch 002 | 140.4s] New best model: val F2 = 0.5288
+  -> [Epoch 003 | 140.1s] New best model: val F2 = 0.5376
+  -> [Epoch 006 | 139.4s] New best model: val F2 = 0.5899
+  -> [Epoch 007 | 138.4s] New best model: val F2 = 0.6069
+  Fold 1 | Epochs: 22 (best: 7) | Time: 51.6 min | Prec: 0.2727 | Rec: 0.7742 | F2: 0.5660 | Acc: 0.5267 | Loss: 0.7607
+
+SUMMARY: R3D18_A128_oversampling
+                   Model Name  Precision  Recall  F2-Score  Eval Accuracy  Eval Loss
+R3D18_A128_oversampling_fold1     0.2727  0.7742    0.5660         0.5267     0.7607
+                      Average     0.2727  0.7742    0.5660         0.5267     0.7607
+                    Std. Dev.        NaN     NaN       NaN            NaN        NaN
+[INFO] Results backed up to: /home/bschenberg/aneurysm_cnn/experiments/R3D18_A128_oversampling
+
+================================================================================
+STARTING EXPERIMENT: R3D18_B128_oversampling
+  - Model: R3D18, Epochs: 100, BS: 4, LR: 0.0001
+  - Balancing: oversampling, Folds: 1 (single 80/20 split)
+  - Results will be saved to: ./experiments/R3D18_B128_oversampling
+================================================================================
+  -> [Epoch 001 | 140.4s] New best model: val F2 = 0.1724
+  -> [Epoch 002 | 145.6s] New best model: val F2 = 0.3757
+  -> [Epoch 003 | 143.3s] New best model: val F2 = 0.4198
+  -> [Epoch 004 | 142.1s] New best model: val F2 = 0.4487
+  -> [Epoch 005 | 140.2s] New best model: val F2 = 0.6389
+  -> [Epoch 018 | 142.0s] New best model: val F2 = 0.7101
+  Fold 1 | Epochs: 33 (best: 18) | Time: 78.2 min | Prec: 0.2593 | Rec: 0.6774 | F2: 0.5122 | Acc: 0.5333 | Loss: 0.8652
+
+SUMMARY: R3D18_B128_oversampling
+                   Model Name  Precision  Recall  F2-Score  Eval Accuracy  Eval Loss
+R3D18_B128_oversampling_fold1     0.2593  0.6774    0.5122         0.5333     0.8652
+                      Average     0.2593  0.6774    0.5122         0.5333     0.8652
+                    Std. Dev.        NaN     NaN       NaN            NaN        NaN
+[INFO] Results backed up to: /home/bschenberg/aneurysm_cnn/experiments/R3D18_B128_oversampling
+
+================================================================================
+STARTING EXPERIMENT: R3D18_C128_oversampling
+  - Model: R3D18, Epochs: 100, BS: 4, LR: 0.0001
+  - Balancing: oversampling, Folds: 1 (single 80/20 split)
+  - Results will be saved to: ./experiments/R3D18_C128_oversampling
+================================================================================
+  -> [Epoch 002 | 141.3s] New best model: val F2 = 0.5414
+  -> [Epoch 004 | 142.7s] New best model: val F2 = 0.5449
+  Fold 1 | Epochs: 19 (best: 4) | Time: 45.1 min | Prec: 0.3043 | Rec: 0.6774 | F2: 0.5440 | Acc: 0.6133 | Loss: 0.6683
+
+SUMMARY: R3D18_C128_oversampling
+                   Model Name  Precision  Recall  F2-Score  Eval Accuracy  Eval Loss
+R3D18_C128_oversampling_fold1     0.3043  0.6774    0.5440         0.6133     0.6683
+                      Average     0.3043  0.6774    0.5440         0.6133     0.6683
+                    Std. Dev.        NaN     NaN       NaN            NaN        NaN
+[INFO] Results backed up to: /home/bschenberg/aneurysm_cnn/experiments/R3D18_C128_oversampling
+
+================================================================================
+STARTING EXPERIMENT: R3D18_D128_oversampling
+  - Model: R3D18, Epochs: 100, BS: 4, LR: 0.0001
+  - Balancing: oversampling, Folds: 1 (single 80/20 split)
+  - Results will be saved to: ./experiments/R3D18_D128_oversampling
+================================================================================
+  -> [Epoch 002 | 140.5s] New best model: val F2 = 0.6145
+  -> [Epoch 006 | 142.7s] New best model: val F2 = 0.6215
+  -> [Epoch 008 | 141.9s] New best model: val F2 = 0.6287
+  -> [Epoch 014 | 142.5s] New best model: val F2 = 0.6395
+  -> [Epoch 015 | 142.1s] New best model: val F2 = 0.6757
+  Fold 1 | Epochs: 30 (best: 15) | Time: 70.8 min | Prec: 0.2558 | Rec: 0.3548 | F2: 0.3293 | Acc: 0.6533 | Loss: 0.6068
+
+SUMMARY: R3D18_D128_oversampling
+                   Model Name  Precision  Recall  F2-Score  Eval Accuracy  Eval Loss
+R3D18_D128_oversampling_fold1     0.2558  0.3548    0.3293         0.6533     0.6068
+                      Average     0.2558  0.3548    0.3293         0.6533     0.6068
+                    Std. Dev.        NaN     NaN       NaN            NaN        NaN
+[INFO] Results backed up to: /home/bschenberg/aneurysm_cnn/experiments/R3D18_D128_oversampling
+
+================================================================================
+STARTING EXPERIMENT: R3D18_E128_oversampling
+  - Model: R3D18, Epochs: 100, BS: 4, LR: 0.0001
+  - Balancing: oversampling, Folds: 1 (single 80/20 split)
+  - Results will be saved to: ./experiments/R3D18_E128_oversampling
+================================================================================
+  -> [Epoch 001 | 142.7s] New best model: val F2 = 0.0935
+  -> [Epoch 002 | 137.8s] New best model: val F2 = 0.5670
+  -> [Epoch 013 | 141.5s] New best model: val F2 = 0.5758
+  -> [Epoch 023 | 143.5s] New best model: val F2 = 0.6111
+  Fold 1 | Epochs: 38 (best: 23) | Time: 89.9 min | Prec: 0.2784 | Rec: 0.8710 | F2: 0.6109 | Acc: 0.5067 | Loss: 0.8053
+
+SUMMARY: R3D18_E128_oversampling
+                   Model Name  Precision  Recall  F2-Score  Eval Accuracy  Eval Loss
+R3D18_E128_oversampling_fold1     0.2784  0.8710    0.6109         0.5067     0.8053
+                      Average     0.2784  0.8710    0.6109         0.5067     0.8053
+                    Std. Dev.        NaN     NaN       NaN            NaN        NaN
+[INFO] Results backed up to: /home/bschenberg/aneurysm_cnn/experiments/R3D18_E128_oversampling
+
+================================================================================
+STARTING EXPERIMENT: R3D18_F128_oversampling
+  - Model: R3D18, Epochs: 100, BS: 4, LR: 0.0001
+  - Balancing: oversampling, Folds: 1 (single 80/20 split)
+  - Results will be saved to: ./experiments/R3D18_F128_oversampling
+================================================================================
+  -> [Epoch 001 | 138.6s] New best model: val F2 = 0.5247
+  -> [Epoch 002 | 139.3s] New best model: val F2 = 0.5469
+  -> [Epoch 003 | 140.8s] New best model: val F2 = 0.5660
+  -> [Epoch 005 | 140.6s] New best model: val F2 = 0.5721
+  -> [Epoch 012 | 141.7s] New best model: val F2 = 0.5833
+  -> [Epoch 027 | 139.8s] New best model: val F2 = 0.5990
+  Fold 1 | Epochs: 42 (best: 27) | Time: 98.6 min | Prec: 0.2252 | Rec: 0.8065 | F2: 0.5319 | Acc: 0.3867 | Loss: 0.8864
+
+SUMMARY: R3D18_F128_oversampling
+                   Model Name  Precision  Recall  F2-Score  Eval Accuracy  Eval Loss
+R3D18_F128_oversampling_fold1     0.2252  0.8065    0.5319         0.3867     0.8864
+                      Average     0.2252  0.8065    0.5319         0.3867     0.8864
+                    Std. Dev.        NaN     NaN       NaN            NaN        NaN
+[INFO] Results backed up to: /home/bschenberg/aneurysm_cnn/experiments/R3D18_F128_oversampling
+
+================================================================================
+STARTING EXPERIMENT: R3D18_A128_wcf
+  - Model: R3D18, Epochs: 100, BS: 4, LR: 0.0001
+  - Balancing: weighted_cost_function, Folds: 1 (single 80/20 split)
+  - Results will be saved to: ./experiments/R3D18_A128_wcf
+================================================================================
+  -> [Epoch 003 | 139.6s] New best model: val F2 = 0.2083
+  -> [Epoch 005 | 140.5s] New best model: val F2 = 0.4802
+  Fold 1 | Epochs: 20 (best: 5) | Time: 46.7 min | Prec: 0.2474 | Rec: 0.7742 | F2: 0.5430 | Acc: 0.4667 | Loss: 0.7034
+
+SUMMARY: R3D18_A128_wcf
+          Model Name  Precision  Recall  F2-Score  Eval Accuracy  Eval Loss
+R3D18_A128_wcf_fold1     0.2474  0.7742    0.5430         0.4667     0.7034
+             Average     0.2474  0.7742    0.5430         0.4667     0.7034
+           Std. Dev.        NaN     NaN       NaN            NaN        NaN
+[INFO] Results backed up to: /home/bschenberg/aneurysm_cnn/experiments/R3D18_A128_wcf
+
+================================================================================
+STARTING EXPERIMENT: R3D18_B128_wcf
+  - Model: R3D18, Epochs: 100, BS: 4, LR: 0.0001
+  - Balancing: weighted_cost_function, Folds: 1 (single 80/20 split)
+  - Results will be saved to: ./experiments/R3D18_B128_wcf
+================================================================================
+  -> [Epoch 001 | 137.7s] New best model: val F2 = 0.5708
+  Fold 1 | Epochs: 16 (best: 1) | Time: 38.3 min | Prec: 0.2067 | Rec: 1.0000 | F2: 0.5657 | Acc: 0.2067 | Loss: 0.8854
+
+SUMMARY: R3D18_B128_wcf
+          Model Name  Precision  Recall  F2-Score  Eval Accuracy  Eval Loss
+R3D18_B128_wcf_fold1     0.2067  1.0000    0.5657         0.2067     0.8854
+             Average     0.2067  1.0000    0.5657         0.2067     0.8854
+           Std. Dev.        NaN     NaN       NaN            NaN        NaN
+[INFO] Results backed up to: /home/bschenberg/aneurysm_cnn/experiments/R3D18_B128_wcf
+
+================================================================================
+STARTING EXPERIMENT: R3D18_C128_wcf
+  - Model: R3D18, Epochs: 100, BS: 4, LR: 0.0001
+  - Balancing: weighted_cost_function, Folds: 1 (single 80/20 split)
+  - Results will be saved to: ./experiments/R3D18_C128_wcf
+================================================================================
+  -> [Epoch 001 | 139.7s] New best model: val F2 = 0.4706
+  -> [Epoch 005 | 142.3s] New best model: val F2 = 0.5202
+  Fold 1 | Epochs: 20 (best: 5) | Time: 47.5 min | Prec: 0.2451 | Rec: 0.8065 | F2: 0.5531 | Acc: 0.4467 | Loss: 0.8218
+
+SUMMARY: R3D18_C128_wcf
+          Model Name  Precision  Recall  F2-Score  Eval Accuracy  Eval Loss
+R3D18_C128_wcf_fold1     0.2451  0.8065    0.5531         0.4467     0.8218
+             Average     0.2451  0.8065    0.5531         0.4467     0.8218
+           Std. Dev.        NaN     NaN       NaN            NaN        NaN
+[INFO] Results backed up to: /home/bschenberg/aneurysm_cnn/experiments/R3D18_C128_wcf
+
+================================================================================
+STARTING EXPERIMENT: R3D18_D128_wcf
+  - Model: R3D18, Epochs: 100, BS: 4, LR: 0.0001
+  - Balancing: weighted_cost_function, Folds: 1 (single 80/20 split)
+  - Results will be saved to: ./experiments/R3D18_D128_wcf
+================================================================================
+  -> [Epoch 001 | 146.0s] New best model: val F2 = 0.2941
+  -> [Epoch 004 | 144.3s] New best model: val F2 = 0.5298
+  -> [Epoch 006 | 147.5s] New best model: val F2 = 0.6204
+  -> [Epoch 007 | 143.7s] New best model: val F2 = 0.6711
+  Fold 1 | Epochs: 22 (best: 7) | Time: 52.7 min | Prec: 0.3571 | Rec: 0.4839 | F2: 0.4518 | Acc: 0.7133 | Loss: 0.5992
+
+SUMMARY: R3D18_D128_wcf
+          Model Name  Precision  Recall  F2-Score  Eval Accuracy  Eval Loss
+R3D18_D128_wcf_fold1     0.3571  0.4839    0.4518         0.7133     0.5992
+             Average     0.3571  0.4839    0.4518         0.7133     0.5992
+           Std. Dev.        NaN     NaN       NaN            NaN        NaN
+[INFO] Results backed up to: /home/bschenberg/aneurysm_cnn/experiments/R3D18_D128_wcf
+
+================================================================================
+STARTING EXPERIMENT: R3D18_E128_wcf
+  - Model: R3D18, Epochs: 100, BS: 4, LR: 0.0001
+  - Balancing: weighted_cost_function, Folds: 1 (single 80/20 split)
+  - Results will be saved to: ./experiments/R3D18_E128_wcf
+================================================================================
+  -> [Epoch 001 | 142.4s] New best model: val F2 = 0.5236
+  Fold 1 | Epochs: 16 (best: 1) | Time: 38.2 min | Prec: 0.2018 | Rec: 0.7097 | F2: 0.4721 | Acc: 0.3600 | Loss: 0.7202
+
+SUMMARY: R3D18_E128_wcf
+          Model Name  Precision  Recall  F2-Score  Eval Accuracy  Eval Loss
+R3D18_E128_wcf_fold1     0.2018  0.7097    0.4721         0.3600     0.7202
+             Average     0.2018  0.7097    0.4721         0.3600     0.7202
+           Std. Dev.        NaN     NaN       NaN            NaN        NaN
+[INFO] Results backed up to: /home/bschenberg/aneurysm_cnn/experiments/R3D18_E128_wcf
+
+================================================================================
+STARTING EXPERIMENT: R3D18_F128_wcf
+  - Model: R3D18, Epochs: 100, BS: 4, LR: 0.0001
+  - Balancing: weighted_cost_function, Folds: 1 (single 80/20 split)
+  - Results will be saved to: ./experiments/R3D18_F128_wcf
+================================================================================
+  -> [Epoch 001 | 140.4s] New best model: val F2 = 0.5708
+  Fold 1 | Epochs: 16 (best: 1) | Time: 38.5 min | Prec: 0.2067 | Rec: 1.0000 | F2: 0.5657 | Acc: 0.2067 | Loss: 1.0767
+
+SUMMARY: R3D18_F128_wcf
+          Model Name  Precision  Recall  F2-Score  Eval Accuracy  Eval Loss
+R3D18_F128_wcf_fold1     0.2067  1.0000    0.5657         0.2067     1.0767
+             Average     0.2067  1.0000    0.5657         0.2067     1.0767
+           Std. Dev.        NaN     NaN       NaN            NaN        NaN
+[INFO] Results backed up to: /home/bschenberg/aneurysm_cnn/experiments/R3D18_F128_wcf
+
+
+********************************************************************************
+EXPERIMENTS FINISHED
+********************************************************************************
+
+## Job finished at 20-05-2026 as 10:28:40 ###################
