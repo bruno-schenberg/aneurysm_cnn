@@ -20,6 +20,8 @@ from typing import Any, Dict, List, Optional, Tuple, Type, Union
 import torch
 from sklearn.metrics import fbeta_score, roc_auc_score
 
+from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR
+
 
 # ----------------------------------------------------
 # 1. Per-Epoch Training
@@ -186,6 +188,29 @@ def validate_one_epoch(
 # ----------------------------------------------------
 
 
+def build_scheduler(
+    optimizer: torch.optim.Optimizer,
+    num_epochs: int,
+    warmup_epochs: int = 5,
+) -> torch.optim.lr_scheduler.LRScheduler:
+    """
+    Build a linear-warmup + cosine-decay LR scheduler.
+
+    Args:
+        optimizer: The optimiser whose LR will be scheduled.
+        num_epochs: Total training epochs (warmup + cosine phases).
+        warmup_epochs: Number of epochs for linear warmup from ~0 to base LR.
+
+    Returns:
+        A ``SequentialLR`` scheduler that should be stepped once per epoch.
+    """
+    warmup_epochs = min(warmup_epochs, num_epochs)
+    cosine_epochs = max(num_epochs - warmup_epochs, 1)
+    warmup = LinearLR(optimizer, start_factor=0.01, total_iters=warmup_epochs)
+    cosine = CosineAnnealingLR(optimizer, T_max=cosine_epochs)
+    return SequentialLR(optimizer, schedulers=[warmup, cosine], milestones=[warmup_epochs])
+
+
 def run_training_loop(
     model: torch.nn.Module,
     train_loader: torch.utils.data.DataLoader,
@@ -198,6 +223,8 @@ def run_training_loop(
     patience: int = 0,
     grad_accum_steps: int = 1,
     use_amp: bool = True,
+    min_checkpoint_epoch: int = 0,
+    scheduler: Optional[torch.optim.lr_scheduler.LRScheduler] = None,
 ) -> Tuple[List[Dict[str, Any]], float, Optional[Dict[str, Any]]]:
     """
     Trains a model for ``num_epochs`` epochs and returns the best-AUC checkpoint.
@@ -218,6 +245,9 @@ def run_training_loop(
         patience: Early stopping patience in epochs. ``0`` disables early stopping.
         grad_accum_steps: Number of mini-batches to accumulate gradients over.
         use_amp: Use mixed precision.
+        min_checkpoint_epoch: Earliest epoch (1-based) at which checkpointing is
+            allowed. ``0`` disables the gate (original behaviour).
+        scheduler: Optional LR scheduler, stepped once per epoch after validation.
 
     Returns:
         A tuple of:
@@ -254,39 +284,43 @@ def run_training_loop(
             model, val_loader, criterion, device, use_amp=use_amp,
         )
 
-        epoch_duration = time.time() - epoch_start_time
+        if scheduler is not None:
+            scheduler.step()
 
-        if val_auc > best_val_auc:
+        epoch_duration = time.time() - epoch_start_time
+        current_epoch = epoch + 1  # 1-based
+        can_checkpoint = current_epoch >= min_checkpoint_epoch
+
+        if val_auc > best_val_auc and can_checkpoint:
             best_val_auc = val_auc
             best_model_checkpoint = {
                 "state_dict": copy.deepcopy(model.state_dict()),
-                "best_epoch": epoch + 1,
+                "best_epoch": current_epoch,
                 "best_val_auc": val_auc,
                 "best_val_f2": val_f2,
             }
             epochs_without_improvement = 0
             print(
-                f"  -> [Epoch {epoch + 1:03d} | {epoch_duration:.1f}s] "
+                f"  -> [Epoch {current_epoch:03d} | {epoch_duration:.1f}s] "
                 f"New best model: val AUC = {best_val_auc:.4f} (F2 = {val_f2:.4f})"
             )
-        else:
+        elif can_checkpoint:
             epochs_without_improvement += 1
-            if patience > 0:
-                if epochs_without_improvement >= patience:
-                    metrics_history.append({
-                        "epoch": epoch + 1,
-                        "train_loss": train_loss,
-                        "train_acc": train_acc,
-                        "val_loss": val_loss,
-                        "val_acc": val_acc,
-                        "val_f2": val_f2,
-                        "val_auc": val_auc,
-                        "duration_sec": epoch_duration,
-                    })
-                    break
+            if patience > 0 and epochs_without_improvement >= patience:
+                metrics_history.append({
+                    "epoch": current_epoch,
+                    "train_loss": train_loss,
+                    "train_acc": train_acc,
+                    "val_loss": val_loss,
+                    "val_acc": val_acc,
+                    "val_f2": val_f2,
+                    "val_auc": val_auc,
+                    "duration_sec": epoch_duration,
+                })
+                break
 
         metrics_history.append({
-            "epoch": epoch + 1,
+            "epoch": current_epoch,
             "train_loss": train_loss,
             "train_acc": train_acc,
             "val_loss": val_loss,

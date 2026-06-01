@@ -37,7 +37,7 @@ from .plots import (
     evaluate_models,
     save_fold_artifacts,
 )
-from .training import run_training_loop, validate_one_epoch
+from .training import build_scheduler, run_training_loop, validate_one_epoch
 
 
 # ----------------------------------------------------
@@ -95,7 +95,16 @@ def run_one_fold(
         weight_decay=config.get("WEIGHT_DECAY", 1e-4),
     )
 
-    # [Step 2] Run the training loop; checkpoints at the highest val F2 epoch
+    # [Step 2] Optionally build a cosine LR scheduler with linear warmup
+    scheduler = None
+    if config.get("USE_LR_SCHEDULER", False):
+        scheduler = build_scheduler(
+            optimizer,
+            num_epochs=config["EPOCHS"],
+            warmup_epochs=config.get("LR_WARMUP_EPOCHS", 5),
+        )
+
+    # [Step 3] Run the training loop; checkpoints at the highest val AUC epoch
     grad_accum_steps = config.get("GRAD_ACCUM_STEPS", 1)
     metrics_history, total_time, best_model_checkpoint = run_training_loop(
         model=model,
@@ -109,14 +118,16 @@ def run_one_fold(
         patience=config.get("EARLY_STOPPING_PATIENCE", 0),
         grad_accum_steps=grad_accum_steps,
         use_amp=config.get("USE_AMP", True),
+        min_checkpoint_epoch=config.get("MIN_EPOCHS_BEFORE_CHECKPOINT", 0),
+        scheduler=scheduler,
     )
-    # [Step 3] Restore AUC-optimal checkpoint for final evaluation
+    # [Step 4] Restore AUC-optimal checkpoint for final evaluation
     if best_model_checkpoint is not None:
         model.load_state_dict(best_model_checkpoint["state_dict"])
     else:
         print(f"  Warning [Fold {fold}]: No checkpoint saved (all F2 = 0). Using final epoch weights.")
 
-    # [Step 4] Evaluate on the appropriate set depending on experiment config
+    # [Step 5] Evaluate on the appropriate set depending on experiment config
     if config.get("HOLD_OUT_TEST_SET", False):
         eval_loader = test_loader
         eval_set_name = "Test"
@@ -133,7 +144,7 @@ def run_one_fold(
         "validate_one_epoch did not return detailed results as a list."
     )
 
-    # [Step 5] Save best-checkpoint metadata for artifact traceability
+    # [Step 6] Save best-checkpoint metadata for artifact traceability
     if best_model_checkpoint is not None:
         checkpoint_metadata_path = os.path.join(
             fold_output_dir, "best_checkpoint_metadata.json"
@@ -149,7 +160,7 @@ def run_one_fold(
                 indent=2,
             )
 
-    # [Step 6] Save all evaluation artifacts (plots, CSVs, model weights).
+    # [Step 7] Save all evaluation artifacts (plots, CSVs, model weights).
     # Only the state_dict is passed — not the full checkpoint dict — so the
     # saved .pth file can be loaded directly with model.load_state_dict().
     best_model_state_dict = (
