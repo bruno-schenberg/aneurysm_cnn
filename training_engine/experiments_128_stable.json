@@ -15,7 +15,8 @@
         "EARLY_STOPPING_PATIENCE": 15,
         "MIN_EPOCHS_BEFORE_CHECKPOINT": 10,
         "USE_LR_SCHEDULER": true,
-        "LR_WARMUP_EPOCHS": 5
+        "LR_WARMUP_EPOCHS": 5,
+        "CHECKPOINT_METRIC": "f2"
     },
     {
         "name": "R3D18_B128_none_stable",
@@ -33,7 +34,8 @@
         "EARLY_STOPPING_PATIENCE": 15,
         "MIN_EPOCHS_BEFORE_CHECKPOINT": 10,
         "USE_LR_SCHEDULER": true,
-        "LR_WARMUP_EPOCHS": 5
+        "LR_WARMUP_EPOCHS": 5,
+        "CHECKPOINT_METRIC": "f2"
     },
     {
         "name": "R3D18_C128_none_stable",
@@ -51,7 +53,8 @@
         "EARLY_STOPPING_PATIENCE": 15,
         "MIN_EPOCHS_BEFORE_CHECKPOINT": 10,
         "USE_LR_SCHEDULER": true,
-        "LR_WARMUP_EPOCHS": 5
+        "LR_WARMUP_EPOCHS": 5,
+        "CHECKPOINT_METRIC": "f2"
     },
     {
         "name": "R3D18_D128_none_stable",
@@ -69,7 +72,8 @@
         "EARLY_STOPPING_PATIENCE": 15,
         "MIN_EPOCHS_BEFORE_CHECKPOINT": 10,
         "USE_LR_SCHEDULER": true,
-        "LR_WARMUP_EPOCHS": 5
+        "LR_WARMUP_EPOCHS": 5,
+        "CHECKPOINT_METRIC": "f2"
     },
     {
         "name": "R3D18_E128_none_stable",
@@ -87,7 +91,8 @@
         "EARLY_STOPPING_PATIENCE": 15,
         "MIN_EPOCHS_BEFORE_CHECKPOINT": 10,
         "USE_LR_SCHEDULER": true,
-        "LR_WARMUP_EPOCHS": 5
+        "LR_WARMUP_EPOCHS": 5,
+        "CHECKPOINT_METRIC": "f2"
     },
     {
         "name": "R3D18_F128_none_stable",
@@ -105,7 +110,8 @@
         "EARLY_STOPPING_PATIENCE": 15,
         "MIN_EPOCHS_BEFORE_CHECKPOINT": 10,
         "USE_LR_SCHEDULER": true,
-        "LR_WARMUP_EPOCHS": 5
+        "LR_WARMUP_EPOCHS": 5,
+        "CHECKPOINT_METRIC": "f2"
     },
     {
         "name": "R3D18_A128_oversampling_stable",
@@ -123,7 +129,8 @@
         "EARLY_STOPPING_PATIENCE": 15,
         "MIN_EPOCHS_BEFORE_CHECKPOINT": 10,
         "USE_LR_SCHEDULER": true,
-        "LR_WARMUP_EPOCHS": 5
+        "LR_WARMUP_EPOCHS": 5,
+        "CHECKPOINT_METRIC": "f2"
     },
     {
         "name": "R3D18_B128_oversampling_stable",
@@ -141,7 +148,8 @@
         "EARLY_STOPPING_PATIENCE": 15,
         "MIN_EPOCHS_BEFORE_CHECKPOINT": 10,
         "USE_LR_SCHEDULER": true,
-        "LR_WARMUP_EPOCHS": 5
+        "LR_WARMUP_EPOCHS": 5,
+        "CHECKPOINT_METRIC": "f2"
     },
     {
         "name": "R3D18_C128_oversampling_stable",
@@ -159,7 +167,8 @@
         "EARLY_STOPPING_PATIENCE": 15,
         "MIN_EPOCHS_BEFORE_CHECKPOINT": 10,
         "USE_LR_SCHEDULER": true,
-        "LR_WARMUP_EPOCHS": 5
+        "LR_WARMUP_EPOCHS": 5,
+        "CHECKPOINT_METRIC": "f2"
     },
     {
         "name": "R3D18_D128_oversampling_stable",
@@ -177,7 +186,8 @@
         "EARLY_STOPPING_PATIENCE": 15,
         "MIN_EPOCHS_BEFORE_CHECKPOINT": 10,
         "USE_LR_SCHEDULER": true,
-        "LR_WARMUP_EPOCHS": 5
+        "LR_WARMUP_EPOCHS": 5,
+        "CHECKPOINT_METRIC": "f2"
     },
     {
         "name": "R3D18_E128_oversampling_stable",
@@ -195,7 +205,8 @@
         "EARLY_STOPPING_PATIENCE": 15,
         "MIN_EPOCHS_BEFORE_CHECKPOINT": 10,
         "USE_LR_SCHEDULER": true,
-        "LR_WARMUP_EPOCHS": 5
+        "LR_WARMUP_EPOCHS": 5,
+        "CHECKPOINT_METRIC": "f2"
     },
     {
         "name": "R3D18_F128_oversampling_stable",
@@ -213,7 +224,8 @@
         "EARLY_STOPPING_PATIENCE": 15,
         "MIN_EPOCHS_BEFORE_CHECKPOINT": 10,
         "USE_LR_SCHEDULER": true,
-        "LR_WARMUP_EPOCHS": 5
+        "LR_WARMUP_EPOCHS": 5,
+        "CHECKPOINT_METRIC": "f2"
     },
     {
         "name": "R3D18_A128_wcf_stable",
@@ -231,7 +243,8 @@
         "EARLY_STOPPING_PATIENCE": 15,
         "MIN_EPOCHS_BEFORE_CHECKPOINT": 10,
         "USE_LR_SCHEDULER": true,
-        "LR_WARMUP_EPOCHS": 5
+        "LR_WARMUP_EPOCHS": 5,
+        "CHECKPOINT_METRIC": "f2"
     },
     {
         "name": "R3D18_B128_wcf_stable",
@@ -249,7 +262,8 @@
         "EARLY_STOPPING_PATIENCE": 15,
         "MIN_EPOCHS_BEFORE_CHECKPOINT": 10,
         "USE_LR_SCHEDULER": true,
-        "LR_WARMUP_EPOCHS": 5
+        "LR_WARMUP_EPOCHS": 5,
+        "CHECKPOINT_METRIC": "f2"
     },
     {
         "name": "R3D18_C128_wcf_stable",
@@ -267,7 +281,8 @@
         "EARLY_STOPPING_PATIENCE": 15,
         "MIN_EPOCHS_BEFORE_CHECKPOINT": 10,
         "USE_LR_SCHEDULER": true,
-        "LR_WARMUP_EPOCHS": 5
+        "LR_WARMUP_EPOCHS": 5,
+        "CHECKPOINT_METRIC": "f2"
     },
     {
         "name": "R3D18_D128_wcf_stable",
@@ -285,7 +300,8 @@
         "EARLY_STOPPING_PATIENCE": 15,
         "MIN_EPOCHS_BEFORE_CHECKPOINT": 10,
         "USE_LR_SCHEDULER": true,
-        "LR_WARMUP_EPOCHS": 5
+        "LR_WARMUP_EPOCHS": 5,
+        "CHECKPOINT_METRIC": "f2"
     },
     {
         "name": "R3D18_E128_wcf_stable",
@@ -303,7 +319,8 @@
         "EARLY_STOPPING_PATIENCE": 15,
         "MIN_EPOCHS_BEFORE_CHECKPOINT": 10,
         "USE_LR_SCHEDULER": true,
-        "LR_WARMUP_EPOCHS": 5
+        "LR_WARMUP_EPOCHS": 5,
+        "CHECKPOINT_METRIC": "f2"
     },
     {
         "name": "R3D18_F128_wcf_stable",
@@ -321,6 +338,7 @@
         "EARLY_STOPPING_PATIENCE": 15,
         "MIN_EPOCHS_BEFORE_CHECKPOINT": 10,
         "USE_LR_SCHEDULER": true,
-        "LR_WARMUP_EPOCHS": 5
+        "LR_WARMUP_EPOCHS": 5,
+        "CHECKPOINT_METRIC": "f2"
     }
 ]

@@ -225,13 +225,10 @@ def run_training_loop(
     use_amp: bool = True,
     min_checkpoint_epoch: int = 0,
     scheduler: Optional[torch.optim.lr_scheduler.LRScheduler] = None,
+    checkpoint_metric: str = "auc",
 ) -> Tuple[List[Dict[str, Any]], float, Optional[Dict[str, Any]]]:
     """
-    Trains a model for ``num_epochs`` epochs and returns the best-AUC checkpoint.
-
-    Checkpointing is driven by ``val_auc`` (ROC-AUC), which is more stable than
-    F2 on small, imbalanced validation sets because it is threshold-independent.
-    ``val_f2`` is still tracked in ``metrics_history`` for reporting.
+    Trains a model for ``num_epochs`` epochs and returns the best checkpoint.
 
     Args:
         model: Network to train.
@@ -248,6 +245,8 @@ def run_training_loop(
         min_checkpoint_epoch: Earliest epoch (1-based) at which checkpointing is
             allowed. ``0`` disables the gate (original behaviour).
         scheduler: Optional LR scheduler, stepped once per epoch after validation.
+        checkpoint_metric: Which validation metric drives checkpointing.
+            ``"auc"`` (default) or ``"f2"``.
 
     Returns:
         A tuple of:
@@ -267,8 +266,11 @@ def run_training_loop(
         else criterion_cls()
     )
 
+    if checkpoint_metric not in ("auc", "f2"):
+        raise ValueError(f"checkpoint_metric must be 'auc' or 'f2', got '{checkpoint_metric}'")
+
     metrics_history: List[Dict[str, Any]] = []
-    best_val_auc = 0.0
+    best_metric_value = 0.0
     best_model_checkpoint: Optional[Dict[str, Any]] = None
     epochs_without_improvement = 0
     start_time = time.time()
@@ -290,9 +292,10 @@ def run_training_loop(
         epoch_duration = time.time() - epoch_start_time
         current_epoch = epoch + 1  # 1-based
         can_checkpoint = current_epoch >= min_checkpoint_epoch
+        current_metric = val_auc if checkpoint_metric == "auc" else val_f2
 
-        if val_auc > best_val_auc and can_checkpoint:
-            best_val_auc = val_auc
+        if current_metric > best_metric_value and can_checkpoint:
+            best_metric_value = current_metric
             best_model_checkpoint = {
                 "state_dict": copy.deepcopy(model.state_dict()),
                 "best_epoch": current_epoch,
@@ -302,7 +305,8 @@ def run_training_loop(
             epochs_without_improvement = 0
             print(
                 f"  -> [Epoch {current_epoch:03d} | {epoch_duration:.1f}s] "
-                f"New best model: val AUC = {best_val_auc:.4f} (F2 = {val_f2:.4f})"
+                f"New best model ({checkpoint_metric}): "
+                f"val AUC = {val_auc:.4f}, F2 = {val_f2:.4f}"
             )
         elif can_checkpoint:
             epochs_without_improvement += 1
@@ -334,7 +338,7 @@ def run_training_loop(
 
     if best_model_checkpoint is None:
         print(
-            "Warning: No epoch produced a positive AUC score. "
+            f"Warning: No epoch produced a positive {checkpoint_metric} score. "
             "No best-model checkpoint was saved."
         )
 

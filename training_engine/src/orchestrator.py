@@ -120,6 +120,7 @@ def run_one_fold(
         use_amp=config.get("USE_AMP", True),
         min_checkpoint_epoch=config.get("MIN_EPOCHS_BEFORE_CHECKPOINT", 0),
         scheduler=scheduler,
+        checkpoint_metric=config.get("CHECKPOINT_METRIC", "auc"),
     )
     # [Step 4] Restore AUC-optimal checkpoint for final evaluation
     if best_model_checkpoint is not None:

@@ -48,6 +48,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "VAL_SPLIT_RATIO": 0.30,    # Fraction of dev set used for validation when USE_KFOLD=False
     "EARLY_STOPPING_PATIENCE": 0,  # Epochs without val AUC improvement before stopping; 0 = disabled
     "MIN_EPOCHS_BEFORE_CHECKPOINT": 0,  # Earliest epoch at which checkpointing/early-stopping kicks in; 0 = disabled
+    "CHECKPOINT_METRIC": "auc",    # Validation metric for checkpointing: 'auc' or 'f2'
     "USE_LR_SCHEDULER": False,     # Enable cosine-decay LR schedule with linear warmup
     "LR_WARMUP_EPOCHS": 5,        # Number of linear-warmup epochs (only used when USE_LR_SCHEDULER=True)
     "WEIGHT_DECAY": 1e-4,          # AdamW weight decay (L2 regularisation strength)
