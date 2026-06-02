@@ -4,10 +4,10 @@ training.py
 Implements the per-epoch training and validation loops and the full multi-epoch
 training loop for a single cross-validation fold.
 
-- We checkpoint on ROC-AUC because it is threshold-independent and more stable
-  than F2 on small, imbalanced validation sets. F2 (which weights recall over
-  precision) is still computed each epoch and recorded in the metrics history for
-  reference, but AUC drives the model selection decision.
+- Checkpointing can be driven by ``"auc"``, ``"f2"``, or ``"val_loss"``.
+  val_loss (lower-is-better) is the most stable signal for whether the model is
+  still learning. AUC and F2 are always computed and recorded regardless of which
+  metric drives checkpointing.
 - ``run_training_loop`` receives the loss criterion as a class rather than an
   instance so it can instantiate it internally with the correct weight tensor
   for the current fold's device.
@@ -225,7 +225,7 @@ def run_training_loop(
     use_amp: bool = True,
     min_checkpoint_epoch: int = 0,
     scheduler: Optional[torch.optim.lr_scheduler.LRScheduler] = None,
-    checkpoint_metric: str = "auc",
+    checkpoint_metric: str = "val_loss",
 ) -> Tuple[List[Dict[str, Any]], float, Optional[Dict[str, Any]]]:
     """
     Trains a model for ``num_epochs`` epochs and returns the best checkpoint.
@@ -246,7 +246,7 @@ def run_training_loop(
             allowed. ``0`` disables the gate (original behaviour).
         scheduler: Optional LR scheduler, stepped once per epoch after validation.
         checkpoint_metric: Which validation metric drives checkpointing.
-            ``"auc"`` (default) or ``"f2"``.
+            ``"auc"`` (default), ``"f2"``, or ``"val_loss"``.
 
     Returns:
         A tuple of:
@@ -266,11 +266,12 @@ def run_training_loop(
         else criterion_cls()
     )
 
-    if checkpoint_metric not in ("auc", "f2"):
-        raise ValueError(f"checkpoint_metric must be 'auc' or 'f2', got '{checkpoint_metric}'")
+    if checkpoint_metric not in ("auc", "f2", "val_loss"):
+        raise ValueError(f"checkpoint_metric must be 'auc', 'f2', or 'val_loss', got '{checkpoint_metric}'")
 
     metrics_history: List[Dict[str, Any]] = []
-    best_metric_value = 0.0
+    # For val_loss, lower is better; for auc/f2, higher is better
+    best_metric_value = float("inf") if checkpoint_metric == "val_loss" else 0.0
     best_model_checkpoint: Optional[Dict[str, Any]] = None
     epochs_without_improvement = 0
     start_time = time.time()
@@ -292,9 +293,20 @@ def run_training_loop(
         epoch_duration = time.time() - epoch_start_time
         current_epoch = epoch + 1  # 1-based
         can_checkpoint = current_epoch >= min_checkpoint_epoch
-        current_metric = val_auc if checkpoint_metric == "auc" else val_f2
+        if checkpoint_metric == "auc":
+            current_metric = val_auc
+        elif checkpoint_metric == "f2":
+            current_metric = val_f2
+        else:
+            current_metric = val_loss
 
-        if current_metric > best_metric_value and can_checkpoint:
+        improved = (
+            current_metric < best_metric_value
+            if checkpoint_metric == "val_loss"
+            else current_metric > best_metric_value
+        )
+
+        if improved and can_checkpoint:
             best_metric_value = current_metric
             best_model_checkpoint = {
                 "state_dict": copy.deepcopy(model.state_dict()),
@@ -338,7 +350,7 @@ def run_training_loop(
 
     if best_model_checkpoint is None:
         print(
-            f"Warning: No epoch produced a positive {checkpoint_metric} score. "
+            f"Warning: No epoch improved the {checkpoint_metric} metric. "
             "No best-model checkpoint was saved."
         )
 
