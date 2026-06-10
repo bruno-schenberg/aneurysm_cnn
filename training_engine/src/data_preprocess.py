@@ -28,9 +28,7 @@ from monai.transforms import (
     RandFlipd,
     RandGaussianNoised,
     RandRotate90d,
-    RandRotated,
     RandScaleIntensityd,
-    RandZoomd,
     Resized,
     ScaleIntensityd,
 )
@@ -95,7 +93,6 @@ def set_seed(seed: int = 42) -> None:
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     set_determinism(seed=seed)
-    torch.backends.cudnn.deterministic = True
 
 
 def seed_worker(worker_id: int) -> None:
@@ -260,9 +257,7 @@ def get_transforms(
             RandFlipd(keys=keys, prob=0.5, spatial_axis=1),
             RandFlipd(keys=keys, prob=0.5, spatial_axis=2),
             RandRotate90d(keys=keys, prob=0.5, max_k=3, spatial_axes=(0, 1)),
-            RandRotated(keys=keys, range_x=0.26, range_y=0.26, range_z=0.26, prob=0.5),
             RandScaleIntensityd(keys=keys, factors=0.1, prob=0.5),
-            RandZoomd(keys=keys, min_zoom=0.9, max_zoom=1.1, prob=0.3, keep_size=True),
             RandGaussianNoised(keys=keys, prob=0.2, mean=0.0, std=0.05),
         ])
     ensure_keys = ["image", "tabular"] if use_tabular else ["image"]
