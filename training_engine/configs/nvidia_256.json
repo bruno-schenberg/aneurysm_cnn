@@ -1,0 +1,24 @@
+[
+    {
+        "name": "nvidia_monai256",
+        "model": "R3D18",
+        "data_path_key": "iso_256",
+        "EPOCHS": 5,
+        "EARLY_STOPPING_PATIENCE": 0,
+        "BATCH_SIZE": 2,
+        "GRAD_ACCUM_STEPS": 2,
+        "NUM_WORKERS": 2,
+        "normalization": "percentile"
+    },
+    {
+        "name": "nvidia_kinetics256",
+        "model": "R3D18_KINETICS",
+        "data_path_key": "iso_256",
+        "EPOCHS": 5,
+        "EARLY_STOPPING_PATIENCE": 0,
+        "BATCH_SIZE": 2,
+        "GRAD_ACCUM_STEPS": 2,
+        "NUM_WORKERS": 2,
+        "normalization": "percentile"
+    }
+]

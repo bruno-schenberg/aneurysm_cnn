@@ -1,0 +1,38 @@
+[
+    {
+        "name": "nnunet_enc_c90z384_freeze5",
+        "model": "NNUNET_ENC",
+        "data_path_key": "c90z_384",
+        "SPATIAL_DIMS": 3,
+        "EPOCHS": 50,
+        "BATCH_SIZE": 2,
+        "LEARNING_RATE": 1e-4,
+        "WEIGHT_DECAY": 1e-4,
+        "DROPOUT": 0.5,
+        "FREEZE_BACKBONE_EPOCHS": 5,
+        "CHECKPOINT_METRIC": "val_auc",
+        "USE_AMP": true,
+        "AMP_DTYPE": "bfloat16",
+        "EARLY_STOPPING_PATIENCE": 15,
+        "normalization": "percentile",
+        "balancing": "weighted_cost_function"
+    },
+    {
+        "name": "nnunet_enc_c90z384_nofreeze",
+        "model": "NNUNET_ENC",
+        "data_path_key": "c90z_384",
+        "SPATIAL_DIMS": 3,
+        "EPOCHS": 50,
+        "BATCH_SIZE": 2,
+        "LEARNING_RATE": 5e-5,
+        "WEIGHT_DECAY": 1e-4,
+        "DROPOUT": 0.5,
+        "FREEZE_BACKBONE_EPOCHS": 0,
+        "CHECKPOINT_METRIC": "val_auc",
+        "USE_AMP": true,
+        "AMP_DTYPE": "bfloat16",
+        "EARLY_STOPPING_PATIENCE": 15,
+        "normalization": "percentile",
+        "balancing": "weighted_cost_function"
+    }
+]

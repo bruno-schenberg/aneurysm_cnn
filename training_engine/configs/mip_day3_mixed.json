@@ -1,0 +1,28 @@
+[
+    {
+        "name": "MIP_axial_mixed_ResNet50",
+        "model": "RESNET50_2D",
+        "data_path_key": "mip_axial_mixed",
+        "SPATIAL_DIMS": 2,
+        "BATCH_SIZE": 32,
+        "LEARNING_RATE": 1e-4,
+        "EPOCHS": 100,
+        "balancing": "oversampling",
+        "CHECKPOINT_METRIC": "val_f2",
+        "USE_AMP": true,
+        "AMP_DTYPE": "bfloat16"
+    },
+    {
+        "name": "MIP_earlyfusion_mixed_ResNet50",
+        "model": "RESNET50_2D_3CH",
+        "data_path_key": "mip_3ch_mixed",
+        "SPATIAL_DIMS": 2,
+        "BATCH_SIZE": 32,
+        "LEARNING_RATE": 1e-4,
+        "EPOCHS": 100,
+        "balancing": "oversampling",
+        "CHECKPOINT_METRIC": "val_f2",
+        "USE_AMP": true,
+        "AMP_DTYPE": "bfloat16"
+    }
+]

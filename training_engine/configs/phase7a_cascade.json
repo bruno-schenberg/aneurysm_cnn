@@ -1,0 +1,21 @@
+[
+    {
+        "name": "P7A_patch_classifier_64",
+        "model": "PATCH_CLASSIFIER_3D",
+        "data_path_key": "patch_dataset_64",
+        "SPATIAL_DIMS": 3,
+        "EPOCHS": 60,
+        "BATCH_SIZE": 16,
+        "LEARNING_RATE": 1e-3,
+        "WEIGHT_DECAY": 1e-4,
+        "DROPOUT": 0.3,
+        "NUM_WORKERS": 4,
+        "CHECKPOINT_METRIC": "val_f2",
+        "USE_AMP": true,
+        "AMP_DTYPE": "bfloat16",
+        "EARLY_STOPPING_PATIENCE": 15,
+        "normalization": "percentile",
+        "balancing": "oversampling",
+        "CACHE_RATE": 1.0
+    }
+]

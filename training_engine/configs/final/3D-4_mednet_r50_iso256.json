@@ -1,0 +1,31 @@
+[
+    {
+        "name": "3D-4_mednet_r50_iso256",
+        "USE_KFOLD": true,
+        "N_SPLITS": 5,
+        "STRATIFY_BY_SCANNER": false,
+        "CHECKPOINT_METRIC": "val_auc",
+        "balancing": "oversampling",
+        "EVAL_ON_TEST": true,
+        "TEST_IDS_FILE": "dataset/test_ids.json",
+        "EXCLUSIONS_FILE": "dataset/exclusions.json",
+        "RANDOM_SEED": 42,
+        "SPLIT_SEED": 42,
+        "model": "R3D50",
+        "data_path_key": "iso_256",
+        "EPOCHS": 80,
+        "BATCH_SIZE": 2,
+        "GRAD_ACCUM_STEPS": 8,
+        "LEARNING_RATE": 0.0001,
+        "WEIGHT_DECAY": 0.0001,
+        "COSINE_T0": 80,
+        "COSINE_ETA_MIN": 1e-07,
+        "EARLY_STOPPING_PATIENCE": 25,
+        "FREEZE_BACKBONE_EPOCHS": 5,
+        "normalization": "zscore",
+        "NUM_WORKERS": 4,
+        "USE_AMP": true,
+        "AMP_DTYPE": "bfloat16",
+        "CUDNN_BENCHMARK": true
+    }
+]

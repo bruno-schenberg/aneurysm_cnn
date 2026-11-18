@@ -1,0 +1,21 @@
+[
+    {
+        "name": "modelnet10_smoke",
+        "model": "R3D18_KINETICS",
+        "data_path_key": "modelnet10_pair",
+        "EPOCHS": 3,
+        "BATCH_SIZE": 2,
+        "LEARNING_RATE": 1e-3,
+        "USE_AMP": true,
+        "USE_KFOLD": false,
+        "EARLY_STOPPING_PATIENCE": 0,
+        "CHECKPOINT_METRIC": "val_auc",
+        "CACHE_RATE": 0.0,
+        "NUM_WORKERS": 2,
+        "LR_SCHEDULER": "none",
+        "balancing": "weighted_cost_function",
+        "normalization": "none",
+        "AUG_SCALE_INTENSITY_PROB": 0.0,
+        "AUG_NOISE_PROB": 0.0
+    }
+]

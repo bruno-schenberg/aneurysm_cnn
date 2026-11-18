@@ -1,0 +1,62 @@
+[
+    {
+        "name": "MIP_frangi3d_2ch_ResNet50",
+        "model": "RESNET50_2D_2CH",
+        "data_path_key": "mip_frangi_2ch",
+        "SPATIAL_DIMS": 2,
+        "BATCH_SIZE": 32,
+        "LEARNING_RATE": 1e-4,
+        "WEIGHT_DECAY": 1e-3,
+        "EPOCHS": 100,
+        "balancing": "oversampling",
+        "CHECKPOINT_METRIC": "val_auc",
+        "FREEZE_BACKBONE_EPOCHS": 5,
+        "USE_AMP": true,
+        "AMP_DTYPE": "bfloat16"
+    },
+    {
+        "name": "MIP_frangi3d_diff_ResNet50",
+        "model": "RESNET50_2D",
+        "data_path_key": "mip_frangi_diff",
+        "SPATIAL_DIMS": 2,
+        "BATCH_SIZE": 32,
+        "LEARNING_RATE": 1e-4,
+        "WEIGHT_DECAY": 1e-3,
+        "EPOCHS": 100,
+        "balancing": "oversampling",
+        "CHECKPOINT_METRIC": "val_auc",
+        "FREEZE_BACKBONE_EPOCHS": 5,
+        "USE_AMP": true,
+        "AMP_DTYPE": "bfloat16"
+    },
+    {
+        "name": "MIP_frangi2d_2ch_ResNet50",
+        "model": "RESNET50_2D_2CH",
+        "data_path_key": "mip_frangi2d_2ch",
+        "SPATIAL_DIMS": 2,
+        "BATCH_SIZE": 32,
+        "LEARNING_RATE": 1e-4,
+        "WEIGHT_DECAY": 1e-3,
+        "EPOCHS": 100,
+        "balancing": "oversampling",
+        "CHECKPOINT_METRIC": "val_auc",
+        "FREEZE_BACKBONE_EPOCHS": 5,
+        "USE_AMP": true,
+        "AMP_DTYPE": "bfloat16"
+    },
+    {
+        "name": "MIP_frangi2d_diff_ResNet50",
+        "model": "RESNET50_2D",
+        "data_path_key": "mip_frangi2d_diff",
+        "SPATIAL_DIMS": 2,
+        "BATCH_SIZE": 32,
+        "LEARNING_RATE": 1e-4,
+        "WEIGHT_DECAY": 1e-3,
+        "EPOCHS": 100,
+        "balancing": "oversampling",
+        "CHECKPOINT_METRIC": "val_auc",
+        "FREEZE_BACKBONE_EPOCHS": 5,
+        "USE_AMP": true,
+        "AMP_DTYPE": "bfloat16"
+    }
+]

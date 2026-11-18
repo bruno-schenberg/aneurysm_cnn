@@ -1,0 +1,28 @@
+[
+    {
+        "name": "mil_modelnet10_smoke",
+        "model": "MIL_R3D18K",
+        "data_path_key": "modelnet10_pair",
+        "MIL_PATCH_SIZE": 32,
+        "EPOCHS": 5,
+        "BATCH_SIZE": 2,
+        "LEARNING_RATE": 1e-3,
+        "WEIGHT_DECAY": 1e-4,
+        "FREEZE_BACKBONE_EPOCHS": 2,
+        "GRAD_ACCUM_STEPS": 4,
+        "USE_AMP": true,
+        "AMP_DTYPE": "bfloat16",
+        "USE_KFOLD": false,
+        "TEST_SPLIT_RATIO": 0.15,
+        "VAL_SPLIT_RATIO": 0.15,
+        "EARLY_STOPPING_PATIENCE": 10,
+        "CHECKPOINT_METRIC": "val_f2",
+        "LR_SCHEDULER": "none",
+        "balancing": "weighted_cost_function",
+        "normalization": "none",
+        "AUG_SCALE_INTENSITY_PROB": 0.0,
+        "AUG_NOISE_PROB": 0.0,
+        "NUM_WORKERS": 4,
+        "CACHE_RATE": 1.0
+    }
+]

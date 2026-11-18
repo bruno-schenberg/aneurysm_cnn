@@ -1,0 +1,96 @@
+[
+    {
+        "name": "MIP_axial_ResNet50",
+        "model": "RESNET50_2D",
+        "data_path_key": "mip_axial",
+        "SPATIAL_DIMS": 2,
+        "BATCH_SIZE": 32,
+        "LEARNING_RATE": 1e-4,
+        "EPOCHS": 100,
+        "balancing": "oversampling",
+        "CHECKPOINT_METRIC": "val_f2",
+        "USE_AMP": true,
+        "AMP_DTYPE": "bfloat16"
+    },
+    {
+        "name": "MIP_coronal_ResNet50",
+        "model": "RESNET50_2D",
+        "data_path_key": "mip_coronal",
+        "SPATIAL_DIMS": 2,
+        "BATCH_SIZE": 32,
+        "LEARNING_RATE": 1e-4,
+        "EPOCHS": 100,
+        "balancing": "oversampling",
+        "CHECKPOINT_METRIC": "val_f2",
+        "USE_AMP": true,
+        "AMP_DTYPE": "bfloat16"
+    },
+    {
+        "name": "MIP_sagittal_ResNet50",
+        "model": "RESNET50_2D",
+        "data_path_key": "mip_sagittal",
+        "SPATIAL_DIMS": 2,
+        "BATCH_SIZE": 32,
+        "LEARNING_RATE": 1e-4,
+        "EPOCHS": 100,
+        "balancing": "oversampling",
+        "CHECKPOINT_METRIC": "val_f2",
+        "USE_AMP": true,
+        "AMP_DTYPE": "bfloat16"
+    },
+    {
+        "name": "MIP_earlyfusion_ResNet50",
+        "model": "RESNET50_2D_3CH",
+        "data_path_key": "mip_3ch",
+        "SPATIAL_DIMS": 2,
+        "BATCH_SIZE": 32,
+        "LEARNING_RATE": 1e-4,
+        "EPOCHS": 100,
+        "balancing": "oversampling",
+        "CHECKPOINT_METRIC": "val_f2",
+        "USE_AMP": true,
+        "AMP_DTYPE": "bfloat16"
+    },
+    {
+        "name": "MIP_latefusion_ResNet50",
+        "model": "RESNET50_2D_LATEFUSION",
+        "data_path_key": "mip_3ch",
+        "SPATIAL_DIMS": 2,
+        "BATCH_SIZE": 16,
+        "LEARNING_RATE": 1e-4,
+        "EPOCHS": 100,
+        "balancing": "oversampling",
+        "CHECKPOINT_METRIC": "val_f2",
+        "USE_AMP": true,
+        "AMP_DTYPE": "bfloat16"
+    },
+
+    {
+        "_comment": "Day 3: mixed training (our 759 + Lausanne 296 = ~1055 volumes)",
+        "name": "MIP_axial_mixed_ResNet50",
+        "model": "RESNET50_2D",
+        "data_path_key": "mip_axial_mixed",
+        "SPATIAL_DIMS": 2,
+        "BATCH_SIZE": 32,
+        "LEARNING_RATE": 1e-4,
+        "EPOCHS": 100,
+        "balancing": "oversampling",
+        "CHECKPOINT_METRIC": "val_f2",
+        "USE_AMP": true,
+        "AMP_DTYPE": "bfloat16"
+    },
+    {
+        "_comment": "Day 3: mixed training early fusion",
+        "name": "MIP_earlyfusion_mixed_ResNet50",
+        "model": "RESNET50_2D_3CH",
+        "data_path_key": "mip_3ch_mixed",
+        "SPATIAL_DIMS": 2,
+        "BATCH_SIZE": 32,
+        "LEARNING_RATE": 1e-4,
+        "EPOCHS": 100,
+        "balancing": "oversampling",
+        "CHECKPOINT_METRIC": "val_f2",
+        "USE_AMP": true,
+        "AMP_DTYPE": "bfloat16"
+    }
+]

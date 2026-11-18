@@ -1,0 +1,33 @@
+[
+    {
+        "name": "3D-8_swin_ssl_c90z384",
+        "USE_KFOLD": false,
+        "N_SPLITS": 5,
+        "STRATIFY_BY_SCANNER": false,
+        "CHECKPOINT_METRIC": "val_auc",
+        "balancing": "oversampling",
+        "EVAL_ON_TEST": true,
+        "TEST_IDS_FILE": "dataset/test_ids.json",
+        "EXCLUSIONS_FILE": "dataset/exclusions.json",
+        "RANDOM_SEED": 42,
+        "SPLIT_SEED": 42,
+        "model": "SWIN_ENC",
+        "data_path_key": "c90z_384",
+        "EPOCHS": 50,
+        "BATCH_SIZE": 1,
+        "GRAD_ACCUM_STEPS": 16,
+        "LEARNING_RATE": 0.0001,
+        "WEIGHT_DECAY": 0.0001,
+        "COSINE_T0": 80,
+        "COSINE_ETA_MIN": 1e-07,
+        "EARLY_STOPPING_PATIENCE": 15,
+        "FREEZE_BACKBONE_EPOCHS": 5,
+        "normalization": "percentile",
+        "NUM_WORKERS": 4,
+        "USE_AMP": true,
+        "AMP_DTYPE": "bfloat16",
+        "CUDNN_BENCHMARK": true,
+        "DROPOUT": 0.5,
+        "WARMUP_EPOCHS": 5
+    }
+]

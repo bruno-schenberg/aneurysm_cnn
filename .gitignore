@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+.pytest_cache/
+
+# Data and outputs: no data ships with this repo, keep yours out of git
+dataset/
+sample_dataset/
+data_engine/reports/
+training_engine/experiments/
+training_engine/ensemble_out/
+training_engine/thesis_stats_out/
+training_engine/scripts/diagnostics/output/
+training_engine/configs/_split/
+segmentation/evaluation*/

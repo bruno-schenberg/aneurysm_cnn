@@ -1,0 +1,28 @@
+[
+    {
+        "name": "P7C_r3d18k_vessel_crop_256",
+        "model": "R3D18_KINETICS",
+        "data_path_key": "vessel_crop_256",
+        "SPATIAL_DIMS": 3,
+        "normalization": "percentile",
+        "LEARNING_RATE": 3e-5,
+        "LR_SCHEDULER": "cosine",
+        "COSINE_T0": 80,
+        "COSINE_T_MULT": 1,
+        "COSINE_ETA_MIN": 1e-7,
+        "FREEZE_BACKBONE_EPOCHS": 5,
+        "BATCH_SIZE": 2,
+        "GRAD_ACCUM_STEPS": 4,
+        "NUM_WORKERS": 2,
+        "USE_AMP": true,
+        "AMP_DTYPE": "float16",
+        "CUDNN_BENCHMARK": false,
+        "EARLY_STOPPING_PATIENCE": 25,
+        "CHECKPOINT_METRIC": "val_f2",
+        "EVAL_ON_TEST": false,
+        "EPOCHS": 80,
+        "balancing": "oversampling",
+        "LOSS_FN": "cross_entropy",
+        "CACHE_RATE": 1.0
+    }
+]

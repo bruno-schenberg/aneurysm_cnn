@@ -1,0 +1,41 @@
+[
+    {
+        "name": "monai256_fp16_bs4",
+        "model": "R3D18",
+        "data_path_key": "iso_256",
+        "EPOCHS": 2,
+        "EARLY_STOPPING_PATIENCE": 0,
+        "BATCH_SIZE": 4,
+        "GRAD_ACCUM_STEPS": 2,
+        "NUM_WORKERS": 2,
+        "AMP_DTYPE": "float16",
+        "CUDNN_BENCHMARK": true,
+        "normalization": "percentile"
+    },
+    {
+        "name": "monai256_fp16_nobench",
+        "model": "R3D18",
+        "data_path_key": "iso_256",
+        "EPOCHS": 2,
+        "EARLY_STOPPING_PATIENCE": 0,
+        "BATCH_SIZE": 2,
+        "GRAD_ACCUM_STEPS": 2,
+        "NUM_WORKERS": 2,
+        "AMP_DTYPE": "float16",
+        "CUDNN_BENCHMARK": false,
+        "normalization": "percentile"
+    },
+    {
+        "name": "monai256_fp16_bs4_nobench",
+        "model": "R3D18",
+        "data_path_key": "iso_256",
+        "EPOCHS": 2,
+        "EARLY_STOPPING_PATIENCE": 0,
+        "BATCH_SIZE": 4,
+        "GRAD_ACCUM_STEPS": 2,
+        "NUM_WORKERS": 2,
+        "AMP_DTYPE": "float16",
+        "CUDNN_BENCHMARK": false,
+        "normalization": "percentile"
+    }
+]

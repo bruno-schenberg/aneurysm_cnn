@@ -1,0 +1,19 @@
+[
+    {
+        "name": "MIP_earlyfusion_top90_kfold",
+        "model": "RESNET50_2D_3CH",
+        "data_path_key": "mip_3ch_top90",
+        "SPATIAL_DIMS": 2,
+        "BATCH_SIZE": 32,
+        "LEARNING_RATE": 1e-4,
+        "WEIGHT_DECAY": 1e-3,
+        "EPOCHS": 100,
+        "balancing": "oversampling",
+        "CHECKPOINT_METRIC": "val_auc",
+        "FREEZE_BACKBONE_EPOCHS": 5,
+        "USE_AMP": true,
+        "AMP_DTYPE": "bfloat16",
+        "USE_KFOLD": true,
+        "N_SPLITS": 5
+    }
+]

@@ -1,0 +1,26 @@
+[
+    {
+        "name": "2D-8_n4_latefusion_512",
+        "USE_KFOLD": true,
+        "N_SPLITS": 5,
+        "STRATIFY_BY_SCANNER": false,
+        "CHECKPOINT_METRIC": "val_auc",
+        "balancing": "oversampling",
+        "EVAL_ON_TEST": true,
+        "TEST_IDS_FILE": "dataset/test_ids.json",
+        "EXCLUSIONS_FILE": "dataset/exclusions.json",
+        "RANDOM_SEED": 42,
+        "SPLIT_SEED": 42,
+        "model": "RESNET50_2D_LATEFUSION",
+        "SPATIAL_DIMS": 2,
+        "BATCH_SIZE": 9,
+        "LEARNING_RATE": 0.0001,
+        "WEIGHT_DECAY": 0.001,
+        "EPOCHS": 100,
+        "FREEZE_BACKBONE_EPOCHS": 5,
+        "USE_AMP": true,
+        "AMP_DTYPE": "bfloat16",
+        "data_path_key": "mip_grid_n4/vessel90_stretch_512",
+        "GRAD_ACCUM_STEPS": 2
+    }
+]

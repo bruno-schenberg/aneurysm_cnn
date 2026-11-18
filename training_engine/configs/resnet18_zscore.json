@@ -1,0 +1,32 @@
+[
+    {
+        "name": "R3D18_iso128_zscore",
+        "model": "R3D18",
+        "data_path_key": "iso_128",
+        "STRATIFY_BY_SCANNER": true,
+        "normalization": "zscore"
+    },
+    {
+        "name": "R3D18_iso256_zscore",
+        "model": "R3D18",
+        "data_path_key": "iso_256",
+        "STRATIFY_BY_SCANNER": true,
+        "normalization": "zscore",
+        "NUM_WORKERS": 2
+    },
+    {
+        "name": "R3D18_KINETICS_iso128_zscore",
+        "model": "R3D18_KINETICS",
+        "data_path_key": "iso_128",
+        "STRATIFY_BY_SCANNER": true,
+        "normalization": "zscore"
+    },
+    {
+        "name": "R3D18_KINETICS_iso256_zscore",
+        "model": "R3D18_KINETICS",
+        "data_path_key": "iso_256",
+        "STRATIFY_BY_SCANNER": true,
+        "normalization": "zscore",
+        "NUM_WORKERS": 2
+    }
+]

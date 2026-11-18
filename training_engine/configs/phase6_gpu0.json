@@ -1,0 +1,63 @@
+[
+    {
+        "name": "P6E_efficientnet_b4_top90",
+        "model": "EFFICIENTNET_B4_3CH",
+        "data_path_key": "mip_3ch_top90",
+        "SPATIAL_DIMS": 2,
+        "BATCH_SIZE": 16,
+        "LEARNING_RATE": 1e-4,
+        "WEIGHT_DECAY": 1e-3,
+        "EPOCHS": 100,
+        "balancing": "oversampling",
+        "CHECKPOINT_METRIC": "val_auc",
+        "FREEZE_BACKBONE_EPOCHS": 5,
+        "USE_AMP": true,
+        "AMP_DTYPE": "bfloat16"
+    },
+    {
+        "name": "P6E_convnext_t_top90",
+        "model": "CONVNEXT_T_3CH",
+        "data_path_key": "mip_3ch_top90",
+        "SPATIAL_DIMS": 2,
+        "BATCH_SIZE": 32,
+        "LEARNING_RATE": 1e-4,
+        "WEIGHT_DECAY": 1e-3,
+        "EPOCHS": 100,
+        "balancing": "oversampling",
+        "CHECKPOINT_METRIC": "val_auc",
+        "FREEZE_BACKBONE_EPOCHS": 5,
+        "USE_AMP": true,
+        "AMP_DTYPE": "bfloat16"
+    },
+    {
+        "name": "P6A_resnet50_top90_512",
+        "model": "RESNET50_2D_3CH",
+        "data_path_key": "mip_3ch_top90_512",
+        "SPATIAL_DIMS": 2,
+        "BATCH_SIZE": 16,
+        "LEARNING_RATE": 1e-4,
+        "WEIGHT_DECAY": 1e-3,
+        "EPOCHS": 100,
+        "balancing": "oversampling",
+        "CHECKPOINT_METRIC": "val_auc",
+        "FREEZE_BACKBONE_EPOCHS": 5,
+        "USE_AMP": true,
+        "AMP_DTYPE": "bfloat16"
+    },
+    {
+        "name": "P6B_thinslab5_resnet50",
+        "model": "RESNET50_2D_NCH",
+        "data_path_key": "mip_thinslab5",
+        "SPATIAL_DIMS": 2,
+        "IN_CHANNELS": 5,
+        "BATCH_SIZE": 32,
+        "LEARNING_RATE": 1e-4,
+        "WEIGHT_DECAY": 1e-3,
+        "EPOCHS": 100,
+        "balancing": "oversampling",
+        "CHECKPOINT_METRIC": "val_auc",
+        "FREEZE_BACKBONE_EPOCHS": 5,
+        "USE_AMP": true,
+        "AMP_DTYPE": "bfloat16"
+    }
+]

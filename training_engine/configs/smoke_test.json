@@ -1,0 +1,14 @@
+[
+    {
+        "name": "smoke_R3D18_iso128",
+        "model": "R3D18",
+        "data_path_key": "sample_iso_128",
+        "EPOCHS": 2,
+        "BATCH_SIZE": 2,
+        "USE_KFOLD": false,
+        "EARLY_STOPPING_PATIENCE": 0,
+        "CACHE_RATE": 0.0,
+        "NUM_WORKERS": 2,
+        "LR_SCHEDULER": "none"
+    }
+]

@@ -1,0 +1,21 @@
+[
+    {
+        "name": "ConvLSTM_c90z384",
+        "model": "CONVLSTM",
+        "data_path_key": "c90z_384",
+        "SPATIAL_DIMS": 3,
+        "BATCH_SIZE": 1,
+        "GRAD_ACCUM_STEPS": 2,
+        "LEARNING_RATE": 1e-4,
+        "WEIGHT_DECAY": 1e-3,
+        "EPOCHS": 50,
+        "balancing": "oversampling",
+        "CHECKPOINT_METRIC": "val_auc",
+        "FREEZE_BACKBONE_EPOCHS": 3,
+        "USE_AMP": true,
+        "AMP_DTYPE": "bfloat16",
+        "EARLY_STOPPING_PATIENCE": 10,
+        "NUM_WORKERS": 2,
+        "CACHE_RATE": 0.0
+    }
+]

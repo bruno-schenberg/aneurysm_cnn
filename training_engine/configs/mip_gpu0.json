@@ -1,0 +1,41 @@
+[
+    {
+        "name": "MIP_axial_ResNet50",
+        "model": "RESNET50_2D",
+        "data_path_key": "mip_axial",
+        "SPATIAL_DIMS": 2,
+        "BATCH_SIZE": 32,
+        "LEARNING_RATE": 1e-4,
+        "EPOCHS": 100,
+        "balancing": "oversampling",
+        "CHECKPOINT_METRIC": "val_f2",
+        "USE_AMP": true,
+        "AMP_DTYPE": "bfloat16"
+    },
+    {
+        "name": "MIP_coronal_ResNet50",
+        "model": "RESNET50_2D",
+        "data_path_key": "mip_coronal",
+        "SPATIAL_DIMS": 2,
+        "BATCH_SIZE": 32,
+        "LEARNING_RATE": 1e-4,
+        "EPOCHS": 100,
+        "balancing": "oversampling",
+        "CHECKPOINT_METRIC": "val_f2",
+        "USE_AMP": true,
+        "AMP_DTYPE": "bfloat16"
+    },
+    {
+        "name": "MIP_sagittal_ResNet50",
+        "model": "RESNET50_2D",
+        "data_path_key": "mip_sagittal",
+        "SPATIAL_DIMS": 2,
+        "BATCH_SIZE": 32,
+        "LEARNING_RATE": 1e-4,
+        "EPOCHS": 100,
+        "balancing": "oversampling",
+        "CHECKPOINT_METRIC": "val_f2",
+        "USE_AMP": true,
+        "AMP_DTYPE": "bfloat16"
+    }
+]

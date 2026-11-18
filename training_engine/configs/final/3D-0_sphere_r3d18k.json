@@ -1,0 +1,33 @@
+[
+    {
+        "name": "3D-0_sphere_r3d18k",
+        "USE_KFOLD": false,
+        "N_SPLITS": 5,
+        "STRATIFY_BY_SCANNER": false,
+        "CHECKPOINT_METRIC": "val_auc",
+        "balancing": "oversampling",
+        "EVAL_ON_TEST": true,
+        "TEST_IDS_FILE": "dataset/test_ids.json",
+        "EXCLUSIONS_FILE": "dataset/exclusions.json",
+        "RANDOM_SEED": 42,
+        "SPLIT_SEED": 42,
+        "model": "R3D18_KINETICS",
+        "data_path_key": "iso_256",
+        "EPOCHS": 80,
+        "BATCH_SIZE": 4,
+        "GRAD_ACCUM_STEPS": 4,
+        "LEARNING_RATE": 0.0001,
+        "WEIGHT_DECAY": 0.0001,
+        "COSINE_T0": 80,
+        "COSINE_ETA_MIN": 1e-07,
+        "EARLY_STOPPING_PATIENCE": 25,
+        "FREEZE_BACKBONE_EPOCHS": 5,
+        "normalization": "percentile",
+        "NUM_WORKERS": 4,
+        "USE_AMP": true,
+        "AMP_DTYPE": "bfloat16",
+        "CUDNN_BENCHMARK": true,
+        "ADD_SYNTHETIC_SPHERE": true,
+        "SYNTHETIC_SPHERE_RADIUS": 2.5
+    }
+]

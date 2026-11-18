@@ -1,0 +1,50 @@
+[
+    {
+        "name": "smoke_R3D18K_128_sphere",
+        "model": "R3D18_KINETICS",
+        "data_path_key": "sample_iso_128",
+        "ADD_SYNTHETIC_SPHERE": true,
+        "EPOCHS": 2,
+        "BATCH_SIZE": 2,
+        "USE_KFOLD": false,
+        "EARLY_STOPPING_PATIENCE": 0,
+        "CACHE_RATE": 0.0,
+        "NUM_WORKERS": 2,
+        "LR_SCHEDULER": "none"
+    },
+    {
+        "name": "R3D18K_128_sphere",
+        "model": "R3D18_KINETICS",
+        "data_path_key": "iso_128",
+        "ADD_SYNTHETIC_SPHERE": true,
+        "LEARNING_RATE": 3e-5,
+        "LR_SCHEDULER": "cosine",
+        "COSINE_T0": 80,
+        "FREEZE_BACKBONE_EPOCHS": 5,
+        "GRAD_ACCUM_STEPS": 4,
+        "balancing": "oversampling",
+        "LOSS_FN": "cross_entropy",
+        "EARLY_STOPPING_PATIENCE": 25,
+        "CHECKPOINT_METRIC": "val_f2",
+        "EVAL_ON_TEST": false,
+        "EPOCHS": 80
+    },
+    {
+        "name": "R3D18K_128_sphere_r5",
+        "model": "R3D18_KINETICS",
+        "data_path_key": "iso_128",
+        "ADD_SYNTHETIC_SPHERE": true,
+        "SYNTHETIC_SPHERE_RADIUS": 5.0,
+        "LEARNING_RATE": 3e-5,
+        "LR_SCHEDULER": "cosine",
+        "COSINE_T0": 80,
+        "FREEZE_BACKBONE_EPOCHS": 5,
+        "GRAD_ACCUM_STEPS": 4,
+        "balancing": "oversampling",
+        "LOSS_FN": "cross_entropy",
+        "EARLY_STOPPING_PATIENCE": 25,
+        "CHECKPOINT_METRIC": "val_f2",
+        "EVAL_ON_TEST": false,
+        "EPOCHS": 80
+    }
+]

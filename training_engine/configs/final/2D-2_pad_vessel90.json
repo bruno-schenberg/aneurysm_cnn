@@ -1,0 +1,25 @@
+[
+    {
+        "name": "2D-2_pad_vessel90",
+        "USE_KFOLD": true,
+        "N_SPLITS": 5,
+        "STRATIFY_BY_SCANNER": false,
+        "CHECKPOINT_METRIC": "val_auc",
+        "balancing": "oversampling",
+        "EVAL_ON_TEST": true,
+        "TEST_IDS_FILE": "dataset/test_ids.json",
+        "EXCLUSIONS_FILE": "dataset/exclusions.json",
+        "RANDOM_SEED": 42,
+        "SPLIT_SEED": 42,
+        "model": "RESNET50_2D_3CH",
+        "SPATIAL_DIMS": 2,
+        "BATCH_SIZE": 32,
+        "LEARNING_RATE": 0.0001,
+        "WEIGHT_DECAY": 0.001,
+        "EPOCHS": 100,
+        "FREEZE_BACKBONE_EPOCHS": 5,
+        "USE_AMP": true,
+        "AMP_DTYPE": "bfloat16",
+        "data_path_key": "mip_grid/vessel90_pad_384"
+    }
+]

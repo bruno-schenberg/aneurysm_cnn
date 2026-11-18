@@ -1,0 +1,50 @@
+[
+    {
+        "name": "MIP_axial_mixed_v2",
+        "model": "RESNET50_2D",
+        "data_path_key": "mip_axial_mixed",
+        "EXTERNAL_DATA_PREFIX": "laus_",
+        "SPATIAL_DIMS": 2,
+        "BATCH_SIZE": 32,
+        "LEARNING_RATE": 1e-4,
+        "WEIGHT_DECAY": 1e-3,
+        "EPOCHS": 100,
+        "balancing": "oversampling",
+        "CHECKPOINT_METRIC": "val_auc",
+        "FREEZE_BACKBONE_EPOCHS": 5,
+        "USE_AMP": true,
+        "AMP_DTYPE": "bfloat16"
+    },
+    {
+        "name": "MIP_earlyfusion_mixed_v2",
+        "model": "RESNET50_2D_3CH",
+        "data_path_key": "mip_3ch_mixed",
+        "EXTERNAL_DATA_PREFIX": "laus_",
+        "SPATIAL_DIMS": 2,
+        "BATCH_SIZE": 32,
+        "LEARNING_RATE": 1e-4,
+        "WEIGHT_DECAY": 1e-3,
+        "EPOCHS": 100,
+        "balancing": "oversampling",
+        "CHECKPOINT_METRIC": "val_auc",
+        "FREEZE_BACKBONE_EPOCHS": 5,
+        "USE_AMP": true,
+        "AMP_DTYPE": "bfloat16"
+    },
+    {
+        "name": "MIP_sagittal_mixed",
+        "model": "RESNET50_2D",
+        "data_path_key": "mip_sagittal_mixed",
+        "EXTERNAL_DATA_PREFIX": "laus_",
+        "SPATIAL_DIMS": 2,
+        "BATCH_SIZE": 32,
+        "LEARNING_RATE": 1e-4,
+        "WEIGHT_DECAY": 1e-3,
+        "EPOCHS": 100,
+        "balancing": "oversampling",
+        "CHECKPOINT_METRIC": "val_auc",
+        "FREEZE_BACKBONE_EPOCHS": 5,
+        "USE_AMP": true,
+        "AMP_DTYPE": "bfloat16"
+    }
+]
