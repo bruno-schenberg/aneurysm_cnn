@@ -1,5 +1,7 @@
 # CNNs for Intracranial Aneurysm Detection on TOF-MRA
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24350820.svg)](https://doi.org/10.5281/zenodo.24350820)
+
 A master's thesis project implementing a full end-to-end pipeline for training and evaluating 2D and 3D CNNs that detect intracranial aneurysms in TOF-MRA (time-of-flight magnetic resonance angiography) exams, with exam-level labels only.
 
 The system is split into two independent stages: a **data engine** that converts raw DICOM archives into standardised, resampled NIfTI volumes and 2D representations (MIP, thin-slab, Frangi), and a **training engine** that trains, cross-validates, and evaluates classification models across configurable experiments. Both engines are thin project-specific wrappers around two reusable libraries:

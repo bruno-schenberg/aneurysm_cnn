@@ -12,6 +12,7 @@ authors:
   - family-names: Schenberg
     given-names: Bruno
 version: 1.0.0
+doi: 10.5281/zenodo.24350820
 date-released: 2026-11-18
 license: MIT
 repository-code: "https://github.com/bruno-schenberg/aneurysm_cnn"
