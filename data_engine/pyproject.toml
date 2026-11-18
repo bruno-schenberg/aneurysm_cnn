@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "DICOM -> NIfTI preprocessing pipeline for aneurysm MRA data"
 requires-python = ">=3.10"
 dependencies = [
-    "medprep @ git+https://github.com/bruno-schenberg/medprep.git",
+    "medprep @ git+https://github.com/bruno-schenberg/medprep.git@v0.1.0",
     "pydicom>=2.4",
     "pandas>=2.0",
     "monai>=1.3",

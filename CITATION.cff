@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using these metadata."
+type: software
+title: "CNNs for Intracranial Aneurysm Detection on TOF-MRA"
+abstract: >-
+  Code for a master's thesis on intracranial aneurysm detection in TOF-MRA
+  with exam-level labels: a DICOM to NIfTI/MIP data pipeline, a 2D/3D CNN
+  training engine with patient-grouped cross-validation, and a zero-shot
+  nnU-Net baseline with a score-level ensemble. No data or trained weights
+  are included.
+authors:
+  - family-names: Schenberg
+    given-names: Bruno
+version: 1.0.0
+date-released: 2026-11-18
+license: MIT
+repository-code: "https://github.com/bruno-schenberg/aneurysm_cnn"
+keywords:
+  - intracranial aneurysm
+  - TOF-MRA
+  - deep learning
+  - medical imaging
+  - maximum intensity projection
